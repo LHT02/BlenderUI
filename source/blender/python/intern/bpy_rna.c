@@ -8810,7 +8810,7 @@ void pyrna_free_types(void)
  * the Python class this should not be so tricky, but changing the references as
  * you'd expect when changing ownership crashes blender on exit so I had to comment out
  * the #Py_DECREF. This is not so bad because the leak only happens when re-registering
- * (continuously running `SCRIPT_OT_reload`).
+ * (continuously re-registering modules).
  * - Should still be fixed - Campbell
  */
 PyDoc_STRVAR(pyrna_register_class_doc,

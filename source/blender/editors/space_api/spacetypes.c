@@ -67,15 +67,13 @@ void ED_spacetypes_init(void)
    * created at all - and an unregistered space type cannot be reached from the
    * editor-type menu, from the operator search menu, or from Python.
    *
-   * Four registrations are kept for machinery rather than for a user:
-   * `script` (SPACE_SCRIPT) is a deprecated space id whose only purpose is to
-   * carry the script operators, `info` is the space type the .blend reader
-   * falls back to for an area with no space data at all, and `topbar` /
-   * `statusbar` are the global areas. None of them is offered as an editor. */
+   * Three registrations are kept for machinery rather than for a user: `info`
+   * is the space type the .blend reader falls back to for an area with no
+   * space data at all, and `topbar` / `statusbar` are the global areas. None of
+   * them is offered as an editor. */
   ED_spacetype_image();
   ED_spacetype_info();
   ED_spacetype_file();
-  ED_spacetype_script();
   ED_spacetype_text();
   ED_spacetype_sequencer();
   ED_spacetype_console();

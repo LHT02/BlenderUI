@@ -214,8 +214,8 @@ gates that matter:
 
 * **The registry.** `ED_spacetypes_init()` no longer creates the 3D viewport,
   node editor, properties, outliner, clip editor, dope sheet, graph editor, NLA
-  editor or spreadsheet space types. An unregistered space type cannot be
-  opened, cannot be scripted, and is not offered by the operator search menu.
+  editor, spreadsheet or script space types. An unregistered space type cannot
+  be opened, cannot be scripted, and is not offered by the operator search menu.
 * **The enum.** `rna_enum_space_type_items` drives the Editor Type menu, the
   `SCREEN_OT_space_type_set_or_cycle` operator, `Area.type`, `Area.ui_type` and
   `Panel.bl_space_type` - it is the product's editor set, and it now names only
@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 4 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph` (947 KB) |
+      | Editor modules deleted | 5 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script` (958 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -960,6 +960,36 @@ The work is staged so the build stays green at every step.
 
       No keymap data is involved - there is no `constraint.*` entry in either
       keymap file - which is why the usual signals said nothing.
+
+      ### `editors/space_script/` is deleted, keymap data included
+
+      The script space was the last space type registered for machinery rather
+      than for a user: a pre-2.5 view whose `script_main_region_draw()` body had
+      been commented out since 2.5, kept - per the comment in `ED_spacetypes_init`
+      - only to carry two operators. Deleted whole (11 KB: `space_script.c`,
+      `script_ops.c`, `script_edit.c`, `script_intern.h`), together with the
+      `SpaceScript` DNA struct, the `SCRIPT_SET_NULL` macro and the
+      `SPACE_SCRIPT = 14` enumerator.
+
+      It is the bag method again, and the keymap is the part that bites. The
+      `Script` keymap function never existed in `keymap_data` - the space's own
+      keymap was always empty, so the count is unchanged at 116 - but `km_screen`
+      carried `("script.reload", {"type": 'F8', ...})`. Deleting the operator and
+      leaving that binding is exactly the macro failure recorded earlier in this
+      file: a keyconfig that aborts part way and leaves single-digit keymaps.
+      The binding, `wm_keymap_utils.c`'s `STRPREFIX(opname, "SCRIPT_OT")` special
+      case, and the top bar's "System > Reload Scripts" menu entry all went in
+      the same step.
+
+      One thing deliberately kept: `WindowManager.tag_script_reload()`. It is not
+      the operator's private machinery - `bpy/utils/__init__.py` calls it from
+      `register_module` / `unregister_module` - so it stays and only its comment
+      changed. Likewise `bpy.ops.script.reload` is gone but nothing in `scripts/`
+      called it except a documentation index and that one menu entry.
+
+      `SPACE_SCRIPT = 14` was removed rather than reused. Every value in that
+      enum is explicit, so 14 is now an unused slot and 15/16/18 keep their
+      meaning without a renumbering pass.
 
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 

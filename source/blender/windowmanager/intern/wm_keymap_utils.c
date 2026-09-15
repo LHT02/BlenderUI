@@ -388,10 +388,6 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
   else if (STRPREFIX(opname, "NLA_OT")) {
     km = WM_keymap_find_all(wm, "NLA Editor", sl->spacetype, 0);
   }
-  /* Script */
-  else if (STRPREFIX(opname, "SCRIPT_OT")) {
-    km = WM_keymap_find_all(wm, "Script", sl->spacetype, 0);
-  }
   /* Text */
   else if (STRPREFIX(opname, "TEXT_OT")) {
     km = WM_keymap_find_all(wm, "Text", sl->spacetype, 0);

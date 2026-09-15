@@ -1495,29 +1495,6 @@ typedef struct Script {
   /** 1024 = FILE_MAX. */
   char scriptarg[256];
 } Script;
-#define SCRIPT_SET_NULL(_script) \
-  _script->py_draw = _script->py_event = _script->py_button = _script->py_browsercallback = \
-      _script->py_globaldict = NULL; \
-  _script->flags = 0
-
-/** Script View - Obsolete (pre 2.5). */
-typedef struct SpaceScript {
-  SpaceLink *next, *prev;
-  /** Storage of regions for inactive spaces. */
-  ListBase regionbase;
-  char spacetype;
-  char link_flag;
-  char _pad0[6];
-  /* End 'SpaceLink' header. */
-
-  struct Script *script;
-
-  short flags, menunr;
-  char _pad1[4];
-
-  void *but_refs;
-} SpaceScript;
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -2063,8 +2040,9 @@ typedef enum eSpace_Type {
 #endif
   SPACE_ACTION = 12,
   SPACE_NLA = 13,
-  /* TODO: fully deprecate */
-  SPACE_SCRIPT = 14, /* Deprecated */
+  /* 14 was `SPACE_SCRIPT`, a pre-2.5 view whose only remaining job was to carry
+   * `SCRIPT_OT_*`. BLUI deleted the space, its operators and its F8 binding;
+   * the slot stays reserved so the other explicit values keep their meaning. */
 #ifdef DNA_DEPRECATED_ALLOW
   SPACE_TIME = 15, /* Deprecated */
 #endif

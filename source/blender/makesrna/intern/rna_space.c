@@ -582,7 +582,6 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
       return &RNA_SpaceClipEditor;
 
       /* Currently no type info. */
-    case SPACE_SCRIPT:
     case SPACE_EMPTY:
     case SPACE_TOPBAR:
     case SPACE_STATUSBAR:

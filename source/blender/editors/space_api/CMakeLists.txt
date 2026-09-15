@@ -30,7 +30,6 @@ set(LIB
   bf_editor_space_info
   bf_editor_space_node
   bf_editor_space_outliner
-  bf_editor_space_script
   bf_editor_space_sequencer
   bf_editor_space_statusbar
   bf_editor_space_text

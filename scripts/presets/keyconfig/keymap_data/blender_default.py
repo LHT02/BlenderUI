@@ -750,7 +750,6 @@ def km_screen(params):
             ("screen.repeat_history", {"type": 'R', "value": 'PRESS', "ctrl": True, "alt": True}, None),
             ("screen.region_flip", {"type": 'F5', "value": 'PRESS'}, None),
             ("screen.redo_last", {"type": 'F6', "value": 'PRESS'}, None),
-            ("script.reload", {"type": 'F8', "value": 'PRESS'}, None),
             ("screen.userpref_show", {"type": 'U', "value": 'PRESS', "ctrl": True, "alt": True}, None),
         ])
 

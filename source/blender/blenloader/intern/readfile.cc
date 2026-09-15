@@ -2555,18 +2555,6 @@ static void lib_link_workspace_layout_restore(IDNameLib_Map *id_map,
               st->text = static_cast<Text *>(newmain->texts.first);
             }
           } break;
-          case SPACE_SCRIPT: {
-            SpaceScript *scpt = reinterpret_cast<SpaceScript *>(sl);
-
-            scpt->script = static_cast<Script *>(
-                restore_pointer_by_name(id_map, reinterpret_cast<ID *>(scpt->script), USER_REAL));
-
-            // screen->script = nullptr; /* 2.45 set to null, better re-run the script. */
-            if (scpt->script) {
-              SCRIPT_SET_NULL(scpt->script);
-            }
-            break;
-          }
           case SPACE_OUTLINER: {
             SpaceOutliner *space_outliner = reinterpret_cast<SpaceOutliner *>(sl);
 

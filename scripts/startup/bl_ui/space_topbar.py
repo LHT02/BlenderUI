@@ -338,10 +338,6 @@ class TOPBAR_MT_blender_system(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("script.reload")
-
-        layout.separator()
-
         layout.operator("wm.memory_statistics")
         layout.operator("wm.debug_menu")
         layout.operator_menu_enum("wm.redraw_timer", "type")

@@ -948,7 +948,7 @@ void RNA_api_wm(StructRNA *srna)
 
   RNA_def_function(srna, "print_undo_steps", "rna_WindowManager_print_undo_steps");
 
-  /* Used by (#SCRIPT_OT_reload). */
+  /* Used by `bpy.utils.register_module` / `unregister_module`. */
   func = RNA_def_function(srna, "tag_script_reload", "rna_WindowManager_tag_script_reload");
   RNA_def_function_ui_description(
       func, "Tag for refreshing the interface after scripts have been reloaded");
