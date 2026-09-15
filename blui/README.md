@@ -888,6 +888,32 @@ The work is staged so the build stays green at every step.
       feature retirement, not a registration cut - and it needs the enum, the
       mode selector, the overlay and the transform code changed together.
 
+      ### The object bag cannot be taken family by family either
+
+      `ED_operatortypes_object()` is 223 operators across six prefixes, so the
+      obvious next move was to take one family at a time by editing the
+      individual `WM_operatortype_append` lines inside it. Tried it on the
+      smallest, `CONSTRAINT_OT_*` (14).
+
+      It fails for a reason that has nothing to do with constraints. The
+      operators are named by **`interface_templates.cc`** - `CONSTRAINT_OT_apply`,
+      `_copy`, `_copy_to_selected`, `_move_to_index`, `_delete`, and a
+      `WM_operatortype_find("CONSTRAINT_OT_move_to_index")` that would get NULL
+      back. That file is the interface layer, and BLUI keeps it.
+
+      It is the **template-layer trap** again, the same one that made
+      `space_buttons` and `space_clip` expensive: an operator reached through a
+      UI template rather than through a header or a keymap. The object bag's
+      families are wired into the interface templates for constraints, and
+      presumably for the rest.
+
+      So the object bag is not a set of six removable families. It is one
+      block, and it comes out with `interface_templates.cc`'s constraint
+      template code or not at all.
+
+      No keymap data is involved - there is no `constraint.*` entry in either
+      keymap file - which is why the usual signals said nothing.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
