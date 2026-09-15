@@ -1007,6 +1007,50 @@ The work is staged so the build stays green at every step.
       unconditionally true once both are gone, so each one needs a decision
       rather than a deletion. That is why `space_script` went first.
 
+      ### The undo registry was the data editors' one shared edge
+
+      `editors/lattice/` looked like a 40 KB module whose public header was down
+      to a single function, `ED_lattice_undosys_type()`. That is the shape of the
+      whole data-editor layer - `ED_curves.h` is down to two functions, one of
+      them its undo type. `editors/undo/undo_system_types.cc` was registering
+      thirteen undo types, ten of which belong to editors BLUI does not have:
+      armature, curve, font, lattice, metaball, mesh, curves, sculpt, particle
+      and paint-curve. None of them could ever be pushed, because none of those
+      editors can be entered.
+
+      Those ten rows are gone. `ED_undosys_type_init()` now registers three -
+      image, text, and the memfile fallback that has to stay last.
+
+      The registry was the only edge the whole layer shared, so removing it drops
+      every data editor's consumer count by exactly one. It is not by itself
+      enough to delete any of them, and that is the finding worth keeping: they
+      are all riders on the same two modules. Measured after the cut:
+
+      | Module | Size | Consumers left |
+      | --- | --- | --- |
+      | `lattice` | 40 KB | `space_view3d/view3d_select.cc`, 4 sites |
+      | `metaball` | 35 KB | `space_view3d`, 1 site; `object`, 4 sites |
+
+      (The other four - `armature` 583 KB, `mesh` 1334 KB, `curve` 486 KB,
+      `curves` 84 KB - were not re-measured site by site. Do that before quoting
+      a number for them; the two above are the ones actually counted.)
+
+      Every remaining consumer is itself on the deletion list, so the order is
+      forced and it is the reverse of the intuitive one: **`object` and
+      `space_view3d` have to go first** - they are the top of this cone, not the
+      bottom - and the data editors follow them for free, the same way uvedit
+      follows `mesh` and `transform`. Roughly 2.5 MB rides on those two.
+
+      Two details a later pass should not lose:
+
+      - `BKE_UNDOSYS_TYPE_SCULPT`, `_PARTICLE` and `_PAINTCURVE` are now declared
+        and defined but never assigned, because `sculpt_undo.cc` and
+        `paint_curve_undo.cc` still compare against them. They are null at
+        runtime and harmless; they go with `sculpt_paint`.
+      - Each module still carries its now-uncalled `ED_*_undosys_type()`
+        definition. That is dead code, but it belongs to the module that will
+        take it away, so it was left in place rather than deleted piecemeal.
+
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 
       CORRECTED. This section used to say uvedit was "four calls short", on the

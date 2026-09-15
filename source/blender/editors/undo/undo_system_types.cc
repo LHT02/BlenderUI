@@ -8,15 +8,7 @@
 
 #include "BLI_utildefines.h"
 
-#include "ED_armature.h"
-#include "ED_curve.h"
-#include "ED_curves.h"
-#include "ED_lattice.h"
-#include "ED_mball.h"
-#include "ED_mesh.h"
 #include "ED_paint.h"
-#include "ED_particle.h"
-#include "ED_sculpt.h"
 #include "ED_text.h"
 #include "ED_undo.h"
 #include "undo_intern.hh"
@@ -26,25 +18,24 @@
 
 void ED_undosys_type_init(void)
 {
-  /* Edit Modes */
-  BKE_undosys_type_append(ED_armature_undosys_type);
-  BKE_undosys_type_append(ED_curve_undosys_type);
-  BKE_undosys_type_append(ED_font_undosys_type);
-  BKE_undosys_type_append(ED_lattice_undosys_type);
-  BKE_undosys_type_append(ED_mball_undosys_type);
-  BKE_undosys_type_append(ED_mesh_undosys_type);
-  BKE_undosys_type_append(ED_curves_undosys_type);
+  /* BLUI registers undo only for the editors it kept. Blender's list also had
+   * the edit-mode and paint-mode undo types - armature, curve, font, lattice,
+   * metaball, mesh, curves, sculpt, particle and paint-curve. Every one of
+   * those belongs to a 3D or paint editor that BLUI does not register, so none
+   * of them could ever be pushed. Dropping them is what lets the data editors
+   * underneath (lattice, metaball, curves, ...) stop being referenced from
+   * here; each was otherwise reachable *only* through this registry and through
+   * `space_view3d` / `object`.
+   *
+   * `BKE_UNDOSYS_TYPE_SCULPT`, `_PARTICLE` and `_PAINTCURVE` are left declared
+   * and defined but never assigned, because `sculpt_undo.cc` and
+   * `paint_curve_undo.cc` still compare against them. They become null and go
+   * away with `sculpt_paint`. */
 
-  /* Paint Modes */
+  /* Image editor. */
   BKE_UNDOSYS_TYPE_IMAGE = BKE_undosys_type_append(ED_image_undosys_type);
 
-  BKE_UNDOSYS_TYPE_SCULPT = BKE_undosys_type_append(ED_sculpt_undosys_type);
-
-  BKE_UNDOSYS_TYPE_PARTICLE = BKE_undosys_type_append(ED_particle_undosys_type);
-
-  BKE_UNDOSYS_TYPE_PAINTCURVE = BKE_undosys_type_append(ED_paintcurve_undosys_type);
-
-  /* Text editor */
+  /* Text editor. */
   BKE_UNDOSYS_TYPE_TEXT = BKE_undosys_type_append(ED_text_undosys_type);
 
   /* Keep global undo last (as a fallback). */
