@@ -2711,35 +2711,6 @@ def km_armature(params):
 
 
 # Lattice edit mode.
-def km_lattice(params):
-    items = []
-    keymap = (
-        "Lattice",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("lattice.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("lattice.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("lattice.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("lattice.select_more", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("lattice.select_less", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("object.vertex_parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
-        *_template_items_context_menu("VIEW3D_MT_edit_lattice_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_proportional_edit')]}),
-        # Tools
-        op_tool_cycle("builtin.select_box", {"type": 'Q', "value": 'PRESS'}),
-        op_tool_cycle("builtin.move", {"type": 'W', "value": 'PRESS'}),
-        op_tool_cycle("builtin.rotate", {"type": 'E', "value": 'PRESS'}),
-        op_tool_cycle("builtin.scale", {"type": 'R', "value": 'PRESS'}),
-        op_tool_cycle("builtin.transform", {"type": 'T', "value": 'PRESS'}),
-        op_tool_cycle("builtin.measure", {"type": 'M', "value": 'PRESS'}),
-    ])
-
-    return keymap
 
 
 # Particle edit mode.
@@ -3131,7 +3102,6 @@ def generate_keymaps_impl(params=None):
         km_sculpt(params),
         km_mesh(params),
         km_armature(params),
-        km_lattice(params),
         km_particle(params),
         km_object_non_modal(params),
 

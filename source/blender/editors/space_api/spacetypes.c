@@ -94,9 +94,7 @@ void ED_spacetypes_init(void)
   ED_operatortypes_asset();
   ED_operatortypes_gpencil();
   ED_operatortypes_object();
-  ED_operatortypes_lattice();
   ED_operatortypes_mesh();
-  ED_operatortypes_geometry();
   ED_operatortypes_sculpt();
   ED_operatortypes_sculpt_curves();
   ED_operatortypes_uvedit();
@@ -202,7 +200,6 @@ void ED_spacetypes_keymap(wmKeyConfig *keyconf)
   ED_keymap_animchannels(keyconf);
   ED_keymap_gpencil(keyconf);
   ED_keymap_object(keyconf);
-  ED_keymap_lattice(keyconf);
   ED_keymap_mesh(keyconf);
   ED_keymap_uvedit(keyconf);
   ED_keymap_curves(keyconf);

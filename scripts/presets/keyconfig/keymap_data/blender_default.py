@@ -4124,27 +4124,6 @@ def km_armature(params):
 
 
 # Lattice edit mode.
-def km_lattice(params):
-    items = []
-    keymap = (
-        "Lattice",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        *_template_items_select_actions(params, "lattice.select_all"),
-        ("lattice.select_more", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("lattice.select_less", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("object.vertex_parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
-        ("lattice.flip", {"type": 'F', "value": 'PRESS', "alt": True}, None),
-        op_menu("VIEW3D_MT_hook", {"type": 'H', "value": 'PRESS', "ctrl": True}),
-        *_template_items_proportional_editing(
-            params, connected=False, toggle_data_path='tool_settings.use_proportional_edit'),
-        *_template_items_context_menu("VIEW3D_MT_edit_lattice_context_menu", params.context_menu_event),
-    ])
-
-    return keymap
 
 
 # Particle edit mode.
@@ -5491,7 +5470,6 @@ def generate_keymaps(params=None):
         km_sculpt(params),
         km_mesh(params),
         km_armature(params),
-        km_lattice(params),
         km_particle(params),
         km_curves(params),
         km_sculpt_curves(params),
