@@ -729,24 +729,40 @@ The work is staged so the build stays green at every step.
 
       ### Operator registration is entangled with the keymap layer
 
-      Removing a batch of `ED_operatortypes_*()` calls - metaball, lattice,
-      geometry, sculpt, sculpt_curves, physics, curve, curves, armature - builds
-      and passes every check, and is still the wrong change on its own: it adds
-      nine `WM_modalkeymap_assign: unknown operator` errors to the console
-      (`SCULPT_OT_brush_stroke`, `_expand`, `_mesh_filter`, the four gesture
-      ops, `CURVE_OT_pen`).
+      Removing `ED_operatortypes_X()` on its own is the wrong change, and so is
+      removing it together with `ED_keymap_X()`. Both were tried.
 
-      The operators and their **modal keymaps** are registered from different
-      places. `ED_operatortypes_sculpt()` supplied `SCULPT_OT_brush_stroke`;
-      `ED_keymap_paint()` is what assigns a modal map to it - and the two calls
-      sit next to each other in `ED_spacetypes_init()` with nothing to say they
-      are a pair.
+      Removing nine `ED_operatortypes_*()` calls - metaball, lattice, geometry,
+      sculpt, sculpt_curves, physics, curve, curves, armature - builds and passes
+      every check, and puts nine `WM_modalkeymap_assign: unknown operator` errors
+      on the console (`SCULPT_OT_brush_stroke`, `_expand`, `_mesh_filter`, the
+      four gesture ops, `CURVE_OT_pen`). An operator and its **modal keymap** are
+      registered from different places: `ED_operatortypes_sculpt()` supplied
+      `SCULPT_OT_brush_stroke`, `ED_keymap_paint()` is what assigns a modal map
+      to it, and the two calls sit adjacent in `ED_spacetypes_init()` with
+      nothing to say they are a pair.
 
-      So `ED_operatortypes_X()` and `ED_keymap_X()` have to come out together.
-      That is the operator/keymap-data rule again, one layer down. Reverted
-      rather than kept: trading two clean console lines for nine error lines
-      obscures the next real problem, and the operator surface removed is small
-      beside the untangling it needs.
+      So the curve pair was removed together - `ED_operatortypes_curve()` and
+      `ED_keymap_curve(keyconf)`. That fixes the errors: zero unknown operators.
+      It also takes the console from **2** `OperatorProperties not found` lines
+      to **50**, because the keymap *data* still carries the curve entries and
+      `bl_keymap_utils/io.py` prints one line per property it cannot set.
+
+      It is a **triple**, not a pair:
+
+      ```
+      ED_operatortypes_X()   +   ED_keymap_X(keyconf)   +   X's entries in keymap_data
+      ```
+
+      The third is the one that costs, and it is the same rule that governed the
+      macros - an operator and the keymap data naming it go together. Both
+      attempts were reverted: a change that trades two clean console lines for
+      nine errors or forty-eight warnings makes the next real problem harder to
+      find, and the checks cannot see any of it.
+
+      Note the signature difference that cost a round: `ED_operatortypes_X()`
+      takes no arguments, `ED_keymap_X()` takes `keyconf`. A pattern matching
+      `\(\)` silently removes only half the pair.
 
       ### What deleting a module actually involves
 
