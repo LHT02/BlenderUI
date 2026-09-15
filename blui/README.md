@@ -1156,6 +1156,42 @@ The work is staged so the build stays green at every step.
       invisible until the build breaks on it. `ED_lattice.h` and `ED_mball.h` each
       had one of these sitting in this very file.
 
+      ### Measured and rejected: `physics` and `curves`
+
+      Both looked like the next cheap rider after `lattice` and `metaball`.
+      Neither is, and the reasons differ - recorded so the next pass does not
+      spend a round rediscovering them.
+
+      **`physics` (304 KB).** Its two headers are clean: `ED_particle.h` and
+      `ED_physics.h` contain only function declarations and no macros, so the
+      `ED_mball.h` trap does not apply here. But the `PE_*` API is called from
+      *kept* modules, not only doomed ones:
+
+      | Consumer | Sites | Kept? |
+      | --- | --- | --- |
+      | `draw/intern/draw_cache_impl_particles.c` | 2 | kept |
+      | `draw/engines/overlay/overlay_particle.cc` | 4 | kept |
+      | `makesrna/intern/rna_sculpt_paint.c` | 4 | kept |
+      | `makesrna/intern/rna_object.c` | 1 | kept |
+      | `space_view3d` (5), `transform` (6), `object` (3), `space_buttons` (1) | 15 | doomed |
+
+      The kept half is the particle-cache *draw* path plus the particle-edit RNA,
+      so deleting `physics` needs a product decision - does BLUI display particle
+      systems at all - rather than a mechanical cut. `ED_rigidbody_object_remove`
+      is also called from three places in `object_add.cc`.
+
+      **`curves` (84 KB).** The byte count misleads: `ED_curves.h` is 239 lines
+      exporting a ~25-function C++ API in `blender::ed::curves` - selection,
+      transverts, poll functions, the screen-space box/lasso/circle select
+      helpers. It is the hair-curves editor that sculpt mode drives. Small
+      module, large surface.
+
+      The pattern worth keeping: **module size is not a proxy for deletion
+      cost.** `lattice` was 40 KB and cost four call sites. `curves` is 84 KB and
+      exposes an API that would take a round of its own. Measure the header, not
+      the directory - which is the same lesson as the include sweeps, arrived at
+      from the other direction.
+
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 
       CORRECTED. This section used to say uvedit was "four calls short", on the
