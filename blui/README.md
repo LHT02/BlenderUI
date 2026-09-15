@@ -792,6 +792,32 @@ The work is staged so the build stays green at every step.
       from the function's name. Expect the same elsewhere: `ED_operatortypes_X()`
       is a bag, not a label.
 
+      #### The mesh bag is clean, but its keymap data points into a kept module
+
+      `ED_operatortypes_mesh()` was checked the same way, and it is the tidiest
+      bag so far: 149 `MESH_OT_*` and no calls into any other registrar. The
+      keymap data is equally contained - `km_mesh` with 47 entries in
+      `blender_default.py` and 19 in `industry_compatible_data.py`, plus the two
+      C call sites (`ED_operatortypes_mesh()` and `ED_keymap_mesh()`).
+
+      It does not follow that it can be removed. `_template_items_uv_select_mode`
+      - a helper used by the **UV keymaps, which BLUI keeps** - expands to
+      `mesh.select_mode` items, and carries a bare `("mesh.select_mode", ...)`
+      entry described in its own comment as a "hack to prevent fall-through".
+      Removing the mesh operators makes those unknown operators inside a
+      component that stays.
+
+      So this one is not a mechanical removal like the curve editor; it needs a
+      product decision first: does BLUI's image editor have a UV mode with
+      select-mode switching, or is that whole corner of the keymap data dead?
+      The image editor is a viewer, which suggests dead - but suggesting is not
+      the same as knowing, and the answer changes what comes out.
+
+      Note the contrast with the curve case. There, the extra member of the bag
+      was an invisible operator family (`FONT_OT_*`). Here the bag is clean and
+      the surprise is in the *data*, reaching from a module being deleted into
+      one being kept. Both directions have to be checked.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
