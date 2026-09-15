@@ -991,6 +991,22 @@ The work is staged so the build stays green at every step.
       enum is explicit, so 14 is now an unused slot and 15/16/18 keep their
       meaning without a renumbering pass.
 
+      The next unreachable space deletion is `space_topbar` + `space_statusbar`
+      (10 KB + 5 KB). Both are still registered as global areas even though no
+      area in the startup file uses one - `check_editor_set.py` asserts the
+      startup areas are all offered editors, and neither is offered. Measured so
+      the next round does not have to: about 30 sites, and unlike `space_script`
+      most of them are *semantic* rather than declarative. The semantic ones are
+      `screen_ops.c` (6, including the area polls at 4114/4182/4314/4335/4399/5517),
+      `screen/area.cc` (827, 3347), `screen/screen_edit.c` (1104) and
+      `wm_event_system.cc` (6086, 6146); the declarative ones are shared with
+      `space_script` - `readfile.cc`, `wm_draw.c`, `rna_space.c`, `rna_screen.c`,
+      `interface_template_search_menu.cc`, `interface/resources.cc`,
+      `blenkernel/context.cc`, `screen_user_menu.c`, `gpencil_utils.c`. Every
+      `ELEM(area->spacetype, SPACE_TOPBAR, SPACE_STATUSBAR)` test becomes
+      unconditionally true once both are gone, so each one needs a decision
+      rather than a deletion. That is why `space_script` went first.
+
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 
       CORRECTED. This section used to say uvedit was "four calls short", on the
