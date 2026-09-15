@@ -548,6 +548,42 @@ The work is staged so the build stays green at every step.
         registrations before the keymap data that names them takes the entire
         key configuration down with it. Operator and keymap data go together.
 
+      **Start with `space_spreadsheet`.** It is the smallest module and its
+      coupling has been measured rather than estimated, so it is the one to
+      prove the pattern on before repeating it 26 times:
+
+      | Symbol | Refs | Files |
+      | --- | --- | --- |
+      | `SPACE_SPREADSHEET` | 25 | 16 |
+      | `SpaceSpreadsheet` | 53 | 17 |
+      | `ED_spacetype_spreadsheet` | 2 | 2 |
+      | `spreadsheet_operatortypes` | 3 | 3 |
+      | `RNA_SpaceSpreadsheet` | 3 | 3 |
+
+      (The "~146 places" this section used to quote was the general problem, not
+      this module. Measure before believing a number.)
+
+      The whole job, in order:
+
+      1. `ED_spacetype_spreadsheet()` is **already uncalled** - it went with the
+         space-type registry in the first batch - so deleting the
+         implementation cannot break the editor set. Nothing outside
+         `space_spreadsheet/` calls `spreadsheet_operatortypes()` or
+         `spreadsheet_keymap()` either.
+      2. Delete `source/blender/editors/space_spreadsheet/` (23 files) and its
+         `add_subdirectory` in `source/blender/editors/CMakeLists.txt`.
+      3. The four external touch points, which are why this is not a
+         one-line job: `ED_space_api.h` (the declaration),
+         **`rna_space.c`** and **`MOD_nodes.cc`** (both `#include
+         "ED_spreadsheet.h"` - the geometry-nodes modifier has a spreadsheet
+         inspection feature), then `SpaceSpreadsheet` in `DNA_space_types.h`,
+         `SPACE_SPREADSHEET` in the `eSpace_Type` enum, `RNA_SpaceSpreadsheet`
+         in `rna_space.c`, and the theme references in `DNA_userdef_types.h`,
+         `rna_userdef.c`, `resources.cc`, `screen_ops.c` and
+         `bpy_rna_callback.c`.
+      4. Build, run the suite, commit. Only then start the next module, and
+         commit it separately - each module is one green step.
+
       > **Note for whoever continues this.** "Guarded by a `WITH_*` option"
       > does *not* mean "safe to delete". Several intern libraries build a
       > **stub** when their feature is off and the core links that stub
