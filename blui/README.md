@@ -472,15 +472,36 @@ The work is staged so the build stays green at every step.
       from the operator search, or from Python. See *Only BLUI's editors exist*
       above, and `blui/tools/check_editor_set.py`.
 
+      Third batch: **the dead UI scripts are gone** — 53 files, ~1.2 MB, from
+      `scripts/startup/bl_ui/`. These are the modules that draw Blender's 3D
+      panels: `space_view3d`, `space_node`, `space_outliner`, `space_clip`,
+      `space_graph`, `space_nla`, `space_dopesheet`, `space_properties`,
+      `space_spreadsheet` and forty-odd `properties_*` modules. They were
+      already unreachable — `bl_ui/__init__.py` stopped importing them when the
+      editor set was cut — so this is pure removal, with no C-side coupling and
+      no risk to the `.blend` format. The console output after the deletion is
+      byte-for-byte what it was before.
+
+      > Two of the "unused" modules were not unused, and one of them would have
+      > been a real bug. `bl_ui/utils.py` holds the shared panel mixins and is
+      > imported by name rather than listed in `_modules`, and
+      > `bl_ui/space_time.py` looks like a dope-sheet module but
+      > `space_sequencer.py:595` does `from bl_ui.space_time import
+      > marker_menu_generic` - deleting it takes the sequencer's marker menu
+      > with it, silently, because a missing menu is a runtime warning rather
+      > than an error. Both are kept. Grep for the module name across the tree,
+      > not just for its entry in the module list.
+
       That is the reversible half. What remains is to **delete the now
-      unreachable source**: `space_view3d`, `space_node`, `space_outliner`,
-      `space_spreadsheet`, `space_clip`, `space_action`, `space_graph`,
-      `space_nla`, `space_buttons`, `space_info`, `space_script`,
-      `space_statusbar`, `space_topbar`, `object`, `mesh`, `sculpt_paint`,
-      `uvedit`, `armature`, `metaball`, `lattice`, `curve`, `curves`,
-      `physics`, `transform`, `gizmo_library`, `mask`, `animation` and their
-      RNA, operator registration and UI scripts. Two things have to be checked
-      first, and they are where the remaining work is:
+      unreachable C source**: the space types and the 3D data editors, with
+      their RNA and operator registration -
+      `space_view3d`, `space_node`, `space_outliner`, `space_spreadsheet`,
+      `space_clip`, `space_action`, `space_graph`, `space_nla`, `space_buttons`,
+      `space_info`, `space_script`, `space_statusbar`, `space_topbar`, `object`,
+      `mesh`, `sculpt_paint`, `uvedit`, `armature`, `metaball`, `lattice`,
+      `curve`, `curves`, `physics`, `transform`, `gizmo_library`, `mask` and
+      `animation`. Two things have to be checked first, and they are where the
+      remaining work is:
 
       * **Operators the surviving components need but that are registered from
         a doomed module.** `transform_operatortypes()` was one (see the trap
