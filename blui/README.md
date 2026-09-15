@@ -810,8 +810,18 @@ The work is staged so the build stays green at every step.
       So this one is not a mechanical removal like the curve editor; it needs a
       product decision first: does BLUI's image editor have a UV mode with
       select-mode switching, or is that whole corner of the keymap data dead?
-      The image editor is a viewer, which suggests dead - but suggesting is not
-      the same as knowing, and the answer changes what comes out.
+
+      The evidence, gathered rather than guessed: the embedded startup file's
+      image area is in **`VIEW`** mode, which is what a viewer wants - but
+      `space_image.py` still carries live UV branches (`elif tool_mode == 'UV'`,
+      `if sima.mode != 'UV'`), so the mode is reachable through the editor's own
+      controls. The keymap data is therefore not dead yet; it is dead only once
+      the image editor stops offering a UV mode.
+
+      That makes the order clear: retire UV mode from the image editor first -
+      it is a viewer - and the mesh operators and the UV keymap data become
+      removable together afterwards. Doing it the other way round would turn
+      working keymaps into unknown operators inside a component BLUI keeps.
 
       Note the contrast with the curve case. There, the extra member of the bag
       was an invisible operator family (`FONT_OT_*`). Here the bag is clean and
