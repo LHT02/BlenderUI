@@ -3608,9 +3608,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
   if (!main->is_read_invalid) {
     blo_do_versions_400(fd, lib, main);
   }
-  if (!main->is_read_invalid) {
-    blo_do_versions_cycles(fd, lib, main);
-  }
+  /* BLUI does not read Blender's files, so `blo_do_versions_cycles()` is gone.
+   * It only ever ran for files older than Blender 2.80 (`MAIN_VERSION_ATLEAST`
+   * guards), and BLUI cannot create the Cycles data it migrated in any case. */
 
   /* WATCH IT!!!: pointers from libdata have not been converted yet here! */
   /* WATCH IT 2!: Userdef struct init see do_versions_userdef() above! */
@@ -3650,9 +3650,6 @@ static void do_versions_after_linking(FileData *fd, Main *main)
   }
   if (!main->is_read_invalid) {
     do_versions_after_linking_300(fd, main);
-  }
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_cycles(main);
   }
 
   main->is_locked_for_linking = false;

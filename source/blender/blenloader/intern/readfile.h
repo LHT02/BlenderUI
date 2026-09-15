@@ -224,7 +224,6 @@ void blo_do_versions_280(struct FileData *fd, struct Library *lib, struct Main *
 void blo_do_versions_290(struct FileData *fd, struct Library *lib, struct Main *bmain);
 void blo_do_versions_300(struct FileData *fd, struct Library *lib, struct Main *bmain);
 void blo_do_versions_400(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_cycles(struct FileData *fd, struct Library *lib, struct Main *bmain);
 
 void do_versions_after_linking_250(struct Main *bmain);
 void do_versions_after_linking_260(struct Main *bmain);
@@ -232,7 +231,6 @@ void do_versions_after_linking_270(struct Main *bmain);
 void do_versions_after_linking_280(struct FileData *fd, struct Main *bmain);
 void do_versions_after_linking_290(struct FileData *fd, struct Main *bmain);
 void do_versions_after_linking_300(struct FileData *fd, struct Main *bmain);
-void do_versions_after_linking_cycles(struct Main *bmain);
 
 /**
  * Direct data-blocks with global linking.

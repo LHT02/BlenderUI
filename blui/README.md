@@ -44,15 +44,46 @@ The build produces `build\bin\BLUI.exe`.
 
 ---
 
+## Compatibility: none required
+
+**BLUI does not read or write Blender's `.blend` files, and does not need to.**
+This is a deliberate product decision, not a limitation to be fixed later, and
+it removes constraints that would otherwise shape the whole strip:
+
+* **DNA structs can be deleted or changed freely.** `source/blender/make/dna`
+  exists to describe Blender's data layout; BLUI's use of it is now internal
+  only. Removing `SpaceView3D` or `SpaceNode` no longer has a file-format cost.
+* **`BLENDER_VERSION` no longer has to stay pinned to 306.** It was pinned
+  because the `.blend` reader, the DNA structs and the legacy `do_versions`
+  upgrade paths all key off it.
+* **The legacy upgrade machinery is dead weight.** Everything under
+  `source/blender/blenloader/intern/versioning_*.c` exists to bring an *older
+  Blender file* up to the current layout. BLUI only ever reads files it wrote
+  itself, always at the current version, so every `MAIN_VERSION_ATLEAST` branch
+  in them is unreachable.
+
+`.blend` remains BLUI's own storage format for `startup.blend` and
+`userpref.blend`, written and read by the same build. What is gone is any
+obligation to understand anyone else's file, or an older one of its own.
+
+The first deletion this unblocked is `blenloader/intern/versioning_cycles.c`
+(61 KB): it migrated Cycles particle and shader data, every branch of it guarded
+by a pre-2.80 version check, for a renderer BLUI does not contain.
+
+---
+
 ## What makes this a separate product
 
 ### 1. A separate product version
 
-`BLENDER_VERSION` is *pinned* to the Blender file/DNA generation (306). The
-`.blend` reader, the DNA structs and the legacy `do_versions` upgrade paths all
-depend on it, so changing it would silently change file-format behaviour.
+`BLENDER_VERSION` is currently left at 306, Blender's file/DNA generation. It
+used to be *pinned* there because the `.blend` reader, the DNA structs and the
+legacy `do_versions` upgrade paths all key off it - but BLUI has no
+compatibility obligation to anyone else's file (see *Compatibility: none
+required* above), so that pin is now only a starting point rather than a
+constraint.
 
-BLUI therefore has its own version in
+BLUI has its own version in
 `source/blender/blenkernel/BKE_blender_version.h`:
 
 | Macro | Value | Meaning |
