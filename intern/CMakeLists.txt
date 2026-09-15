@@ -1,6 +1,28 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright 2006 Blender Foundation
 
+# ---------------------------------------------------------------------------
+# BLUI stripping notes.
+#
+# BLUI is a file browsing / image viewing environment, not a 3D content
+# creation suite, so this fork removes 3D subsystems. Before deleting an
+# intern library, check that nothing still compiles against its headers:
+#
+#   "Guarded by a WITH_* option" does NOT mean "safe to delete".
+#
+# Several libraries here build a *stub* implementation when their feature is
+# disabled, and the rest of Blender links that stub unconditionally:
+#
+#   opensubdiv : stub/opensubdiv_*_stub.cc, always linked. BKE_subdiv_*
+#                includes opensubdiv_*_capi.h regardless of WITH_OPENSUBDIV.
+#   libmv      : intern/stub.cc, always linked. BKE_tracking_* includes
+#                libmv-capi.h regardless of WITH_LIBMV.
+#   iksolver   : reached through ikplugin when WITH_IK_SOLVER is on.
+#
+# Deleting any of these produces "C1083: cannot open include file". `cycles`
+# is safe to delete: nothing outside intern/cycles includes its headers.
+# ---------------------------------------------------------------------------
+
 # add_subdirectory(atomic)  # header only
 add_subdirectory(atomic)
 add_subdirectory(clog)

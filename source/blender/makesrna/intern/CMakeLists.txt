@@ -432,7 +432,6 @@ set(LIB
   bf_editor_curves
   bf_editor_gizmo_library
   bf_editor_gpencil_legacy
-  bf_editor_io
   bf_editor_mesh
   bf_editor_object
   bf_editor_physics

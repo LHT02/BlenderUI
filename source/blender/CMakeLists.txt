@@ -158,10 +158,6 @@ add_subdirectory(makesdna)
 add_subdirectory(makesrna)
 add_subdirectory(compositor)
 
-if(WITH_BLENDER_THUMBNAILER)
-  add_subdirectory(blendthumb)
-endif()
-
 
 if(WITH_IMAGE_OPENEXR)
   add_subdirectory(imbuf/intern/openexr)
@@ -175,6 +171,6 @@ if(WITH_PYTHON)
   add_subdirectory(python)
 endif()
 
-if(WITH_FREESTYLE)
-  add_subdirectory(freestyle)
-endif()
+# BLUI: `freestyle` (non-photorealistic line rendering) and `blendthumb`
+# (the Windows .blend thumbnail handler) were deleted from this fork; both
+# belong to the 3D side of Blender rather than to a file/image viewer.
