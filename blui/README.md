@@ -764,6 +764,25 @@ The work is staged so the build stays green at every step.
       takes no arguments, `ED_keymap_X()` takes `keyconf`. A pattern matching
       `\(\)` silently removes only half the pair.
 
+      #### An unresolved question, recorded as such
+
+      The curve triple was removed in full - `ED_operatortypes_curve()`,
+      `ED_keymap_curve(keyconf)`, and the whole `km_curve` function with its 21
+      `curve.*` entries and its collector line. Zero unknown operators. But the
+      console went to **42** `OperatorProperties not found` lines, and only eight
+      of them were accounted for by the keymap data that came out.
+
+      A grep says only `km_curve` names a `curve.*` operator, so the remaining
+      thirty-odd warnings come from something else that
+      `ED_operatortypes_curve()` supplied - and that something was **not**
+      identified. It is written here as an open question rather than a
+      conclusion, because guessing at it would be worse than leaving it: the
+      next attempt should remove the triple and read the 42 warning names
+      (`mode`, `style`, `action`) against the operators `ED_operatortypes_curve()`
+      registers, rather than trusting the `curve.*` grep.
+
+      Reverted, so the console is back to two lines.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
