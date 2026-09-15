@@ -727,6 +727,27 @@ The work is staged so the build stays green at every step.
       `space_view3d` + the data editors as a single planned block rather than
       discovering the interlock seven times.
 
+      ### Operator registration is entangled with the keymap layer
+
+      Removing a batch of `ED_operatortypes_*()` calls - metaball, lattice,
+      geometry, sculpt, sculpt_curves, physics, curve, curves, armature - builds
+      and passes every check, and is still the wrong change on its own: it adds
+      nine `WM_modalkeymap_assign: unknown operator` errors to the console
+      (`SCULPT_OT_brush_stroke`, `_expand`, `_mesh_filter`, the four gesture
+      ops, `CURVE_OT_pen`).
+
+      The operators and their **modal keymaps** are registered from different
+      places. `ED_operatortypes_sculpt()` supplied `SCULPT_OT_brush_stroke`;
+      `ED_keymap_paint()` is what assigns a modal map to it - and the two calls
+      sit next to each other in `ED_spacetypes_init()` with nothing to say they
+      are a pair.
+
+      So `ED_operatortypes_X()` and `ED_keymap_X()` have to come out together.
+      That is the operator/keymap-data rule again, one layer down. Reverted
+      rather than kept: trading two clean console lines for nine error lines
+      obscures the next real problem, and the operator surface removed is small
+      beside the untangling it needs.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
