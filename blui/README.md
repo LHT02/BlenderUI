@@ -614,6 +614,47 @@ The work is staged so the build stays green at every step.
       Two modules measured, two rejected, one deleted (`space_spreadsheet`, the
       one whose link surface turned out to be empty).
 
+      ### The next module to try: `space_nla`
+
+      Found by the try-and-revert method, and by a wide margin the cleanest
+      candidate measured so far. Nine files, 217 KB, no public header, and its
+      RNA touches only the DNA struct - so the scope reduction applies whole:
+      keep `SPACE_NLA`, keep `SpaceNla`, keep the RNA, delete only the module.
+
+      The build reaches the link and asks for exactly **six** symbols. Each has
+      exactly **one** external user:
+
+      | Symbol | Its only external user | Stays? |
+      | --- | --- | --- |
+      | `ANIM_nla_context_track_ptr` | `screen/screen_context.c` | yes |
+      | `ANIM_nla_context_strip_ptr` | `screen/screen_context.c` | yes |
+      | `ED_operatormacros_nla` | `space_api/spacetypes.c` | yes |
+      | `ANIM_nla_context_strip` | `animation/fmodifier_ui.c` | no |
+      | `nla_action_get_color` | `animation/anim_channels_defines.c` | no |
+      | `ED_nla_postop_refresh` | `transform/transform_convert_nla.c` | no |
+
+      Compare the two rejected modules: `space_outliner` leaked about fifty call
+      sites across fifteen files, and `space_buttons` leaked three symbols that
+      are reached through the RNA template layer rather than a header. This one
+      is six single-line removals, three of them in files that survive.
+
+      One caution for whoever does it: removing `ED_operatormacros_nla()` from
+      `ED_spacemacros_init()` is the same shape as the change that once took the
+      whole key configuration down (see *Known cosmetic issue*). The keymap data
+      must not name an NLA macro. `check_keymap_config.py` is the guard - run it
+      before believing the build.
+
+      #### Modules rejected so far
+
+      | Module | Why it is not cheap |
+      | --- | --- |
+      | `space_outliner` | ~50 `ED_outliner_select_sync_*` call sites in ~15 files, several that stay |
+      | `space_buttons` | 3 link symbols reached via RNA/templates, not headers |
+      | `space_nla` | **six single call sites - the one to take next** |
+
+      `space_spreadsheet` is deleted. It was the only one whose link surface was
+      empty, which is why it worked and the others did not.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
