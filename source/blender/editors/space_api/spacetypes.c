@@ -105,7 +105,6 @@ void ED_spacetypes_init(void)
   ED_operatortypes_curves();
   ED_operatortypes_armature();
   ED_operatortypes_marker();
-  ED_operatortypes_metaball();
   ED_operatortypes_sound();
   ED_operatortypes_render();
   ED_operatortypes_mask();
@@ -209,7 +208,6 @@ void ED_spacetypes_keymap(wmKeyConfig *keyconf)
   ED_keymap_curves(keyconf);
   ED_keymap_armature(keyconf);
   ED_keymap_physics(keyconf);
-  ED_keymap_metaball(keyconf);
   ED_keymap_paint(keyconf);
   ED_keymap_mask(keyconf);
   ED_keymap_marker(keyconf);

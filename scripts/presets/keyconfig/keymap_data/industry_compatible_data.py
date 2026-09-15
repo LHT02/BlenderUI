@@ -2708,36 +2708,6 @@ def km_armature(params):
 
 
 # Metaball edit mode.
-def km_metaball(params):
-    items = []
-    keymap = (
-        "Metaball",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("mball.reveal_metaelems", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("mball.hide_metaelems", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("mball.hide_metaelems", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("mball.delete_metaelems", {"type": 'BACK_SPACE', "value": 'PRESS'}, None),
-        ("mball.delete_metaelems", {"type": 'DEL', "value": 'PRESS'}, None),
-        ("mball.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
-        ("mball.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("mball.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("mball.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("mball.select_similar", {"type": 'G', "value": 'PRESS', "shift": True}, None),
-        *_template_items_context_menu("VIEW3D_MT_edit_metaball_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_proportional_edit')]}),
-        # Tools
-        *_template_items_basic_tools(),
-    ])
-
-    return keymap
 
 
 # Lattice edit mode.
@@ -3161,7 +3131,6 @@ def generate_keymaps_impl(params=None):
         km_sculpt(params),
         km_mesh(params),
         km_armature(params),
-        km_metaball(params),
         km_lattice(params),
         km_particle(params),
         km_object_non_modal(params),

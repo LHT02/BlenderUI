@@ -4121,28 +4121,6 @@ def km_armature(params):
 
 
 # Metaball edit mode.
-def km_metaball(params):
-    items = []
-    keymap = (
-        "Metaball",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("object.metaball_add", {"type": 'A', "value": 'PRESS', "shift": True}, None),
-        *_template_items_hide_reveal_actions("mball.hide_metaelems", "mball.reveal_metaelems"),
-        ("mball.delete_metaelems", {"type": 'X', "value": 'PRESS'}, None),
-        ("mball.delete_metaelems", {"type": 'DEL', "value": 'PRESS'}, None),
-        ("mball.duplicate_move", {"type": 'D', "value": 'PRESS', "shift": True}, None),
-        *_template_items_select_actions(params, "mball.select_all"),
-        ("mball.select_similar", {"type": 'G', "value": 'PRESS', "shift": True}, None),
-        *_template_items_proportional_editing(
-            params, connected=True, toggle_data_path='tool_settings.use_proportional_edit'),
-        *_template_items_context_menu("VIEW3D_MT_edit_metaball_context_menu", params.context_menu_event),
-    ])
-
-    return keymap
 
 
 # Lattice edit mode.
@@ -5513,7 +5491,6 @@ def generate_keymaps(params=None):
         km_sculpt(params),
         km_mesh(params),
         km_armature(params),
-        km_metaball(params),
         km_lattice(params),
         km_particle(params),
         km_curves(params),
