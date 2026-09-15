@@ -76,11 +76,6 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_select_more);
   WM_operatortype_append(OBJECT_OT_select_less);
 
-  WM_operatortype_append(COLLECTION_OT_create);
-  WM_operatortype_append(COLLECTION_OT_objects_remove_all);
-  WM_operatortype_append(COLLECTION_OT_objects_remove);
-  WM_operatortype_append(COLLECTION_OT_objects_add_active);
-  WM_operatortype_append(COLLECTION_OT_objects_remove_active);
 
   WM_operatortype_append(OBJECT_OT_delete);
   WM_operatortype_append(OBJECT_OT_text_add);
@@ -173,14 +168,8 @@ void ED_operatortypes_object(void)
 
   WM_operatortype_append(OBJECT_OT_constraint_add);
   WM_operatortype_append(OBJECT_OT_constraint_add_with_targets);
-  WM_operatortype_append(POSE_OT_constraint_add);
-  WM_operatortype_append(POSE_OT_constraint_add_with_targets);
   WM_operatortype_append(OBJECT_OT_constraints_copy);
-  WM_operatortype_append(POSE_OT_constraints_copy);
   WM_operatortype_append(OBJECT_OT_constraints_clear);
-  WM_operatortype_append(POSE_OT_constraints_clear);
-  WM_operatortype_append(POSE_OT_ik_add);
-  WM_operatortype_append(POSE_OT_ik_clear);
   WM_operatortype_append(CONSTRAINT_OT_delete);
   WM_operatortype_append(CONSTRAINT_OT_apply);
   WM_operatortype_append(CONSTRAINT_OT_copy);
