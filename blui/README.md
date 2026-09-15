@@ -1192,12 +1192,44 @@ The work is staged so the build stays green at every step.
       the directory - which is the same lesson as the include sweeps, arrived at
       from the other direction.
 
-      ### `space_buttons` is fully scoped, and blocked by RNA, not by 3D code
+      ### `space_buttons` is NOT fully scoped: it hosts shared UI templates
+
+      CORRECTION, one round later. The heading here used to claim this module was
+      "fully scoped" - seven RNA callbacks plus one call in `screen/area.cc`.
+      Cutting exactly those and nothing else took the build **red** with three
+      unresolved symbols, every one of them referenced from a module BLUI keeps:
+
+      | Symbol | Referenced from |
+      | --- | --- |
+      | `uiTemplateTextureShow` | `editors/interface/interface_templates.cc` |
+      | `uiTemplateTextureUser` | `makesrna`, via the generated `rna_ui_gen.c` |
+      | `buttons_context_dir` | `python/intern/bpy.c` |
+
+      So `space_buttons` is not only the Properties editor. It also implements UI
+      *templates* that the interface layer and the generated RNA call, and it
+      registers a context directory that `bpy.c` names. Those are not
+      Properties-editor features - they are shared template machinery that sits
+      in this module because the module was named after the space it served
+      rather than after what it provides. `uiTemplateTextureShow` /
+      `uiTemplateTextureUser` are the image-user template for texture datablocks:
+      a 3D feature BLUI has no use for, whose *callers* are in modules BLUI keeps.
+
+      The attempt was reverted rather than left half-finished - the tree is back
+      at `c19fc60` with a green build. Never leave a red tree; a lost round is
+      cheaper than a broken fork.
+
+      The measurement below is still correct, but it is layer 1 of four:
+
+      2. the `uiTemplateTexture*` definitions and their entries in `UI_interface.h`;
+      3. the RNA definition in `rna_ui.c` that generates `uiTemplateTextureUser`,
+         plus its call in `interface_templates.cc`;
+      4. `buttons_context_dir` in `buttons_context.c` and its name in `bpy.c`.
+
+      Layer 1, which is measured and necessary but not sufficient:
 
       The Properties editor is unregistered, so it is unreachable - but unlike
       `lattice` and `metaball` it is not held in place by doomed code. Both
-      blockers are in modules BLUI keeps. Scoped precisely enough to execute
-      without re-measuring:
+      blockers are in modules BLUI keeps:
 
       | Site | What | Count |
       | --- | --- | --- |
