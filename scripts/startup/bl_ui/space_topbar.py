@@ -203,7 +203,11 @@ class TOPBAR_MT_editor_menus(Menu):
         layout.menu("TOPBAR_MT_file")
         layout.menu("TOPBAR_MT_edit")
 
-        layout.menu("TOPBAR_MT_render")
+        # BLUI: no Render menu. Blender's offers Render Image, Render Animation,
+        # View Render and the render dimensions - all of which need a renderer,
+        # and BLUI has none: Cycles was removed from the fork and the product is
+        # a file browser, an image viewer and a text editor. The menu would only
+        # ever fail or produce nothing.
 
         layout.menu("TOPBAR_MT_window")
         layout.menu("TOPBAR_MT_help")
