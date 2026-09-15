@@ -1192,6 +1192,34 @@ The work is staged so the build stays green at every step.
       the directory - which is the same lesson as the include sweeps, arrived at
       from the other direction.
 
+      ### `space_buttons` is fully scoped, and blocked by RNA, not by 3D code
+
+      The Properties editor is unregistered, so it is unreachable - but unlike
+      `lattice` and `metaball` it is not held in place by doomed code. Both
+      blockers are in modules BLUI keeps. Scoped precisely enough to execute
+      without re-measuring:
+
+      | Site | What | Count |
+      | --- | --- | --- |
+      | `makesrna/rna_space.c:1955-2110` | the `rna_SpaceProperties_*` callbacks | ~10 functions |
+      | `makesrna/rna_space.c:5279-5330` | the `SpaceProperties` RNA struct block | 1 |
+      | `makesrna/rna_space.c:560` | `case SPACE_BUTTONS` in `rna_Space_refine` | 1 |
+      | `makesrna/rna_space.c:531` | `#include "ED_buttons.h"` | 1 |
+      | `editors/screen/area.cc:762` | `ED_buttons_search_string_get(sbuts)` | 1 |
+      | `space_outliner/outliner_select.cc:1196-1197` | `ED_buttons_should_sync_with_outliner` | doomed |
+
+      `ED_buttons.h` is only 1,276 bytes and exports seven functions, so the raw
+      surface is small. The cost is that five of the seven are RNA property
+      callbacks, so deleting them means deleting `SpaceProperties` from the RNA
+      surface - a product statement ("the Properties editor does not exist"), not
+      a mechanical cut. Same shape as `physics`: the blocker is never the module,
+      it is that something BLUI keeps still exposes it.
+
+      The `area.cc:762` case is worth separating from the rest. It is a single
+      call site in a kept module holding a 105 KB module in place, and the cheap
+      fix is to make the area search hook tolerate a space that cannot exist,
+      rather than to keep the module for it.
+
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 
       CORRECTED. This section used to say uvedit was "four calls short", on the
