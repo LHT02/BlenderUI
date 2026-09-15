@@ -931,85 +931,6 @@ def km_user_interface(_params):
 # ------------------------------------------------------------------------------
 # Shared Between Editors (Mask, Time-Line)
 
-def km_mask_editing(params):
-    items = []
-    keymap = (
-        "Mask Editing",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    if params.select_mouse == 'RIGHTMOUSE':
-        # mask.slide_point performs mostly the same function, so for the left
-        # click select keymap it's fine to have the context menu instead.
-        items.extend([
-            ("mask.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
-             {"properties": [("deselect_all", not params.legacy)]}),
-        ])
-
-    items.extend([
-        ("mask.new", {"type": 'N', "value": 'PRESS', "alt": True}, None),
-        op_menu("MASK_MT_add", {"type": 'A', "value": 'PRESS', "shift": True}),
-        *_template_items_proportional_editing(
-            params, connected=False, toggle_data_path='tool_settings.use_proportional_edit_mask'),
-        ("mask.add_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-        ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True}, None),
-        ("mask.delete", {"type": 'X', "value": 'PRESS'}, None),
-        ("mask.delete", {"type": 'DEL', "value": 'PRESS'}, None),
-        ("mask.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
-         {"properties": [("toggle", True)]}),
-        *_template_items_select_actions(params, "mask.select_all"),
-        ("mask.select_linked", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
-        ("mask.select_linked_pick", {"type": 'L', "value": 'PRESS'},
-         {"properties": [("deselect", False)]}),
-        ("mask.select_linked_pick", {"type": 'L', "value": 'PRESS', "shift": True},
-         {"properties": [("deselect", True)]}),
-        ("mask.select_box", {"type": 'B', "value": 'PRESS'}, None),
-        ("mask.select_circle", {"type": 'C', "value": 'PRESS'}, None),
-        ("mask.select_lasso", {"type": params.action_mouse, "value": 'CLICK_DRAG', "ctrl": True, "alt": True},
-         {"properties": [("mode", 'ADD')]}),
-        ("mask.select_lasso", {"type": params.action_mouse, "value": 'CLICK_DRAG', "shift": True, "ctrl": True, "alt": True},
-         {"properties": [("mode", 'SUB')]}),
-        ("mask.select_more", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("mask.select_less", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        *_template_items_hide_reveal_actions("mask.hide_view_set", "mask.hide_view_clear"),
-        ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "ctrl": True}, None),
-        ("mask.cyclic_toggle", {"type": 'C', "value": 'PRESS', "alt": True}, None),
-        ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ("mask.handle_type_set", {"type": 'V', "value": 'PRESS'}, None),
-        ("mask.normals_make_consistent",
-         {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
-        ("mask.parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
-        ("mask.parent_clear", {"type": 'P', "value": 'PRESS', "alt": True}, None),
-        ("mask.shape_key_insert", {"type": 'I', "value": 'PRESS'}, None),
-        ("mask.shape_key_clear", {"type": 'I', "value": 'PRESS', "alt": True}, None),
-        ("mask.duplicate_move", {"type": 'D', "value": 'PRESS', "shift": True}, None),
-        ("mask.copy_splines", {"type": 'C', "value": 'PRESS', "ctrl": True}, None),
-        ("mask.paste_splines", {"type": 'V', "value": 'PRESS', "ctrl": True}, None),
-        ("transform.translate", {"type": 'G', "value": 'PRESS'}, None),
-        ("transform.translate", {"type": params.select_mouse, "value": 'CLICK_DRAG'}, None),
-        ("transform.rotate", {"type": 'R', "value": 'PRESS'}, None),
-        ("transform.resize", {"type": 'S', "value": 'PRESS'}, None),
-        ("transform.tosphere", {"type": 'S', "value": 'PRESS', "shift": True, "alt": True}, None),
-        ("transform.shear", {"type": 'S', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
-        ("transform.transform", {"type": 'S', "value": 'PRESS', "alt": True},
-         {"properties": [("mode", 'MASK_SHRINKFATTEN')]}),
-    ])
-
-    # 3D cursor
-    if params.cursor_tweak_event:
-        items.extend([
-            ("uv.cursor_set", params.cursor_set_event, None),
-            ("transform.translate", params.cursor_tweak_event,
-             {"properties": [("release_confirm", True), ("cursor_transform", True)]}),
-        ])
-    else:
-        items.extend([
-            ("uv.cursor_set", params.cursor_set_event, None),
-        ])
-
-    return keymap
 
 
 def km_markers(params):
@@ -5176,7 +5097,6 @@ def generate_keymaps(params=None):
 
         # Editors.
         km_uv_editor(params),
-        km_mask_editing(params),
         km_markers(params),
         km_time_scrub(params),
         km_image_generic(params),

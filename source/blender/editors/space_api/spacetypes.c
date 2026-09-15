@@ -101,7 +101,6 @@ void ED_spacetypes_init(void)
   ED_operatortypes_marker();
   ED_operatortypes_sound();
   ED_operatortypes_render();
-  ED_operatortypes_mask();
   ED_operatortypes_edutils();
 
   /* Transform is a shared facility, not a 3D-view one: the video sequencer's
@@ -199,7 +198,6 @@ void ED_spacetypes_keymap(wmKeyConfig *keyconf)
   ED_keymap_mesh(keyconf);
   ED_keymap_uvedit(keyconf);
   ED_keymap_paint(keyconf);
-  ED_keymap_mask(keyconf);
   ED_keymap_marker(keyconf);
   ED_keymap_sculpt(keyconf);
 
