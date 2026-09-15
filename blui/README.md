@@ -421,12 +421,21 @@ RNA_boolean_set: OperatorProperties.extend not found.
 Warning: property 'mode' not found in item 'OperatorProperties'
 ```
 
-They come from the C keymap registration: `ED_spacetypes_keymap()` still calls
-`ED_keymap_anim()`, `ED_keymap_object()`, `ED_keymap_mesh()` and friends, which
-create keymaps for operators that BLUI no longer registers. They are harmless -
-an operator property that is not found is skipped, and nothing is disabled by
-it - but they will go away with the same strip that removes those `ED_keymap_*`
-and `ED_operatortypes_*` calls.
+They come from `ED_operatormacros_node()`, which builds the node editor's macro
+operators out of steps naming node operators BLUI no longer registers -
+`RNA_boolean_set(mot->ptr, "socket_select", true)` on a macro step that was
+never created. They are harmless: the property is skipped and nothing is
+disabled by it.
+
+**They cannot be removed by deleting the macro registration on its own.** That
+was tried, and it made BLUI start with *no keymaps at all*: dropping the twelve
+3D `ED_operatormacros_*` calls broke the whole key configuration load.
+`bl_keymap_utils/io.py` walks a macro's nested properties with
+`property_unset()`, which **raises** where the flat case only warns, so the
+first keymap item naming a missing macro aborts the load -
+`("TRANSFORM_OT_edge_slide", ...)` in the mesh keymap, from `mesh_ops.c:225`.
+The operator registration and the keymap data that names it have to be removed
+in the same step, and that is the shape of the remaining Stage 2 work.
 
 ## Roadmap
 
@@ -471,9 +480,12 @@ The work is staged so the build stays green at every step.
         `_marker()`, `_sound()`, `_render()` and `_asset()` are all still
         called from `ED_spacetypes_init()` and should be traced the same way
         before their modules go.
-      * **The `ED_keymap_*` / `ED_operatortypes_*` calls themselves.** Cutting
-        them is also what removes the ten lines of `OperatorProperties.* not
-        found` noise described under *Known cosmetic issue*.
+      * **The `ED_keymap_*` / `ED_operatortypes_*` / `ED_operatormacros_*` calls
+        themselves.** Cutting them is also what removes the ten lines of
+        `OperatorProperties.* not found` noise described under *Known cosmetic
+        issue* - but read that section first, because cutting the macro
+        registrations before the keymap data that names them takes the entire
+        key configuration down with it. Operator and keymap data go together.
 
       > **Note for whoever continues this.** "Guarded by a `WITH_*` option"
       > does *not* mean "safe to delete". Several intern libraries build a

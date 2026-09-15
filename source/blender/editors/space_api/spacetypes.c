@@ -154,7 +154,19 @@ void ED_spacetypes_init(void)
 void ED_spacemacros_init(void)
 {
   /* Macros must go last since they reference other operators.
-   * They need to be registered after python operators too. */
+   * They need to be registered after python operators too.
+   *
+   * BLUI still registers all of them, including the macros for the editors it
+   * does not have. That is not an oversight: the keymap data in
+   * `scripts/presets/keyconfig/keymap_data/` still carries items for those
+   * macros, and `bl_keymap_utils/io.py` walks a macro's nested properties with
+   * `property_unset()`, which raises rather than warning when the macro is
+   * missing. Dropping `ED_operatormacros_mesh()` alone, for instance, breaks
+   * the whole key configuration at `("TRANSFORM_OT_edge_slide", ...)` in the
+   * mesh keymap, and BLUI then starts with no keymaps at all.
+   *
+   * An operator and the keymap data that names it have to be removed in the
+   * same step. */
   ED_operatormacros_armature();
   ED_operatormacros_mesh();
   ED_operatormacros_uvedit();
