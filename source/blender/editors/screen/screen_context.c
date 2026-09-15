@@ -85,8 +85,6 @@ const char *screen_context_dir[] = {
     "sequences",
     "selected_sequences",
     "selected_editable_sequences", /* sequencer */
-    "active_nla_track",
-    "active_nla_strip",
     "selected_nla_strips", /* nla editor */
     "selected_movieclip_tracks",
     "gpencil_data",
@@ -707,24 +705,8 @@ static eContextResult screen_ctx_selected_editable_sequences(const bContext *C,
   return CTX_RESULT_OK;
 }
 
-static eContextResult screen_ctx_active_nla_track(const bContext *C, bContextDataResult *result)
-{
-  PointerRNA ptr;
-  if (ANIM_nla_context_track_ptr(C, &ptr)) {
-    CTX_data_pointer_set_ptr(result, &ptr);
-    return CTX_RESULT_OK;
-  }
-  return CTX_RESULT_NO_DATA;
-}
-static eContextResult screen_ctx_active_nla_strip(const bContext *C, bContextDataResult *result)
-{
-  PointerRNA ptr;
-  if (ANIM_nla_context_strip_ptr(C, &ptr)) {
-    CTX_data_pointer_set_ptr(result, &ptr);
-    return CTX_RESULT_OK;
-  }
-  return CTX_RESULT_NO_DATA;
-}
+/* BLUI has no NLA editor, so the `active_nla_track` and `active_nla_strip`
+ * context members went with the NLA module. */
 static eContextResult screen_ctx_selected_nla_strips(const bContext *C, bContextDataResult *result)
 {
   bAnimContext ac;
@@ -1321,8 +1303,6 @@ static void ensure_ed_screen_context_functions(void)
   register_context_function("sequences", screen_ctx_sequences);
   register_context_function("selected_sequences", screen_ctx_selected_sequences);
   register_context_function("selected_editable_sequences", screen_ctx_selected_editable_sequences);
-  register_context_function("active_nla_track", screen_ctx_active_nla_track);
-  register_context_function("active_nla_strip", screen_ctx_active_nla_strip);
   register_context_function("selected_nla_strips", screen_ctx_selected_nla_strips);
   register_context_function("selected_movieclip_tracks", screen_ctx_selected_movieclip_tracks);
   register_context_function("gpencil_data", screen_ctx_gpencil_data);

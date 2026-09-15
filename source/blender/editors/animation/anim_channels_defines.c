@@ -3917,7 +3917,10 @@ static void acf_nlaaction_color(bAnimContext *UNUSED(ac), bAnimListElem *ale, fl
    *   strips backgrounds but here we're doing channel list backgrounds instead
    *   so we ignore that and use our own when needed
    */
-  nla_action_get_color(ale->adt, (bAction *)ale->data, color);
+  /* The NLA action colour lived in the NLA editor module, which BLUI deleted.
+   * This animation-channel code is on its way out too; a clear colour keeps it
+   * linking until then. */
+  color[0] = color[1] = color[2] = color[3] = 0.0f;
 
   /* NOTE: since the return types only allow rgb, we cannot do the alpha-blending we'd
    * like for the solo-drawing case. Hence, this method isn't actually used for drawing
@@ -3940,7 +3943,8 @@ static void acf_nlaaction_backdrop(bAnimContext *ac, bAnimListElem *ale, float y
    *   strips backgrounds but here we're doing channel list backgrounds instead
    *   so we ignore that and use our own when needed
    */
-  nla_action_get_color(adt, (bAction *)ale->data, color);
+  /* See the note on the other NLA action colour above. */
+  color[0] = color[1] = color[2] = color[3] = 0.0f;
 
   if (adt && (adt->flag & ADT_NLA_EDIT_ON)) {
     color[3] = 1.0f;

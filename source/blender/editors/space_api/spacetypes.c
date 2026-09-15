@@ -182,7 +182,7 @@ void ED_spacemacros_init(void)
   ED_operatormacros_sequencer();
   ED_operatormacros_paint();
   ED_operatormacros_gpencil();
-  ED_operatormacros_nla();
+  /* `ED_operatormacros_nla()` went with the NLA editor module. */
 
   /* Register dropboxes (can use macros). */
   ED_dropboxes_ui();

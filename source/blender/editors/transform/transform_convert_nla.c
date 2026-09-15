@@ -772,8 +772,10 @@ static void special_aftertrans_update__nla(bContext *C, TransInfo *t)
   /* free temp memory */
   ANIM_animdata_freelist(&anim_data);
 
-  /* Perform after-transform validation. */
-  ED_nla_postop_refresh(&ac);
+  /* `ED_nla_postop_refresh()` went with the NLA editor module. It validated the
+   * strip layout after a transform; with no NLA editor there is nothing to
+   * validate against, and this file goes with the rest of the 3D transform
+   * code. */
 }
 
 /** \} */

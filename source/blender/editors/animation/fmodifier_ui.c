@@ -62,10 +62,7 @@ static ListBase *fmodifier_list_space_specific(const bContext *C)
     return &fcu->modifiers;
   }
 
-  if (area->spacetype == SPACE_NLA) {
-    NlaStrip *strip = ANIM_nla_context_strip(C);
-    return &strip->modifiers;
-  }
+  /* The SPACE_NLA branch went with the NLA editor module. */
 
   /* This should not be called in any other space. */
   BLI_assert(false);
