@@ -3942,14 +3942,13 @@ def km_mesh(params):
 
     items.extend([
         # Tools.
-        op_tool_optional(
-            ("mesh.loopcut_slide", {"type": 'R', "value": 'PRESS', "ctrl": True},
-             {"properties": [("TRANSFORM_OT_edge_slide", [("release_confirm", False)],)]}),
-            (op_tool_cycle, "builtin.loop_cut"), params),
-        op_tool_optional(
-            ("mesh.offset_edge_loops_slide", {"type": 'R', "value": 'PRESS', "shift": True, "ctrl": True},
-             {"properties": [("TRANSFORM_OT_edge_slide", [("release_confirm", False)],)]}),
-            (op_tool_cycle, "builtin.offset_edge_loop_cut"), params),
+        # BLUI removed the two entries that carried a `TRANSFORM_OT_edge_slide`
+        # macro sub-property - `mesh.loopcut_slide` on Ctrl+R and
+        # `mesh.offset_edge_loops_slide` on Ctrl+Shift+R. The keymap loader walks
+        # a macro's sub-properties with `property_unset()`, which raises rather
+        # than warns, so an entry naming a macro whose registration is gone takes
+        # the whole key configuration down with it. These two had to come out
+        # before `ED_operatormacros_mesh()` could.
         op_tool_optional(
             ("mesh.inset", {"type": 'I', "value": 'PRESS'}, None),
             (op_tool_cycle, "builtin.inset_faces"), params),
@@ -4014,13 +4013,10 @@ def km_mesh(params):
         ("mesh.quads_convert_to_tris", {"type": 'T', "value": 'PRESS', "shift": True, "ctrl": True},
          {"properties": [("quad_method", 'FIXED'), ("ngon_method", 'CLIP')]}),
         ("mesh.tris_convert_to_quads", {"type": 'J', "value": 'PRESS', "alt": True}, None),
-        op_tool_optional(
-            ("mesh.rip_move", {"type": 'V', "value": 'PRESS'},
-             {"properties": [("MESH_OT_rip", [("use_fill", False)],)]}),
-            (op_tool_cycle, "builtin.rip_region"), params),
-        # No tool is available for this.
-        ("mesh.rip_move", {"type": 'V', "value": 'PRESS', "alt": True},
-         {"properties": [("MESH_OT_rip", [("use_fill", True)],)]}),
+        # BLUI removed two `mesh.rip_move` entries that carried a `MESH_OT_rip`
+        # macro sub-property (V and Alt+V), for the same reason as the
+        # edge-slide pair above: `property_unset()` raises on a macro whose
+        # registration is gone, and that aborts the whole key configuration load.
         ("mesh.rip_edge_move", {"type": 'D', "value": 'PRESS', "alt": True}, None),
         op_menu("VIEW3D_MT_edit_mesh_merge", {"type": 'M', "value": 'PRESS'}),
         op_menu("VIEW3D_MT_edit_mesh_split", {"type": 'M', "value": 'PRESS', "alt": True}),
