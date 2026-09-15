@@ -651,6 +651,7 @@ The work is staged so the build stays green at every step.
       | `space_outliner` | ~50 `ED_outliner_select_sync_*` call sites in ~15 files, several that stay |
       | `space_buttons` | 3 link symbols reached via RNA/templates, not headers |
       | `space_clip` | 15+ symbols across mask, transform, screen, gpencil, RNA and Python - UI templates (`uiTemplateMovieClip`, `uiTemplateTrack`, `uiTemplateMarker`, `uiTemplateMovieclipInformation`), context dirs (`clip_context_dir`) and `ED_space_clip_get/set_clip/mask` |
+      | `space_node` | 20+ symbols, and the decisive one is that **`bf_nodes` itself** needs `ED_init_standard_node_socket_type` and `ED_init_node_socket_type_virtual` - the node *system* depends on the node *editor*. Also `ED_node_clipboard_free` in `wm_init_exit.cc`, `ED_node_is_compositor` in `wm_draw.c`, and the whole `ED_node_tree_*` family in `rna_space.c` |
       | `space_nla` | **done - six single call sites** |
 
       Deleted so far: `space_spreadsheet` (132 KB, three attempts), `space_nla`
