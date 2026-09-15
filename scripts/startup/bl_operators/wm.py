@@ -3327,6 +3327,64 @@ class WM_OT_drop_blend_file(Operator):
         col.operator("wm.append", text="Append...", icon='APPEND_BLEND').filepath = self.filepath
 
 
+class WM_OT_save_active_file(Operator):
+    """Save whatever the focused component edits, to its own file"""
+
+    bl_idname = "wm.save_active_file"
+    bl_label = "Save"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        # BLUI always has a component in focus; there is no document to save
+        # without one.
+        return context.area is not None
+
+    def execute(self, context):
+        area = context.area
+        space = area.spaces.active
+
+        # Text editor: write the buffer back to the file it came from.
+        if area.type == 'TEXT_EDITOR':
+            text = getattr(space, "text", None)
+            if text is None:
+                self.report({'INFO'}, "No text to save")
+                return {'CANCELLED'}
+            if not text.filepath:
+                self.report({'WARNING'},
+                            "\"%s\" has no file path yet, use Text > Save As" % text.name)
+                return {'CANCELLED'}
+            if 'FINISHED' not in bpy.ops.text.save():
+                self.report({'WARNING'}, "Could not save \"%s\"" % text.filepath)
+                return {'CANCELLED'}
+            self.report({'INFO'}, "Saved \"%s\"" % text.filepath)
+            return {'FINISHED'}
+
+        # Image editor: write the image back to its file.
+        if area.type == 'IMAGE_EDITOR':
+            image = getattr(space, "image", None)
+            if image is None:
+                self.report({'INFO'}, "No image to save")
+                return {'CANCELLED'}
+            if not image.filepath:
+                self.report({'WARNING'},
+                            "\"%s\" has no file path yet, use Image > Save As" % image.name)
+                return {'CANCELLED'}
+            if 'FINISHED' not in bpy.ops.image.save():
+                self.report({'WARNING'}, "Could not save \"%s\"" % image.filepath)
+                return {'CANCELLED'}
+            self.report({'INFO'}, "Saved \"%s\"" % image.filepath)
+            return {'FINISHED'}
+
+        # Everything else is a viewer: a file browser, the console, or the
+        # preferences. None of them own a file, and BLUI deliberately has no
+        # document that could be written instead.
+        self.report({'INFO'},
+                    "%s has nothing of its own to save. BLUI edits files, "
+                    "not a document." % area.type.replace('_', ' ').title())
+        return {'CANCELLED'}
+
+
 classes = (
     WM_OT_context_collection_boolean_set,
     WM_OT_context_cycle_array,
@@ -3357,6 +3415,7 @@ classes = (
     WM_OT_properties_edit,
     WM_OT_properties_edit_value,
     WM_OT_properties_remove,
+    WM_OT_save_active_file,
     WM_OT_sysinfo,
     WM_OT_owner_disable,
     WM_OT_owner_enable,

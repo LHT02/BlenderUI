@@ -595,12 +595,14 @@ def km_window(params):
         ])
 
     items.extend([
-        # File operations
-        op_menu("TOPBAR_MT_file_new", {"type": 'N', "value": 'PRESS', "ctrl": True}),
-        op_menu("TOPBAR_MT_file_open_recent", {"type": 'O', "value": 'PRESS', "shift": True, "ctrl": True}),
-        ("wm.open_mainfile", {"type": 'O', "value": 'PRESS', "ctrl": True}, None),
-        ("wm.save_mainfile", {"type": 'S', "value": 'PRESS', "ctrl": True}, None),
-        ("wm.save_as_mainfile", {"type": 'S', "value": 'PRESS', "shift": True, "ctrl": True}, None),
+        # File operations.
+        #
+        # BLUI has no document to create, open or save as: the components edit
+        # real files and each saves its own. So Ctrl+N (new .blend), Ctrl+O
+        # (open .blend), Ctrl+Shift+O (recent .blend) and Ctrl+Shift+S (save as
+        # .blend) are gone, and Ctrl+S saves what the focused component is
+        # editing. Opening is per component, from each editor's own header.
+        ("wm.save_active_file", {"type": 'S', "value": 'PRESS', "ctrl": True}, None),
         ("wm.quit_blender", {"type": 'Q', "value": 'PRESS', "ctrl": True}, None),
 
         # Quick menu and toolbar

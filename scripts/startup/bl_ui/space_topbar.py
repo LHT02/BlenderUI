@@ -215,7 +215,9 @@ class TOPBAR_MT_blender(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("wm.splash")
+        # BLUI: the splash is disabled (USER_SPLASH_DISABLE), and its only other
+        # route was into the app-template / New File menus, which are built
+        # around .blend documents BLUI does not use. About stays.
         layout.operator("wm.splash_about")
 
         layout.separator()
@@ -271,39 +273,22 @@ class TOPBAR_MT_file(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator_context = 'INVOKE_AREA'
-        layout.menu("TOPBAR_MT_file_new", text="New", text_ctxt=i18n_contexts.id_windowmanager, icon='FILE_NEW')
-        layout.operator("wm.open_mainfile", text="Open...", icon='FILE_FOLDER')
-        layout.menu("TOPBAR_MT_file_open_recent")
-        layout.operator("wm.revert_mainfile")
-        layout.menu("TOPBAR_MT_file_recover")
-
-        layout.separator()
-
-        layout.operator_context = 'EXEC_AREA' if context.blend_data.is_saved else 'INVOKE_AREA'
-        layout.operator("wm.save_mainfile", text="Save", icon='FILE_TICK')
-
-        layout.operator_context = 'INVOKE_AREA'
-        layout.operator("wm.save_as_mainfile", text="Save As...")
-        layout.operator_context = 'INVOKE_AREA'
-        layout.operator("wm.save_as_mainfile", text="Save Copy...").copy = True
-
-        layout.separator()
-
-        layout.operator_context = 'INVOKE_AREA'
-        layout.operator("wm.link", text="Link...", icon='LINK_BLEND')
-        layout.operator("wm.append", text="Append...", icon='APPEND_BLEND')
-        layout.menu("TOPBAR_MT_file_previews")
-
-        layout.separator()
-
-        layout.menu("TOPBAR_MT_file_import", icon='IMPORT')
-        layout.menu("TOPBAR_MT_file_export", icon='EXPORT')
-
-        layout.separator()
-
-        layout.menu("TOPBAR_MT_file_external_data")
-        layout.menu("TOPBAR_MT_file_cleanup")
+        # BLUI has no document.
+        #
+        # Blender's File menu is built around one: New, Open, Open Recent,
+        # Revert, Save, Save As, Save Copy, Link and Append all operate on a
+        # .blend that holds the entire session. In BLUI the files are the
+        # documents and each component writes its own - the text editor its text
+        # file, the image editor its image - so those entries are gone and Save
+        # means "save what this window is editing". See
+        # WM_OT_save_active_file. A .blend still exists, but only as BLUI's own
+        # startup and preferences format, never as something the user opens or
+        # saves.
+        #
+        # Opening is per component too: the image editor opens images from its
+        # own header menu, the text editor opens text files from its own.
+        layout.operator_context = 'EXEC_AREA'
+        layout.operator("wm.save_active_file", text="Save", icon='FILE_TICK')
 
         layout.separator()
 
@@ -740,22 +725,10 @@ class TOPBAR_MT_file_context_menu(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator_context = 'INVOKE_AREA'
-        layout.menu("TOPBAR_MT_file_new", text="New", text_ctxt=i18n_contexts.id_windowmanager, icon='FILE_NEW')
-        layout.operator("wm.open_mainfile", text="Open...", icon='FILE_FOLDER')
-
-        layout.separator()
-
-        layout.operator("wm.link", text="Link...", icon='LINK_BLEND')
-        layout.operator("wm.append", text="Append...", icon='APPEND_BLEND')
-
-        layout.separator()
-
-        layout.menu("TOPBAR_MT_file_import", icon='IMPORT')
-        layout.menu("TOPBAR_MT_file_export", icon='EXPORT')
-
-        layout.separator()
-
+        # BLUI: the .blend document entries (New, Open, Link, Append) are gone
+        # for the same reason they are gone from the File menu - BLUI edits real
+        # files and has no document. That leaves this menu as the window-level
+        # entry point it should have been: preferences.
         layout.operator("screen.userpref_show",
                         text="Preferences...", icon='PREFERENCES')
 

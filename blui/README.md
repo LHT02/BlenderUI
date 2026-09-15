@@ -263,6 +263,16 @@ image, saving in the text editor writes the text file, and neither writes a
 container that the other could clobber. Blender's `.blend` remains only as
 BLUI's internal startup/preferences format, never as a user-facing document.
 
+Implemented by `WM_OT_save_active_file` (`bl_operators/wm.py`), which is what
+`Ctrl+S` and the File menu's *Save* now run. It looks at the focused component
+and writes that component's file: `text.save` in the text editor, `image.save`
+in the image editor, and a plain "this window has nothing of its own to save"
+anywhere else. The File menu's document entries - New, Open, Open Recent,
+Revert, Recover, Save As, Save Copy, Link, Append - and their `Ctrl+N`,
+`Ctrl+O`, `Ctrl+Shift+O` and `Ctrl+Shift+S` shortcuts are gone with it.
+Verified end to end: edit a text file in the text editor, press Save, and the
+bytes on disk are the edited ones.
+
 **No splash screen.** BLUI opens straight into the Files workspace. A splash
 announces a product; here it is only something to dismiss. Implemented by
 setting `USER_SPLASH_DISABLE` in `BKE_blendfile_userdef_from_defaults()`.
