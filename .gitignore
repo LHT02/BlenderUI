@@ -73,3 +73,6 @@ waveletNoiseTile.bin
 CMakeSettings.json
 CMakePresets.json
 CMakeUserPresets.json
+
+# BLUI: object files from the standalone tool builds (see blui/tools).
+*.obj
