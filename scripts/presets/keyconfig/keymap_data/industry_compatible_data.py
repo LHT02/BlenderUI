@@ -2396,70 +2396,6 @@ def km_sculpt(params):
 
 
 # Mesh edit mode.
-def km_mesh(params):
-    items = []
-    keymap = (
-        "Mesh",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        # Selection
-        ("mesh.loop_select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'},
-         {"properties": [("extend", False), ("deselect", False), ("toggle", False), ("ring", False)]}),
-        ("mesh.loop_select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "shift": True},
-         {"properties": [("extend", True), ("deselect", False), ("toggle", False), ("ring", False)]}),
-        ("mesh.loop_select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "ctrl": True},
-         {"properties": [("extend", False), ("deselect", True), ("toggle", False), ("ring", False)]}),
-
-        ("mesh.loop_select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "alt": True},
-         {"properties": [("extend", False), ("deselect", False), ("toggle", False), ("ring", True)]}),
-        ("mesh.loop_select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "alt": True, "shift": True},
-         {"properties": [("extend", True), ("deselect", False), ("toggle", False), ("ring", True)]}),
-        ("mesh.loop_select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "alt": True, "ctrl": True},
-         {"properties": [("extend", False), ("deselect", True), ("toggle", False), ("ring", True)]}),
-
-        ("mesh.shortest_path_pick", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True},
-         {"properties": [("use_fill", False)]}),
-
-        ("mesh.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("mesh.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("mesh.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("mesh.select_more", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("mesh.select_less", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("mesh.select_linked", {"type": 'RIGHT_BRACKET', "value": 'PRESS'}, None),
-
-        *_template_items_editmode_mesh_select_mode(params),
-
-        # Hide/reveal.
-        ("mesh.hide", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("mesh.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("mesh.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        # Tools.
-        ("mesh.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
-        op_menu("VIEW3D_MT_edit_mesh_delete", {"type": 'BACK_SPACE', "value": 'PRESS'}),
-        op_menu("VIEW3D_MT_edit_mesh_delete", {"type": 'DEL', "value": 'PRESS'}),
-        ("mesh.dissolve_mode", {"type": 'BACK_SPACE', "value": 'PRESS', "ctrl": True}, None),
-        ("mesh.dissolve_mode", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_proportional_edit')]}),
-        # Menus.
-        *_template_items_context_menu("VIEW3D_MT_edit_mesh_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        # Tools
-        *_template_items_basic_tools(),
-        op_tool_cycle("builtin.bevel", {"type": 'B', "value": 'PRESS', "ctrl": True}),
-        op_tool_cycle("builtin.inset_faces", {"type": 'I', "value": 'PRESS'}),
-        op_tool_cycle("builtin.extrude_region", {"type": 'E', "value": 'PRESS', "ctrl": True}),
-        op_tool_cycle("builtin.knife", {"type": 'K', "value": 'PRESS'}),
-        op_tool_cycle("builtin.loop_cut", {"type": 'C', "value": 'PRESS', "alt": True}),
-
-    ])
-
-    return keymap
 
 
 # Armature edit mode
@@ -2810,7 +2746,6 @@ def generate_keymaps_impl(params=None):
         km_vertex_paint(params),
         km_weight_paint(params),
         km_sculpt(params),
-        km_mesh(params),
         km_object_non_modal(params),
 
         # Modal maps.
