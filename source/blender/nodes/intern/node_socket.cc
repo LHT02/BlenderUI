@@ -530,8 +530,6 @@ static void standard_node_socket_interface_from_socket(bNodeTree * /*ntree*/,
   node_socket_copy_default_value(stemp, sock);
 }
 
-extern "C" void ED_init_standard_node_socket_type(bNodeSocketType *);
-
 static bNodeSocketType *make_standard_socket_type(int type, int subtype)
 {
   const char *socket_idname = nodeStaticSocketType(type, subtype);
@@ -564,8 +562,11 @@ static bNodeSocketType *make_standard_socket_type(int type, int subtype)
   stype->type = type;
   stype->subtype = subtype;
 
-  /* XXX bad-level call! needed for setting draw callbacks */
-  ED_init_standard_node_socket_type(stype);
+  /* Blender calls `ED_init_standard_node_socket_type()` here to install the node
+   * editor's draw callbacks; its own comment reads "XXX bad-level call!". That
+   * call is what made the node *system* depend on the node *editor*. BLUI has no
+   * node editor, so nothing would ever invoke those callbacks, and the edge is
+   * gone with them. */
 
   stype->interface_init_socket = standard_node_socket_interface_init_socket;
   stype->interface_from_socket = standard_node_socket_interface_from_socket;
@@ -576,8 +577,6 @@ static bNodeSocketType *make_standard_socket_type(int type, int subtype)
 
   return stype;
 }
-
-extern "C" void ED_init_node_socket_type_virtual(bNodeSocketType *);
 
 static bNodeSocketType *make_socket_type_virtual()
 {
@@ -599,7 +598,8 @@ static bNodeSocketType *make_socket_type_virtual()
   /* extra type info for standard socket types */
   stype->type = SOCK_CUSTOM;
 
-  ED_init_node_socket_type_virtual(stype);
+  /* See the note in `make_standard_socket_type()` - same bad-level call, same
+   * reason it is gone. */
 
   stype->use_link_limits_of_type = true;
   stype->input_link_limit = 0xFFF;

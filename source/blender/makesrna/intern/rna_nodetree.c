@@ -3192,7 +3192,11 @@ static void rna_NodeSocketStandard_draw(ID *id,
 {
   PointerRNA ptr;
   RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
-  sock->typeinfo->draw(C, layout, &ptr, nodeptr, text);
+  /* BLUI has no node editor, so the draw callbacks are not installed. Guard
+   * rather than call through a NULL pointer if anything reaches this. */
+  if (sock->typeinfo->draw != NULL) {
+    sock->typeinfo->draw(C, layout, &ptr, nodeptr, text);
+  }
 }
 
 static void rna_NodeSocketStandard_draw_color(
@@ -3200,7 +3204,9 @@ static void rna_NodeSocketStandard_draw_color(
 {
   PointerRNA ptr;
   RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
-  sock->typeinfo->draw_color(C, &ptr, nodeptr, r_color);
+  if (sock->typeinfo->draw_color != NULL) {
+    sock->typeinfo->draw_color(C, &ptr, nodeptr, r_color);
+  }
 }
 
 static void rna_NodeSocketInterfaceStandard_draw(ID *id,
