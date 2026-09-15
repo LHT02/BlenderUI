@@ -828,6 +828,37 @@ The work is staged so the build stays green at every step.
       the surprise is in the *data*, reaching from a module being deleted into
       one being kept. Both directions have to be checked.
 
+      ### Two more bag shapes, and a correction
+
+      **A bag can delegate.** `ED_operatortypes_physics()` is seven lines and
+      registers nothing directly:
+
+      ```c
+      operatortypes_particle();   operatortypes_boids();   operatortypes_fluid();
+      operatortypes_pointcache(); operatortypes_dynamicpaint();
+      ```
+
+      Counting `WM_operatortype_append` inside it therefore finds an empty bag
+      and reads as "nothing to remove", which is the opposite of the truth. The
+      test has to follow the calls, not count them.
+
+      **A bag can span families.** `ED_operatortypes_object()` registers 223
+      operators across six prefixes - `OBJECT_OT_*` (190), `CONSTRAINT_OT_*`
+      (14), `GPENCIL_OT_*` (6), `POSE_OT_*` (6), `COLLECTION_OT_*` (5) and
+      `TRANSFORM_OT_*` (2). Note `POSE_OT_*` appears here *and* in
+      `ED_operatortypes_armature()`, which has already been removed - the same
+      split family as `curves`/`sculpt_curves`, and the reason those two had to
+      go together.
+
+      **A correction.** When this bag was first looked at, the two
+      `TRANSFORM_OT_*` entries read as the sequencer's `TRANSFORM_OT_seq_slide`
+      dependency and the conclusion was that `ED_operatortypes_object()` is
+      load-bearing for a component BLUI keeps. It is not: they are
+      `TRANSFORM_OT_vertex_warp` and `TRANSFORM_OT_vertex_random`. The
+      sequencer's dependency is on `transform_operatortypes()`, which is
+      registered from `ED_spacetypes_init()` and is unaffected. Worth writing
+      down because the wrong version was believed for part of a round.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
