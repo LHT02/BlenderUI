@@ -431,7 +431,7 @@ memory. Run them after any change; none of them need a person watching.
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
-| Key configuration (loads fully, Ctrl+S, Shift+F1..F6) | `check_keymap_config.py` | PASS, 135 keymaps |
+| Key configuration (loads fully, Ctrl+S, Shift+F1..F6) | `check_keymap_config.py` | PASS, 116 keymaps |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
 | Open-document isolation (item 4's target) | `check_window_isolation.py -- --strict` | FAILS today, by design |
@@ -501,7 +501,25 @@ The work is staged so the build stays green at every step.
       `%APPDATA%\Blender Foundation` byte-for-byte untouched. The Windows
       binary reports `ProductName BLUI`, `FileVersion 1.0.0`,
       `OriginalFilename BLUI.exe`.
-- [~] **Stage 2 — Physical stripping.** First batch deleted (~1,600 files):
+- [~] **Stage 2 — Physical stripping.** Where it stands:
+
+      | | Count |
+      | --- | --- |
+      | Editor modules deleted | 4 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph` (947 KB) |
+      | Legacy versioning files deleted | 8 (~788 KB) |
+      | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
+      | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
+      | `ED_operatortypes_*` calls | 26 → 15 (all kept components or blocked families) |
+      | Operator bags removed whole | 11 |
+      | Families removed from inside a bag | 8 |
+      | Keymaps | 135 → 116 |
+      | Startup warning lines | 10 → 2 |
+
+      Everything still registered belongs to a component BLUI keeps, or is
+      blocked by one - the rejections and the reason for each are in the tables
+      below. There is no target left that has not been measured.
+
+      First batch deleted (~1,600 files):
       - `intern/cycles` — the entire Cycles renderer
       - `source/blender/freestyle` — the Freestyle line-rendering engine
       - `source/blender/editors/io` + `source/blender/io/{alembic,collada,common,usd}`
