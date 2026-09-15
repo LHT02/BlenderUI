@@ -470,6 +470,7 @@ elseif(WIN32)
     intern/GHOST_ShellMenuWin32.cc
     intern/GHOST_SystemWin32.cc
     intern/GHOST_TrackpadWin32.cc
+    intern/GHOST_TrayWin32.cc
     intern/GHOST_WindowWin32.cc
     intern/GHOST_Wintab.cc
 
@@ -481,6 +482,7 @@ elseif(WIN32)
     intern/GHOST_SystemWin32.hh
     intern/GHOST_TaskbarWin32.hh
     intern/GHOST_TrackpadWin32.hh
+    intern/GHOST_TrayWin32.hh
     intern/GHOST_WindowWin32.hh
     intern/GHOST_Wintab.hh
   )

@@ -269,6 +269,15 @@ typedef enum {
 
   GHOST_kEventQuitRequest,
 
+  /**
+   * BLUI: an entry in the system tray menu was chosen.
+   *
+   * \note #GHOST_GetEventData returns a NUL terminated command string, which
+   * the application interprets. The tray menu lives outside the window, so
+   * there is no other way for it to reach the event loop.
+   */
+  GHOST_kEventTrayCommand,
+
   GHOST_kEventWindowClose,
   GHOST_kEventWindowActivate,
   GHOST_kEventWindowDeactivate,

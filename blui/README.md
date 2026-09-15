@@ -316,6 +316,25 @@ operation, not a tab strip.
 desktop shell, it should be reachable without a window being open: a tray icon
 whose menu can open a specific component directly, Settings in particular.
 
+Status: the tray icon itself is written and builds.
+`intern/ghost/intern/GHOST_TrayWin32.cc` creates a hidden window, installs the
+icon with `Shell_NotifyIcon`, and shows a `TrackPopupMenu` built from a list of
+(label, command) pairs. Choosing an entry does not run anything there - the
+callback fires on the Win32 message loop, where running application code is
+unsafe - so it pushes a `GHOST_kEventTrayCommand` carrying the command string.
+Reached from Python through `GHOST_TrayAdd()` / `GHOST_TrayRemove()`.
+
+Not yet wired to the application. Two things are needed:
+
+* an `wm_event_add_ghostevent()` case that turns `GHOST_kEventTrayCommand` into
+  the matching action, which means building a `bContext` because the tray has no
+  window of its own;
+* BLUI must stop quitting when the last window closes, otherwise the tray is
+  only reachable while a window is already open - which defeats the point.
+  Blender exits on last-window-close today.
+
+Nothing calls `GHOST_TrayAdd()` yet, so no icon appears.
+
 ## Roadmap
 
 The work is staged so the build stays green at every step.

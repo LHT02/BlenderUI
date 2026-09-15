@@ -133,6 +133,30 @@ extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle
 extern GHOST_TSuccess GHOST_GetCursorScreenPosition(int *r_x, int *r_y);
 
 /**
+ * Install the system tray icon with a menu.
+ *
+ * BLUI sits alongside the desktop shell, so it has to be reachable without one
+ * of its windows being open. Choosing a menu entry does not run anything here:
+ * it is delivered as a #GHOST_kEventTrayCommand whose data is the matching
+ * command string, so the application decides what it means.
+ *
+ * \param tooltip: UTF-8 tooltip, may be NULL.
+ * \param labels: UTF-8 labels, parallel to \a commands. A NULL or empty entry
+ *        is drawn as a separator.
+ * \param commands: UTF-8 command strings, parallel to \a labels.
+ * \param count: Number of entries.
+ * \return #GHOST_kSuccess if the icon was installed. Platforms without a tray
+ *         return #GHOST_kFailure.
+ */
+extern GHOST_TSuccess GHOST_TrayAdd(const char *tooltip,
+                                    const char *const *labels,
+                                    const char *const *commands,
+                                    int count);
+
+/** Remove the tray icon. Safe to call when none is installed. */
+extern void GHOST_TrayRemove(void);
+
+/**
  * Creates an event consumer object
  * \param eventCallback: The event callback routine.
  * \param userdata: Pointer to user data returned to the callback routine.

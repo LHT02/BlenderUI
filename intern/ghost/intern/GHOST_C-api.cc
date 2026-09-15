@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "GHOST_C-api.h"
 #include "GHOST_IEvent.hh"
@@ -24,9 +25,13 @@
 
 #ifdef WIN32
 /* GHOST_StartDragFiles needs the Win32 window handle and the OLE drop source;
- * GHOST_ShowShellContextMenu additionally needs the shell menu host. */
+ * GHOST_ShowShellContextMenu additionally needs the shell menu host, and
+ * GHOST_TrayAdd the tray icon. */
 #  include "intern/GHOST_DragSourceWin32.hh"
+#  include "intern/GHOST_EventString.hh"
 #  include "intern/GHOST_ShellMenuWin32.hh"
+#  include "intern/GHOST_SystemWin32.hh"
+#  include "intern/GHOST_TrayWin32.hh"
 #  include "intern/GHOST_WindowWin32.hh"
 #endif
 
@@ -151,6 +156,72 @@ GHOST_TSuccess GHOST_GetCursorScreenPosition(int *r_x, int *r_y)
   (void)r_x;
   (void)r_y;
   return GHOST_kFailure;
+#endif
+}
+
+#ifdef WIN32
+namespace {
+
+/**
+ * Runs on the Win32 message loop when a tray entry is chosen. Application code
+ * must not run here, so the command is copied onto the event queue and the
+ * application picks it up on its next pass.
+ */
+void tray_command_handler(const char *command, void *user_data)
+{
+  GHOST_SystemWin32 *system = static_cast<GHOST_SystemWin32 *>(user_data);
+  if (system == nullptr || command == nullptr) {
+    return;
+  }
+  char *copy = static_cast<char *>(malloc(strlen(command) + 1));
+  if (copy == nullptr) {
+    return;
+  }
+  strcpy(copy, command);
+  /* GHOST_EventString takes ownership and frees it. */
+  system->pushEvent(new GHOST_EventString(
+      system->getMilliSeconds(), GHOST_kEventTrayCommand, nullptr, copy));
+}
+
+}  // namespace
+#endif
+
+GHOST_TSuccess GHOST_TrayAdd(const char *tooltip,
+                             const char *const *labels,
+                             const char *const *commands,
+                             int count)
+{
+#ifdef WIN32
+  if (labels == nullptr || commands == nullptr || count <= 0) {
+    return GHOST_kFailure;
+  }
+
+  std::vector<GHOST_TrayItem> items;
+  items.reserve(size_t(count));
+  for (int i = 0; i < count; i++) {
+    GHOST_TrayItem item;
+    item.label = labels[i];
+    item.command = commands[i];
+    items.push_back(item);
+  }
+
+  GHOST_SystemWin32 *system = static_cast<GHOST_SystemWin32 *>(GHOST_ISystem::getSystem());
+  GHOST_TrayWin32_SetCommandHandler(tray_command_handler, system);
+
+  return GHOST_TrayWin32_Add(tooltip, items.data(), count) ? GHOST_kSuccess : GHOST_kFailure;
+#else
+  (void)tooltip;
+  (void)labels;
+  (void)commands;
+  (void)count;
+  return GHOST_kFailure;
+#endif
+}
+
+void GHOST_TrayRemove(void)
+{
+#ifdef WIN32
+  GHOST_TrayWin32_Remove();
 #endif
 }
 
