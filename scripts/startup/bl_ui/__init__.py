@@ -82,6 +82,9 @@ _modules = [
     "space_view3d",
     "space_view3d_toolbar",
 
+    # BLUI's own headers (application menus, since there is no top bar).
+    "space_blui",
+
     # XXX, keep last so panels show after all other tool options.
     "properties_workspace",
 ]

@@ -174,6 +174,31 @@ written as a timer-driven state machine on purpose: `window.workspace = ...`
 does not update `window.screen` inside a single script run, so each step has to
 happen in its own pass through the event loop.
 
+### No top bar, no status bar
+
+Blender's top bar carries the workspace tabs plus the scene and view-layer
+switchers; its status bar carries operator hints and scene statistics. Both
+exist because Blender is one document that you switch modes within. A BLUI
+component is a window of its own, so neither bar has anything to switch
+between, and together they were the loudest remaining "this is Blender" cue.
+
+`ED_screen_global_areas_refresh()` therefore creates no global areas for any
+window - child and temporary windows never had them, BLUI applies that to
+every window. Verified: every workspace's area reports `xy=(0,0)` and the full
+window size, with no strip reserved at the top or bottom.
+
+Two things lived in those bars and had to go somewhere:
+
+* the **File / Edit / Window / Help menus**, which are now drawn by BLUI's own
+  editor headers in `scripts/startup/bl_ui/space_blui.py`, one per component
+  space type. This is where someone using a file browser looks for them anyway.
+* the **reports banner** ("Cannot do that here"), which rides along in the same
+  header so operator feedback is not lost.
+
+Switching between components is now a window-level concern rather than a tab
+strip, which is the direction the product is heading: separate windows for the
+explorer, the image viewer and the text editor.
+
 ### Brand art
 
 `release/datafiles/splash.png` and `blender_logo.png` are also compiled in, and
@@ -241,6 +266,12 @@ BLUI's internal startup/preferences format, never as a user-facing document.
 **No splash screen.** BLUI opens straight into the Files workspace. A splash
 announces a product; here it is only something to dismiss. Implemented by
 setting `USER_SPLASH_DISABLE` in `BKE_blendfile_userdef_from_defaults()`.
+
+**No top bar and no status bar, and real windows instead.** Blender's top bar
+existed to switch workspaces and scenes within one document, and its status bar
+to report on that document. Neither fits a set of independent component
+windows, and both read as Blender chrome. Switching components is a window-level
+operation, not a tab strip.
 
 **A system tray entry point.** Because BLUI is meant to sit alongside the
 desktop shell, it should be reachable without a window being open: a tray icon

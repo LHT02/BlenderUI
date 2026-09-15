@@ -1070,79 +1070,19 @@ static void screen_area_set_geometry_rect(ScrArea *area, const rcti *rect)
   area->v4->vec.y = rect->ymin;
 }
 
-static void screen_global_area_refresh(wmWindow *win,
-                                       bScreen *screen,
-                                       const eSpace_Type space_type,
-                                       GlobalAreaAlign align,
-                                       const rcti *rect,
-                                       const short height_cur,
-                                       const short height_min,
-                                       const short height_max)
-{
-  /* Full-screens shouldn't have global areas. Don't touch them. */
-  if (screen->state == SCREENFULL) {
-    return;
-  }
+/* BLUI removed the global-area builders from here:
+ *
+ *   screen_global_area_refresh()
+ *   screen_global_header_size()
+ *   screen_global_topbar_area_refresh()
+ *   screen_global_statusbar_area_refresh()
+ *
+ * ED_screen_global_areas_refresh() below no longer creates global areas, so
+ * nothing would call them and they would only produce unused-function warnings.
+ * They are recoverable from git history if BLUI ever wants a top or status bar
+ * back; the two refresh functions are the only ones that describe the layout.
+ */
 
-  ScrArea *area = NULL;
-  LISTBASE_FOREACH (ScrArea *, area_iter, &win->global_areas.areabase) {
-    if (area_iter->spacetype == space_type) {
-      area = area_iter;
-      break;
-    }
-  }
-
-  if (area) {
-    screen_area_set_geometry_rect(area, rect);
-  }
-  else {
-    area = screen_area_create_with_geometry(&win->global_areas, rect, space_type);
-    screen_area_spacelink_add(WM_window_get_active_scene(win), area, space_type);
-
-    /* Data specific to global areas. */
-    area->global = MEM_callocN(sizeof(*area->global), __func__);
-    area->global->size_max = height_max;
-    area->global->size_min = height_min;
-    area->global->align = align;
-  }
-
-  if (area->global->cur_fixed_height != height_cur) {
-    /* Refresh layout if size changes. */
-    area->global->cur_fixed_height = height_cur;
-    screen->do_refresh = true;
-  }
-}
-
-static int screen_global_header_size(void)
-{
-  return (int)ceilf(ED_area_headersize() / UI_SCALE_FAC);
-}
-
-static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
-{
-  const short size = screen_global_header_size();
-  rcti rect;
-
-  BLI_rcti_init(&rect, 0, WM_window_pixels_x(win) - 1, 0, WM_window_pixels_y(win) - 1);
-  rect.ymin = rect.ymax - size;
-
-  screen_global_area_refresh(
-      win, screen, SPACE_TOPBAR, GLOBAL_AREA_ALIGN_TOP, &rect, size, size, size);
-}
-
-static void screen_global_statusbar_area_refresh(wmWindow *win, bScreen *screen)
-{
-  const short size_min = 1;
-  const short size_max = 0.8f * screen_global_header_size();
-  const short size = (screen->flag & SCREEN_COLLAPSE_STATUSBAR) ? size_min : size_max;
-  rcti rect;
-
-  BLI_rcti_init(&rect, 0, WM_window_pixels_x(win) - 1, 0, WM_window_pixels_y(win) - 1);
-  rect.ymax = rect.ymin + size_max;
-
-  screen_global_area_refresh(
-      win, screen, SPACE_STATUSBAR, GLOBAL_AREA_ALIGN_BOTTOM, &rect, size, size_min, size_max);
-}
 
 void ED_screen_global_areas_sync(wmWindow *win)
 {
@@ -1163,18 +1103,25 @@ void ED_screen_global_areas_sync(wmWindow *win)
 
 void ED_screen_global_areas_refresh(wmWindow *win)
 {
-  /* Don't create global area for child and temporary windows. */
+  /* BLUI has no top bar and no status bar, in any window.
+   *
+   * Blender's top bar carries the workspace tabs plus the scene and view-layer
+   * switchers, and its status bar carries operator hints and scene statistics.
+   * Both exist because Blender is a single document that you switch modes
+   * within. A BLUI component is a window of its own - a file browser, an image
+   * viewer, a text editor - so neither bar has anything to switch between, and
+   * together they were the loudest remaining "this is Blender" cue.
+   *
+   * Child and temporary windows never had global areas; BLUI just applies that
+   * to every window. The File / Edit / Window / Help menus that lived in the top
+   * bar are drawn by BLUI's own editor headers instead, and the reports banner
+   * that lived in the status bar moves there with them, so nothing is lost.
+   */
   bScreen *screen = BKE_workspace_active_screen_get(win->workspace_hook);
-  if ((win->parent != NULL) || screen->temp) {
-    if (win->global_areas.areabase.first) {
-      screen->do_refresh = true;
-      BKE_screen_area_map_free(&win->global_areas);
-    }
-    return;
+  if (win->global_areas.areabase.first) {
+    screen->do_refresh = true;
+    BKE_screen_area_map_free(&win->global_areas);
   }
-
-  screen_global_topbar_area_refresh(win, screen);
-  screen_global_statusbar_area_refresh(win, screen);
 }
 
 /* -------------------------------------------------------------------- */
