@@ -76,7 +76,6 @@
 #include "ED_gpencil_legacy.h"
 #include "ED_image.h"
 #include "ED_keyframes_keylist.h"
-#include "ED_lattice.h"
 #include "ED_mball.h"
 #include "ED_mesh.h"
 #include "ED_object.h"

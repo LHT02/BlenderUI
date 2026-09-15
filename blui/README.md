@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 5 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script` (958 KB) |
+      | Editor modules deleted | 6 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice` (999 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -1028,7 +1028,7 @@ The work is staged so the build stays green at every step.
 
       | Module | Size | Consumers left |
       | --- | --- | --- |
-      | `lattice` | 40 KB | `space_view3d/view3d_select.cc`, 4 sites |
+      | `lattice` | 40 KB | **deleted** - see below |
       | `metaball` | 35 KB | `space_view3d`, 1 site; `object`, 4 sites |
 
       (The other four - `armature` 583 KB, `mesh` 1334 KB, `curve` 486 KB,
@@ -1050,6 +1050,48 @@ The work is staged so the build stays green at every step.
       - Each module still carries its now-uncalled `ED_*_undosys_type()`
         definition. That is dead code, but it belongs to the module that will
         take it away, so it was left in place rather than deleted piecemeal.
+
+      ### `editors/lattice/` is deleted
+
+      The first module to fall to the undo-registry cut, and the shape of the
+      cut is the point: four call sites, all in `space_view3d/view3d_select.cc`,
+      and five includes that had been dead for a while.
+
+      The four sites were the lattice edit-mode pre-deselect
+      (`ED_lattice_flags_set(obedit, 0)`, three times - lasso, box, circle) and
+      the lattice branch of the edit-mode click dispatch
+      (`ED_lattice_select_pick`). Both are unreachable: BLUI has no edit mode at
+      all. Removing them leaves `do_lasso_select_lattice`, `do_lattice_box_select`
+      and the circle handler in place but inert, which is deliberate - they are
+      `space_view3d`'s code and die with it, not with this module.
+
+      Five of the six `ED_lattice.h` includes were already dead and had been
+      since `ED_operatortypes_lattice()` was removed: `space_api/spacetypes.c`,
+      `object/object_edit.cc`, `makesrna/rna_object.c` and
+      `makesrna/rna_lattice.c` all included the header without calling anything
+      in it. Only `space_view3d/view3d_select.cc` was live. That is the same
+      leftover pattern as the `ED_uvedit.h` include in `spacetypes.c`, and it is
+      worth expecting: removing an operator bag takes the calls but leaves the
+      include, because nothing warns about an unused include of a header whose
+      symbols are all gone.
+
+      `bf_editor_lattice` had an **empty `LIB`**, which is why this one was safe
+      to unlink outright - unlike `bf_editor_uvedit`, which turned out to be a
+      linker hub carrying `bf_editor_object` and `bf_editor_mesh` into the
+      executable for other modules. Check the `LIB` list before removing a link.
+
+      `ED_lattice.h` went with it (all five of its declarations were lattice
+      edit-mode entry points plus the undo type). The `Lattice` **ID and its DNA
+      stay**: that is a data type the depsgraph, modifiers and RNA still use, and
+      it is not what this deletion was about.
+
+      A note on the build, because it cost a cycle: the three pre-deselect blocks
+      are textually identical, so they were cut with one `replace_all` edit - and
+      that matched only two of them, because the circle-select copy is the only
+      one with no blank line after the closing brace. The compiler named the
+      survivor (`view3d_select.cc(4522)`), which is the cheapest possible way to
+      find it, but a `replace_all` across differently-formatted copies of the
+      same block is worth not trusting.
 
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 

@@ -336,7 +336,6 @@ const EnumPropertyItem rna_enum_object_axis_items[] = {
 #  include "DEG_depsgraph_build.h"
 
 #  include "ED_curve.h"
-#  include "ED_lattice.h"
 #  include "ED_object.h"
 #  include "ED_particle.h"
 

@@ -72,7 +72,6 @@
 #include "ED_curve.h"
 #include "ED_curves.h"
 #include "ED_gpencil_legacy.h"
-#include "ED_lattice.h"
 #include "ED_mball.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
@@ -997,10 +996,6 @@ static bool do_lasso_select_lattice(ViewContext *vc,
   BLI_lasso_boundbox(&rect, mcoords, mcoords_len);
 
   view3d_userdata_lassoselect_init(&data, vc, &rect, mcoords, mcoords_len, sel_op);
-
-  if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-    data.is_changed |= ED_lattice_flags_set(vc->obedit, 0);
-  }
 
   ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d); /* for foreach's screen/vert projection */
   lattice_foreachScreenVert(
@@ -3169,9 +3164,6 @@ static int view3d_select_exec(bContext *C, wmOperator *op)
         changed = ED_armature_edit_select_pick(C, mval, &params);
       }
     }
-    else if (obedit->type == OB_LATTICE) {
-      changed = ED_lattice_select_pick(C, mval, &params);
-    }
     else if (ELEM(obedit->type, OB_CURVES_LEGACY, OB_SURF)) {
       changed = ED_curve_editnurb_select_pick(
           C, mval, ED_view3d_select_dist_px(), vert_without_handles, &params);
@@ -3534,10 +3526,6 @@ static bool do_lattice_box_select(ViewContext *vc, const rcti *rect, const eSele
   BoxSelectUserData data;
 
   view3d_userdata_boxselect_init(&data, vc, rect, sel_op);
-
-  if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-    data.is_changed |= ED_lattice_flags_set(vc->obedit, 0);
-  }
 
   ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d); /* for foreach's screen/vert projection */
   lattice_foreachScreenVert(
@@ -4530,9 +4518,6 @@ static bool lattice_circle_select(ViewContext *vc,
 
   view3d_userdata_circleselect_init(&data, vc, select, mval, rad);
 
-  if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-    data.is_changed |= ED_lattice_flags_set(vc->obedit, 0);
-  }
   ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d); /* for foreach's screen/vert projection */
 
   lattice_foreachScreenVert(vc, latticecurve_circle_doSelect, &data, V3D_PROJ_TEST_CLIP_DEFAULT);
