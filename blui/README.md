@@ -266,8 +266,26 @@ Verified: `wm.window_new(workspace="Settings")` produces a second window whose
 workspace is `Settings` holding a `PREFERENCES` area, while `wm.window_new()`
 with no argument still copies the current component.
 
-Still shared: all windows read one `Main`, so they are independent in what they
-*show* but not yet in the data they hold.
+Editor isolation: every new window now gets its **own layout**. Blender's
+`wm.window_new` shares the source window's layout, a layout owns the screen, and
+the screen owns the areas and their spaces — so two windows on one layout are
+two views of the same editor. Two text editor windows shared a single
+`SpaceText`, which meant opening a file in one changed what the other was
+editing, and the image viewer had the same problem. `wm.window_new` now
+duplicates the layout (and, when a component is named, duplicates that
+workspace's layout for the new window).
+
+Verified with `blui/tools/check_window_isolation.py`, which opens two Text
+windows and compares them:
+
+| | distinct screens | `SpaceText` shared |
+| --- | --- | --- |
+| before | 2 of 3 | yes |
+| after | 3 of 3 | no |
+
+Still shared: the datablocks themselves live in one `Main`, so the list of open
+texts and images is common to all windows even though no two windows are looking
+at the same one.
 
 **Saving is per file, and isolated.** Saving in the image editor writes the
 image, saving in the text editor writes the text file, and neither writes a

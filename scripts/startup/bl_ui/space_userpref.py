@@ -2460,25 +2460,16 @@ classes = (
     USERPREF_PT_interface_menus_mouse_over,
     USERPREF_PT_interface_menus_pie,
 
-    USERPREF_PT_viewport_display,
-    USERPREF_PT_viewport_quality,
-    USERPREF_PT_viewport_textures,
-    USERPREF_PT_viewport_selection,
-    USERPREF_PT_viewport_subdivision,
+    # BLUI: the Viewport and Animation panels are not registered. Their
+    # preferences sections are gone, so they could never be drawn; registering
+    # a panel that can never appear only makes this list harder to read.
 
-    USERPREF_PT_edit_objects,
-    USERPREF_PT_edit_objects_new,
-    USERPREF_PT_edit_objects_duplicate_data,
-    USERPREF_PT_edit_cursor,
-    USERPREF_PT_edit_annotations,
-    USERPREF_PT_edit_weight_paint,
-    USERPREF_PT_edit_gpencil,
+    # BLUI: of Blender's Editing panels only Text Editor and Miscellaneous mean
+    # anything here. Objects, New Objects, Duplicate Data, 3D Cursor,
+    # Annotations, Weight Paint and Grease Pencil all configure 3D content
+    # creation, which BLUI does not do.
     USERPREF_PT_edit_text_editor,
     USERPREF_PT_edit_misc,
-
-    USERPREF_PT_animation_timeline,
-    USERPREF_PT_animation_keyframes,
-    USERPREF_PT_animation_fcurves,
 
     # BLUI: USERPREF_PT_system_cycles_devices is not registered - BLUI has no
     # Cycles, so the panel could only ever draw an empty box.
@@ -2492,20 +2483,19 @@ classes = (
     USERPREF_PT_theme,
     USERPREF_PT_theme_interface_state,
     USERPREF_PT_theme_interface_styles,
-    USERPREF_PT_theme_interface_gizmos,
+    # BLUI: Axis & Gizmo Colors, Bone Color Sets, Collection Colors and Strip
+    # Colors all colour 3D data. The rest of the theme panels are about the
+    # interface itself, which BLUI does have.
     USERPREF_PT_theme_interface_transparent_checker,
     USERPREF_PT_theme_interface_icons,
     USERPREF_PT_theme_text_style,
-    USERPREF_PT_theme_bone_color_sets,
-    USERPREF_PT_theme_collection_colors,
-    USERPREF_PT_theme_strip_colors,
 
     USERPREF_PT_file_paths_data,
     USERPREF_PT_file_paths_script_directories,
-    USERPREF_PT_file_paths_render,
+    # BLUI: the Render, Development and Asset Libraries paths are not
+    # registered - the first configures a renderer BLUI does not have, and the
+    # other two are for building and browsing 3D assets.
     USERPREF_PT_file_paths_applications,
-    USERPREF_PT_file_paths_development,
-    USERPREF_PT_file_paths_asset_libraries,
 
     USERPREF_PT_saveload_blend,
     USERPREF_PT_saveload_blend_autosave,

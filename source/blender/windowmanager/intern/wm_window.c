@@ -1025,46 +1025,51 @@ int wm_window_close_exec(bContext *C, wmOperator *UNUSED(op))
 int wm_window_new_exec(bContext *C, wmOperator *op)
 {
   wmWindow *win_src = CTX_wm_window(C);
-  ScrArea *area = BKE_screen_find_big_area(CTX_wm_screen(C), SPACE_TYPE_ANY, 0);
+  Main *bmain = CTX_data_main(C);
 
-  wmWindow *win_new = WM_window_open(C,
-                                     IFACE_(BLUI_PRODUCT_NAME),
-                                     0,
-                                     0,
-                                     win_src->sizex * 0.95f,
-                                     win_src->sizey * 0.9f,
-                                     area->spacetype,
-                                     false,
-                                     false,
-                                     false,
-                                     WIN_ALIGN_PARENT_CENTER);
-
+  /* BLUI: every new window gets its own layout.
+   *
+   * Blender's wm.window_new shares the source window's layout, a layout owns
+   * the screen, and the screen owns the areas and their spaces. Two windows on
+   * one layout are therefore two views of the same editor: two text editor
+   * windows would share a single SpaceText, so opening a file in one would
+   * change what the other is editing, and the same goes for the image viewer.
+   *
+   * Duplicating the layout is what turns "another window" into "another
+   * component". Verified with blui/tools/check_window_isolation.py, which
+   * compares the SpaceText pointers of two Text windows.
+   */
+  wmWindow *win_new = wm_window_copy_test(C, win_src, true, false);
   if (win_new == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Failed to create window");
     return OPERATOR_CANCELLED;
   }
 
-  /* BLUI: let the caller choose which component the new window shows.
-   *
-   * Blender opens a new window on the same workspace and treats workspaces as
-   * tabs within one document. BLUI has no such document: a component is a
-   * window, so "open Settings" means a window running the Settings component.
-   * Naming the workspace is what makes that possible, and it is also what a
-   * system tray entry would call.
-   */
+  /* Which component the new window should show. Blender treats workspaces as
+   * tabs within one document; BLUI has no such document, so naming one is how
+   * "open Settings" becomes a window rather than a tab. */
   char workspace_name[MAX_NAME];
   RNA_string_get(op->ptr, "workspace", workspace_name);
   if (workspace_name[0] != '\0') {
-    Main *bmain = CTX_data_main(C);
     /* Workspace names carry the two character ID prefix, hence the `+ 2`. */
     WorkSpace *workspace = BLI_findstring(
         &bmain->workspaces, workspace_name, offsetof(ID, name) + 2);
-    if (workspace != NULL) {
-      BKE_workspace_active_set(win_new->workspace_hook, workspace);
+    if (workspace == NULL) {
+      BKE_reportf(op->reports, RPT_WARNING, "No component named \"%s\"", workspace_name);
+      return OPERATOR_FINISHED;
     }
-    else {
-      BKE_reportf(
-          op->reports, RPT_WARNING, "No component named \"%s\"", workspace_name);
+
+    BKE_workspace_active_set(win_new->workspace_hook, workspace);
+
+    /* The layout the copy brought over belongs to the source workspace, so this
+     * window needs its own copy of the requested workspace's layout. Without
+     * it, two windows on the same component would share one screen again. */
+    WorkSpaceLayout *layout_src = workspace->layouts.first;
+    if (layout_src != NULL) {
+      WorkSpaceLayout *layout_new = ED_workspace_layout_duplicate(
+          bmain, workspace, layout_src, win_new);
+      BKE_workspace_active_layout_set(
+          win_new->workspace_hook, win_new->winid, workspace, layout_new);
     }
   }
 
