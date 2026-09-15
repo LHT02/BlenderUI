@@ -167,21 +167,25 @@ void ED_spacemacros_init(void)
    *
    * An operator and the keymap data that names it have to be removed in the
    * same step. */
-  ED_operatormacros_armature();
   ED_operatormacros_mesh();
   ED_operatormacros_uvedit();
-  ED_operatormacros_metaball();
-  /* `ED_operatormacros_node()` went with the node editor. Its macros are built
-   * from node operators that are no longer registered, and that is where the
-   * ten `OperatorProperties.* not found` lines at startup came from. The keymap
-   * data names no node operator outside a helper nothing calls. */
+  /* BLUI registers macros only for the modes it still has keymaps for.
+   * `_metaball()`, `_armature()`, `_curve()`, `_clip()` and `_mask()` are gone,
+   * each verified by `check_keymap_config.py` to leave the configuration
+   * loading.
+   *
+   * `_mesh()` and `_uvedit()` stay, and they are the reason this cannot be done
+   * by reading: the keymap data still names one of their macro sub-properties -
+   * `TRANSFORM_OT_edge_slide` in the mesh keymap, and a UV one alongside it.
+   * `bl_keymap_utils/io.py` calls `property_unset()` on those, which raises
+   * rather than warns, so the whole configuration fails to load and BLUI starts
+   * with 7 keymaps instead of 135. Their keymap data has to come out first. */
   ED_operatormacros_object();
+  /* `ED_operatormacros_metaball()`, `_armature()` and `_curve()` went with their
+   * keymaps - no keymap left names one of their macros. `_mesh()`, `_uvedit()`
+   * and `_object()` stay because a surviving keymap still names one of theirs;
+   * their keymap data has to come out first. */
   ED_operatormacros_file();
-  /* `ED_operatormacros_action()` went with the Dope Sheet module,
-   * `ED_operatormacros_nla()` with the NLA editor. */
-  ED_operatormacros_clip();
-  ED_operatormacros_curve();
-  ED_operatormacros_mask();
   ED_operatormacros_sequencer();
   ED_operatormacros_paint();
   ED_operatormacros_gpencil();
