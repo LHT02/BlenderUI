@@ -53,7 +53,6 @@
 #include "ED_transform.h"
 #include "ED_userpref.h"
 #include "ED_util.h"
-#include "ED_uvedit.h"
 
 void ED_spacetypes_init(void)
 {

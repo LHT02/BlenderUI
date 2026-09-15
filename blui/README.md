@@ -961,33 +961,77 @@ The work is staged so the build stays green at every step.
       No keymap data is involved - there is no `constraint.*` entry in either
       keymap file - which is why the usual signals said nothing.
 
-      ### `editors/uvedit/` is the next module, and it is four calls short
+      ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 
-      Measured the same way the space types were, and it is closer to deletable
-      than anything else left - 14 files, 591 KB, with 29 functions declared in
-      `ED_uvedit.h` and only 16 calls from outside the module.
+      CORRECTED. This section used to say uvedit was "four calls short", on the
+      strength of "16 calls from outside the module". That number counted only
+      symbols prefixed `ED_uvedit_`. Most of what crosses this boundary is *not*
+      prefixed: `uvedit_uv_select_test`, `uvedit_edge_select_test`,
+      `uvedit_face_visible_test`, `uvedit_face_select_test`,
+      `uv_nearest_hit_init_max`, `uv_find_nearest_vert` and
+      `UVPackIsland_Params::isCancelled` are all defined in `editors/uvedit/`
+      and all called from outside it.
 
-      Most of those callers are doomed (`transform` 6, `sculpt_paint` 4,
-      `mesh` 2) and one header include comes from `sculpt_paint/sculpt_uv.cc`,
-      also doomed. What keeps it in place is **four calls from modules that
-      stay**:
+      **Grepping the prefix under-counts by more than half - 16 against 33.**
+      The authority is the linker, not the grep: dropping `bf_editor_uvedit`
+      from `space_image`'s `LIB` produced 19 unresolved symbols, several of them
+      ones the prefix grep had never matched.
 
-      | Call | From |
-      | --- | --- |
-      | `ED_uvedit_buttons_register(art)` | `space_image/space_image.c:1132` |
-      | `ED_uvedit_minmax_multi(...)` | `space_image/image_ops.c:958` |
-      | `ED_uvedit_get_aspect(ob, ...)` | `makesrna/intern/rna_scene_api.c:92` |
-      | `ED_uvedit_selectmode_clean_multi(C)` | `makesrna/intern/rna_scene.c:1968` |
+      `bf_editor_uvedit` is also a **linker hub**. Its own `LIB` is just
+      `bf_bmesh`, but removing it from `space_image` took `bf_editor_object` and
+      `bf_editor_mesh` out of `BLUI.exe` with it, so
+      `bf_editor_space_image.image_edit.c.obj` then failed on
+      `ED_object_get_active_image` - a symbol with nothing to do with UVs.
+      Those libraries reach the executable *through* uvedit today. The link line
+      cannot be trimmed until the module itself dies.
 
-      Two are image-editor UI (a buttons region and a min/max operator), one is
-      an RNA property, one is select-mode cleanup. Each needs a product decision
-      rather than a mechanical edit - the image editor is a viewer, so the UI
-      two are probably dead, but `ED_uvedit_get_aspect` backs something in
-      `rna_scene_api.c` that has to be identified before it can go.
+      The full external surface, measured:
 
-      That is the whole remaining distance: four decisions, then 591 KB and a
-      module. Worth stating because it is the first time the answer has been
-      "four known things" rather than a category.
+      | Consumer | Sites | Symbols |
+      | --- | --- | --- |
+      | `transform/` (4 files) | 10 | prefixed + internals |
+      | `mesh/` (3 files) | 9 | 7 of them internals only |
+      | `sculpt_paint/` (2 files) | 6 | prefixed + internals |
+      | `draw/intern/mesh_extractors/extract_mesh.cc` | 3 | internals only |
+      | `space_image/` (2 files) | 2 | prefixed - **removed this stage** |
+      | `makesrna/` (2 files) | 2 | prefixed - **removed this stage** |
+      | `geometry/intern/uv_pack.cc` | 1 | `isCancelled` - **fixed this stage** |
+
+      What went, and what the four decisions turned out to be:
+
+      - `ED_uvedit_buttons_register(art)` was an unconditional registration of
+        the UV panel category into the image editor's sidebar. A viewer has no
+        UV mode, so those panels were unreachable - simply deleted.
+      - `ED_uvedit_minmax_multi` sat behind `ED_space_image_show_uvedit()`,
+        which needs mesh edit mode. That is a predicate living in *kept*
+        `space_image/image_edit.c`, so it stays; only the branch went.
+      - `ED_uvedit_get_aspect` backed `Scene.uvedit_aspect(ob)`, an RNA
+        *function*, not a property. Without mesh edit mode it returned `(1, 1)`
+        unconditionally, so the function and its registration were deleted.
+      - `ED_uvedit_selectmode_clean_multi` backed the update callback of
+        `ToolSettings.uv_select_mode`. The property **stays** -
+        `bl_ui/space_image.py` still drives it - so only the callback and its
+        `PROP_CONTEXT_UPDATE` flag were removed. (The name says `Scene`, the
+        sdna says `uv_selectmode`: it is a ToolSettings property.)
+      - Four now-dead `ED_uvedit.h` includes went with them, including one in
+        `space_api/spacetypes.c` left over from the `ED_operatortypes_uvedit`
+        removal.
+
+      **Layering violation #2 fixed.** `bool UVPackIsland_Params::isCancelled()`
+      was defined in `editors/uvedit/uvedit_unwrap_ops.cc` and called from
+      `geometry/intern/uv_pack.cc:1562` - a core library calling into an editor
+      library. The three-line definition moved to `uv_pack.cc`, beside its only
+      caller. The first such violation was nodes-system -> node-editor.
+
+      Noted for whoever deletes the module: `ED_image_draw_cursor()` lives in
+      `uvedit_draw.c` but is a generic 2D-cursor helper with nothing UV about
+      it. Its only caller is space_clip, also doomed, so it can go with the
+      module instead of moving.
+
+      The remaining 29 sites are all in `transform`, `mesh`, `sculpt_paint` and
+      `draw`'s mesh extractor - every one a 3D module. uvedit has no consumer
+      that stays, so it is no longer a separate job: it is a rider on those
+      deletions.
 
       ### What deleting a module actually involves
 

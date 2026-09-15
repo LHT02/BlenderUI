@@ -42,7 +42,6 @@
 #include "ED_space_api.h"
 #include "ED_transform.h"
 #include "ED_util.h"
-#include "ED_uvedit.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -1129,7 +1128,6 @@ void ED_spacetype_image(void)
   art->draw = image_buttons_region_draw;
   BLI_addhead(&st->regiontypes, art);
 
-  ED_uvedit_buttons_register(art);
   image_buttons_register(art);
 
   /* regions: tool(bar) */

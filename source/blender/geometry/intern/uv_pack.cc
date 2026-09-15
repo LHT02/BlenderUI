@@ -27,6 +27,17 @@
 
 namespace blender::geometry {
 
+/* BLUI: this was defined in `editors/uvedit/uvedit_unwrap_ops.cc`, which made the
+ * geometry library depend on an editor library for one three-line predicate.
+ * It belongs here, next to its only caller. */
+bool UVPackIsland_Params::isCancelled() const
+{
+  if (stop) {
+    return *stop;
+  }
+  return false;
+}
+
 /* Store information about an island's placement such as translation, rotation and reflection. */
 class uv_phi {
  public:

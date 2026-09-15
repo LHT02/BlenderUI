@@ -173,14 +173,6 @@ void blender::geometry::UVPackIsland_Params::setUDIMOffsetFromSpaceImage(const S
 }
 /** \} */
 
-bool blender::geometry::UVPackIsland_Params::isCancelled() const
-{
-  if (stop) {
-    return *stop;
-  }
-  return false;
-}
-
 /* -------------------------------------------------------------------- */
 /** \name Parametrizer Conversion
  * \{ */

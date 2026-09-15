@@ -37,7 +37,6 @@
 
 #  include "ED_transform.h"
 #  include "ED_transform_snap_object_context.h"
-#  include "ED_uvedit.h"
 
 #  ifdef WITH_PYTHON
 #    include "BPY_extern.h"
@@ -81,20 +80,6 @@ static void rna_Scene_frame_set(Scene *scene, Main *bmain, int frame, float subf
     /* instead just redraw the views */
     WM_main_add_notifier(NC_WINDOW, NULL);
   }
-}
-
-static void rna_Scene_uvedit_aspect(Scene *UNUSED(scene), Object *ob, float aspect[2])
-{
-  if ((ob->type == OB_MESH) && (ob->mode == OB_MODE_EDIT)) {
-    BMEditMesh *em;
-    em = BKE_editmesh_from_object(ob);
-    if (EDBM_uv_check(em)) {
-      ED_uvedit_get_aspect(ob, aspect, aspect + 1);
-      return;
-    }
-  }
-
-  aspect[0] = aspect[1] = 1.0f;
 }
 
 static void rna_SceneRender_get_frame_path(
@@ -262,14 +247,6 @@ void RNA_api_scene(StructRNA *srna)
   RNA_def_float(
       func, "subframe", 0.0, 0.0, 1.0, "", "Subframe time, between 0.0 and 1.0", 0.0, 1.0);
   RNA_def_function_flag(func, FUNC_USE_MAIN);
-
-  func = RNA_def_function(srna, "uvedit_aspect", "rna_Scene_uvedit_aspect");
-  RNA_def_function_ui_description(func, "Get uv aspect for current object");
-  parm = RNA_def_pointer(func, "object", "Object", "", "Object");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_float_vector(func, "result", 2, NULL, 0.0f, FLT_MAX, "", "aspect", 0.0f, FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0);
-  RNA_def_function_output(func, parm);
 
   /* Ray Cast */
   func = RNA_def_function(srna, "ray_cast", "rna_Scene_ray_cast");

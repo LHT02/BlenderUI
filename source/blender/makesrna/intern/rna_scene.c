@@ -36,7 +36,6 @@
 
 #include "ED_gpencil_legacy.h"
 #include "ED_object.h"
-#include "ED_uvedit.h"
 
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
@@ -1961,13 +1960,6 @@ static void rna_Scene_editmesh_select_mode_update(bContext *C, PointerRNA *UNUSE
   }
 }
 
-static void rna_Scene_uv_select_mode_update(bContext *C, PointerRNA *UNUSED(ptr))
-{
-  /* Makes sure that the UV selection states are consistent with the current UV select mode and
-   * sticky mode. */
-  ED_uvedit_selectmode_clean_multi(C);
-}
-
 static void object_simplify_update(Object *ob)
 {
   ModifierData *md;
@@ -3765,8 +3757,6 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "uv_selectmode");
   RNA_def_property_enum_items(prop, rna_enum_mesh_select_mode_uv_items);
   RNA_def_property_ui_text(prop, "UV Selection Mode", "UV selection and display mode");
-  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, "rna_Scene_uv_select_mode_update");
 
   prop = RNA_def_property(srna, "uv_sticky_select_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "uv_sticky");

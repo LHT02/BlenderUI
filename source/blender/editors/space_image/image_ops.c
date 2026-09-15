@@ -73,7 +73,6 @@
 #include "ED_undo.h"
 #include "ED_util.h"
 #include "ED_util_imbuf.h"
-#include "ED_uvedit.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -938,30 +937,16 @@ static int image_view_selected_exec(bContext *C, wmOperator *UNUSED(op))
 {
   SpaceImage *sima;
   ARegion *region;
-  Scene *scene;
-  ViewLayer *view_layer;
   Object *obedit;
 
   /* retrieve state */
   sima = CTX_wm_space_image(C);
   region = CTX_wm_region(C);
-  scene = CTX_data_scene(C);
-  view_layer = CTX_data_view_layer(C);
   obedit = CTX_data_edit_object(C);
 
   /* get bounds */
   float min[2], max[2];
-  if (ED_space_image_show_uvedit(sima, obedit)) {
-    uint objects_len = 0;
-    Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
-        scene, view_layer, ((View3D *)NULL), &objects_len);
-    bool success = ED_uvedit_minmax_multi(scene, objects, objects_len, min, max);
-    MEM_freeN(objects);
-    if (!success) {
-      return OPERATOR_CANCELLED;
-    }
-  }
-  else if (ED_space_image_check_show_maskedit(sima, obedit)) {
+  if (ED_space_image_check_show_maskedit(sima, obedit)) {
     if (!ED_mask_selected_minmax(C, min, max, false)) {
       return OPERATOR_CANCELLED;
     }
