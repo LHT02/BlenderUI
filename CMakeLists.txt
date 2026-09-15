@@ -104,7 +104,7 @@ include(build_files/cmake/macros.cmake)
 
 blender_project_hack_pre()
 
-project(Blender)
+project(BLUI)
 
 blender_project_hack_post()
 

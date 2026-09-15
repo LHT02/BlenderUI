@@ -755,26 +755,18 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
   UserDef *userdef = static_cast<UserDef *>(MEM_callocN(sizeof(UserDef), __func__));
   *userdef = blender::dna::shallow_copy(U_default);
 
-  /* Add-ons. */
+  /* Add-ons.
+   *
+   * BLUI deliberately ships no inherited Blender add-ons. The default list was
+   * made up entirely of 3D import/export and rendering add-ons
+   * (`io_scene_*`, `io_mesh_*`, `io_anim_bvh`, `io_curve_svg`, `cycles`,
+   * `pose_library`) which have no place in a file browsing / image viewing
+   * environment, and none of them are present in a BLUI install - enabling
+   * them only produced a `ModuleNotFoundError` traceback at every start-up.
+   *
+   * BLUI's own default add-ons can be added to this list as they appear. */
   {
-    const char *addons[] = {
-        "io_anim_bvh",
-        "io_curve_svg",
-        "io_mesh_ply",
-        "io_mesh_stl",
-        "io_mesh_uv_layout",
-        "io_scene_fbx",
-        "io_scene_gltf2",
-        "io_scene_obj",
-        "io_scene_x3d",
-        "cycles",
-        "pose_library",
-    };
-    for (int i = 0; i < ARRAY_SIZE(addons); i++) {
-      bAddon *addon = BKE_addon_new();
-      STRNCPY(addon->module, addons[i]);
-      BLI_addtail(&userdef->addons, addon);
-    }
+    /* Intentionally empty - see comment above. */
   }
 
   /* Theme. */

@@ -144,10 +144,10 @@ set(SRC
 # MSVC 2010 gives linking errors with the manifest.
 if(WIN32 AND NOT UNIX)
   add_definitions(
-    -DBLEN_VER_RC_STR="${BLENDER_VERSION}"
-    -DBLEN_VER_RC_1=${BLENDER_VERSION_MAJOR}
-    -DBLEN_VER_RC_2=${BLENDER_VERSION_MINOR}
-    -DBLEN_VER_RC_3=${BLENDER_VERSION_PATCH}
+    -DBLEN_VER_RC_STR="${BLUI_VERSION}.${BLUI_VERSION_PATCH}"
+    -DBLEN_VER_RC_1=${BLUI_VERSION_MAJOR}
+    -DBLEN_VER_RC_2=${BLUI_VERSION_MINOR}
+    -DBLEN_VER_RC_3=${BLUI_VERSION_PATCH}
     -DBLEN_VER_RC_4=0
   )
 
@@ -327,6 +327,19 @@ else()
   endif()
 endif()
 
+if(WIN32 AND NOT WITH_PYTHON_MODULE)
+  # ------------------------------------------------------------------------
+  # BLUI product identity.
+  #
+  # The CMake target stays named `blender` (it is referenced by hundreds of
+  # internal build rules), but the *artifacts* shipped to users must carry the
+  # BLUI name so nothing about the installed product reads as "Blender".
+  set_target_properties(blender PROPERTIES OUTPUT_NAME "BLUI")
+  if(TARGET blender-launcher)
+    set_target_properties(blender-launcher PROPERTIES OUTPUT_NAME "BLUI-launcher")
+  endif()
+endif()
+
 if(WITH_BUILDINFO)
   # Explicitly say that the executable depends on the `buildinfo`.
   add_dependencies(blender buildinfo)
@@ -379,9 +392,12 @@ elseif(WIN32)
     set(TARGETDIR_LIB ${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/bpy)
     set(TARGETDIR_EXE ${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/bpy)
   else()
-    set(TARGETDIR_VER ${BLENDER_VERSION})
+    # BLUI's runtime data directory. Must match `BLUI_VERSION_DIR` in
+    # `BKE_blender_version.h`, because that is what `BKE_appdir` looks up at
+    # run time (`BKE_appdir_folder_id(BLENDER_SYSTEM_SCRIPTS, ...)`).
+    set(TARGETDIR_VER ${BLUI_VERSION})
     set(TARGETDIR_TEXT .)
-    set(TARGETDIR_LIB ./blender.shared)
+    set(TARGETDIR_LIB ./blui.shared)
     set(TARGETDIR_EXE .)
   endif()
 elseif(APPLE)
@@ -977,7 +993,7 @@ elseif(WIN32)
       install(
         FILES ${CMAKE_CURRENT_BINARY_DIR}/\${CMAKE_INSTALL_CONFIG_NAME}/blender_public.pdb
         DESTINATION .
-        RENAME blender.pdb
+        RENAME BLUI.pdb
       )
     else()
       install(FILES $<TARGET_PDB_FILE:blender> DESTINATION . RENAME blender.pdb)
@@ -1080,7 +1096,7 @@ elseif(WIN32)
 
       install(
         DIRECTORY ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/lib
-        DESTINATION ${BLENDER_VERSION}/python/
+        DESTINATION ${TARGETDIR_VER}/python/
         CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
         PATTERN ".svn" EXCLUDE
         PATTERN "*_d.*" EXCLUDE                 # * debug libraries *
@@ -1091,7 +1107,7 @@ elseif(WIN32)
 
       install(
         DIRECTORY ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/lib
-        DESTINATION ${BLENDER_VERSION}/python/
+        DESTINATION ${TARGETDIR_VER}/python/
         CONFIGURATIONS Debug
         PATTERN ".svn" EXCLUDE
         PATTERN "__pycache__" EXCLUDE           # * any cache *
@@ -1101,7 +1117,7 @@ elseif(WIN32)
 
       install(
         DIRECTORY ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/DLLs
-        DESTINATION ${BLENDER_VERSION}/python
+        DESTINATION ${TARGETDIR_VER}/python
         CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
         PATTERN "*.pdb" EXCLUDE
         PATTERN "*_d.*" EXCLUDE
@@ -1109,7 +1125,7 @@ elseif(WIN32)
 
       install(
         DIRECTORY ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/DLLs
-        DESTINATION ${BLENDER_VERSION}/python
+        DESTINATION ${TARGETDIR_VER}/python
         CONFIGURATIONS Debug
       )
 
@@ -1118,7 +1134,7 @@ elseif(WIN32)
           ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/bin/python${_PYTHON_VERSION_NO_DOTS}.dll
           ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/bin/python3.dll
           ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/bin/python.exe
-        DESTINATION ${BLENDER_VERSION}/python/bin
+        DESTINATION ${TARGETDIR_VER}/python/bin
         CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
       )
       install(
@@ -1126,7 +1142,7 @@ elseif(WIN32)
           ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/bin/python${_PYTHON_VERSION_NO_DOTS}_d.dll
           ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/bin/python3_d.dll
           ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/bin/python_d.exe
-        DESTINATION ${BLENDER_VERSION}/python/bin
+        DESTINATION ${TARGETDIR_VER}/python/bin
         CONFIGURATIONS Debug
       )
 
@@ -1309,12 +1325,10 @@ elseif(WIN32)
   if(NOT WITH_PYTHON_MODULE)
     install(
       FILES
-        ${CMAKE_SOURCE_DIR}/release/windows/batch/blender_debug_gpu.cmd
-        ${CMAKE_SOURCE_DIR}/release/windows/batch/blender_debug_gpu_glitchworkaround.cmd
-        ${CMAKE_SOURCE_DIR}/release/windows/batch/blender_debug_log.cmd
-        ${CMAKE_SOURCE_DIR}/release/windows/batch/blender_factory_startup.cmd
-        ${CMAKE_SOURCE_DIR}/release/windows/batch/blender_oculus.cmd
-        ${CMAKE_SOURCE_DIR}/release/windows/batch/oculus.json
+        ${CMAKE_SOURCE_DIR}/release/windows/batch/blui_debug_gpu.cmd
+        ${CMAKE_SOURCE_DIR}/release/windows/batch/blui_debug_gpu_glitchworkaround.cmd
+        ${CMAKE_SOURCE_DIR}/release/windows/batch/blui_debug_log.cmd
+        ${CMAKE_SOURCE_DIR}/release/windows/batch/blui_factory_startup.cmd
       DESTINATION ${TARGETDIR_EXE}
     )
   endif()

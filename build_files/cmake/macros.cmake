@@ -423,7 +423,7 @@ function(blender_add_test_suite)
       --test-release-dir "${_test_release_dir}"
   )
   if(WIN32)
-    set_tests_properties(${ARGS_SUITE_NAME} PROPERTIES ENVIRONMENT "PATH=${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/blender.shared/;$ENV{PATH}")
+    set_tests_properties(${ARGS_SUITE_NAME} PROPERTIES ENVIRONMENT "PATH=${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/blui.shared/;$ENV{PATH}")
   endif()
   unset(_test_release_dir)
 endfunction()
@@ -830,10 +830,15 @@ function(get_blender_version)
   )
 
   file(STRINGS ${CMAKE_SOURCE_DIR}/source/blender/blenkernel/BKE_blender_version.h _contents REGEX "^#define[ \t]+BLENDER_.*$")
+  file(STRINGS ${CMAKE_SOURCE_DIR}/source/blender/blenkernel/BKE_blender_version.h _contents_blui REGEX "^#define[ \t]+BLUI_.*$")
 
   string(REGEX REPLACE ".*#define[ \t]+BLENDER_VERSION[ \t]+([0-9]+).*" "\\1" _out_version "${_contents}")
   string(REGEX REPLACE ".*#define[ \t]+BLENDER_VERSION_PATCH[ \t]+([0-9]+).*" "\\1" _out_version_patch "${_contents}")
   string(REGEX REPLACE ".*#define[ \t]+BLENDER_VERSION_CYCLE[ \t]+([a-z]+).*" "\\1" _out_version_cycle "${_contents}")
+
+  # BLUI product version (independent from the Blender file/DNA version).
+  string(REGEX REPLACE ".*#define[ \t]+BLUI_VERSION[ \t]+([0-9]+).*" "\\1" _out_blui_version "${_contents_blui}")
+  string(REGEX REPLACE ".*#define[ \t]+BLUI_VERSION_PATCH[ \t]+([0-9]+).*" "\\1" _out_blui_version_patch "${_contents_blui}")
 
   if(NOT ${_out_version} MATCHES "[0-9]+")
     message(FATAL_ERROR "Version parsing failed for BLENDER_VERSION")
@@ -847,8 +852,18 @@ function(get_blender_version)
     message(FATAL_ERROR "Version parsing failed for BLENDER_VERSION_CYCLE")
   endif()
 
+  if(NOT ${_out_blui_version} MATCHES "[0-9]+")
+    message(FATAL_ERROR "Version parsing failed for BLUI_VERSION")
+  endif()
+
+  if(NOT ${_out_blui_version_patch} MATCHES "[0-9]+")
+    message(FATAL_ERROR "Version parsing failed for BLUI_VERSION_PATCH")
+  endif()
+
   math(EXPR _out_version_major "${_out_version} / 100")
   math(EXPR _out_version_minor "${_out_version} % 100")
+  math(EXPR _out_blui_version_major "${_out_blui_version} / 100")
+  math(EXPR _out_blui_version_minor "${_out_blui_version} % 100")
 
   # output vars
   set(BLENDER_VERSION "${_out_version_major}.${_out_version_minor}" PARENT_SCOPE)
@@ -856,6 +871,13 @@ function(get_blender_version)
   set(BLENDER_VERSION_MINOR "${_out_version_minor}" PARENT_SCOPE)
   set(BLENDER_VERSION_PATCH "${_out_version_patch}" PARENT_SCOPE)
   set(BLENDER_VERSION_CYCLE "${_out_version_cycle}" PARENT_SCOPE)
+
+  # BLUI product version, used for the window title, about dialogs, the Windows
+  # resource block and (elsewhere) the user configuration directory.
+  set(BLUI_VERSION "${_out_blui_version_major}.${_out_blui_version_minor}" PARENT_SCOPE)
+  set(BLUI_VERSION_MAJOR "${_out_blui_version_major}" PARENT_SCOPE)
+  set(BLUI_VERSION_MINOR "${_out_blui_version_minor}" PARENT_SCOPE)
+  set(BLUI_VERSION_PATCH "${_out_blui_version_patch}" PARENT_SCOPE)
 
 endfunction()
 
@@ -1314,7 +1336,7 @@ macro(windows_install_shared_manifest)
     endif()
     install(FILES ${WINDOWS_INSTALL_FILES}
             CONFIGURATIONS ${WINDOWS_CONFIGURATIONS}
-            DESTINATION "./blender.shared"
+            DESTINATION "./blui.shared"
     )
   else()
     # Python module without manifest.
@@ -1342,24 +1364,24 @@ macro(windows_generate_shared_manifest)
   if(WINDOWS_SHARED_MANIFEST_DEBUG)
     windows_generate_manifest(
       FILES "${WINDOWS_SHARED_MANIFEST_DEBUG}"
-      OUTPUT "${CMAKE_BINARY_DIR}/Debug/blender.shared.manifest"
-      NAME "blender.shared"
+      OUTPUT "${CMAKE_BINARY_DIR}/Debug/blui.shared.manifest"
+      NAME "blui.shared"
     )
     install(
-      FILES ${CMAKE_BINARY_DIR}/Debug/blender.shared.manifest
-      DESTINATION "./blender.shared"
+      FILES ${CMAKE_BINARY_DIR}/Debug/blui.shared.manifest
+      DESTINATION "./blui.shared"
       CONFIGURATIONS Debug
     )
   endif()
   if(WINDOWS_SHARED_MANIFEST_RELEASE)
     windows_generate_manifest(
       FILES "${WINDOWS_SHARED_MANIFEST_RELEASE}"
-      OUTPUT "${CMAKE_BINARY_DIR}/Release/blender.shared.manifest"
-      NAME "blender.shared"
+      OUTPUT "${CMAKE_BINARY_DIR}/Release/blui.shared.manifest"
+      NAME "blui.shared"
     )
     install(
-      FILES ${CMAKE_BINARY_DIR}/Release/blender.shared.manifest
-      DESTINATION "./blender.shared"
+      FILES ${CMAKE_BINARY_DIR}/Release/blui.shared.manifest
+      DESTINATION "./blui.shared"
       CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
     )
   endif()

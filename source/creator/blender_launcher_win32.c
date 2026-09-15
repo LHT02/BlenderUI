@@ -83,13 +83,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     return -1;
   }
 
-  /* Remove the filename (blender-launcher.exe) from path. */
+  /* Remove the filename (BLUI-launcher.exe) from path. */
   if (PathCchRemoveFileSpec(path, MAX_PATH) != S_OK) {
     return -1;
   }
 
-  /* Add blender.exe to path, resulting in the full path to the blender executable. */
-  if (PathCchCombine(path, MAX_PATH, path, L"blender.exe") != S_OK) {
+  /* Add BLUI.exe to path, resulting in the full path to the BLUI executable. */
+  if (PathCchCombine(path, MAX_PATH, path, L"BLUI.exe") != S_OK) {
     return -1;
   }
 

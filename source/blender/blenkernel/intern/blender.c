@@ -94,28 +94,30 @@ static char blender_version_string[48] = "";
 
 static void blender_version_init(void)
 {
+  /* NOTE: This is the *BLUI product* version, intentionally independent from
+   * `BLENDER_VERSION` (which stays pinned to the Blender file/DNA generation). */
   const char *version_cycle = "";
-  if (STREQ(STRINGIFY(BLENDER_VERSION_CYCLE), "alpha")) {
+  if (STREQ(STRINGIFY(BLUI_VERSION_CYCLE), "alpha")) {
     version_cycle = " Alpha";
   }
-  else if (STREQ(STRINGIFY(BLENDER_VERSION_CYCLE), "beta")) {
+  else if (STREQ(STRINGIFY(BLUI_VERSION_CYCLE), "beta")) {
     version_cycle = " Beta";
   }
-  else if (STREQ(STRINGIFY(BLENDER_VERSION_CYCLE), "rc")) {
+  else if (STREQ(STRINGIFY(BLUI_VERSION_CYCLE), "rc")) {
     version_cycle = " Release Candidate";
   }
-  else if (STREQ(STRINGIFY(BLENDER_VERSION_CYCLE), "release")) {
+  else if (STREQ(STRINGIFY(BLUI_VERSION_CYCLE), "release")) {
     version_cycle = "";
   }
   else {
-    BLI_assert_msg(0, "Invalid Blender version cycle");
+    BLI_assert_msg(0, "Invalid BLUI version cycle");
   }
 
   SNPRINTF(blender_version_string,
            "%d.%01d.%d%s",
-           BLENDER_VERSION / 100,
-           BLENDER_VERSION % 100,
-           BLENDER_VERSION_PATCH,
+           BLUI_VERSION / 100,
+           BLUI_VERSION % 100,
+           BLUI_VERSION_PATCH,
            version_cycle);
 }
 

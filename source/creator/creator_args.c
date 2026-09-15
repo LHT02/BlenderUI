@@ -439,7 +439,7 @@ static void arg_py_context_restore(bContext *C, struct BlendePyContextStore *c_p
 
 static void print_version_full(void)
 {
-  printf("Blender %s\n", BKE_blender_version_string());
+  printf(BLUI_PRODUCT_NAME " %s\n", BKE_blender_version_string());
 #  ifdef BUILD_DATE
   printf("\tbuild date: %s\n", build_date);
   printf("\tbuild time: %s\n", build_time);
@@ -460,13 +460,13 @@ static void print_version_short(void)
 #  ifdef BUILD_DATE
   /* NOTE: We include built time since sometimes we need to tell broken from
    * working built of the same hash. */
-  printf("Blender %s (hash %s built %s %s)\n",
+  printf(BLUI_PRODUCT_NAME " %s (hash %s built %s %s)\n",
          BKE_blender_version_string(),
          build_hash,
          build_date,
          build_time);
 #  else
-  printf("Blender %s\n", BKE_blender_version_string());
+  printf(BLUI_PRODUCT_NAME " %s\n", BKE_blender_version_string());
 #  endif
 }
 
@@ -493,8 +493,8 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
 {
   bArgs *ba = (bArgs *)data;
 
-  printf("Blender %s\n", BKE_blender_version_string());
-  printf("Usage: blender [args ...] [file] [args ...]\n\n");
+  printf(BLUI_PRODUCT_NAME " %s\n", BKE_blender_version_string());
+  printf("Usage: blui [args ...] [file] [args ...]\n\n");
 
   printf("Render Options:\n");
   BLI_args_print_arg_doc(ba, "--background");
@@ -926,7 +926,7 @@ static const char arg_handle_debug_mode_set_doc[] =
 static int arg_handle_debug_mode_set(int UNUSED(argc), const char **UNUSED(argv), void *data)
 {
   G.debug |= G_DEBUG; /* std output printf's */
-  printf("Blender %s\n", BKE_blender_version_string());
+  printf(BLUI_PRODUCT_NAME " %s\n", BKE_blender_version_string());
   MEM_set_memory_debug();
 #  ifndef NDEBUG
   BLI_mempool_set_memory_debug();

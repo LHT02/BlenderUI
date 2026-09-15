@@ -220,7 +220,12 @@ endif()
 blender_add_lib(bf_bmesh "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 if(MSVC AND NOT MSVC_CLANG)
-  target_compile_options(bf_bmesh PRIVATE /WX /wd4101)
+  # `/WX` keeps bmesh warning-clean. Blender 3.6 predates MSVC 14.4x, which
+  # added C5287 ("operands are of different enum types") - a warning that
+  # `BKE_customdata.h` trips on newer toolsets. It is a new diagnostic about
+  # pre-existing code, not a regression in BLUI, so silence just that one
+  # instead of giving up on warnings-as-errors for the whole library.
+  target_compile_options(bf_bmesh PRIVATE /WX /wd4101 /wd5287)
 endif()
 
 if(WITH_GTESTS)

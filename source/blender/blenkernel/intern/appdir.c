@@ -214,12 +214,11 @@ bool BKE_appdir_folder_caches(char *path, const size_t path_maxncpy)
   }
 
 #ifdef WIN32
-  BLI_path_join(
-      path, path_maxncpy, caches_root_path, "Blender Foundation", "Blender", "Cache", SEP_STR);
+  BLI_path_join(path, path_maxncpy, caches_root_path, "BLUI", "Cache", SEP_STR);
 #elif defined(__APPLE__)
-  BLI_path_join(path, path_maxncpy, caches_root_path, "Blender", SEP_STR);
+  BLI_path_join(path, path_maxncpy, caches_root_path, "BLUI", SEP_STR);
 #else /* __linux__ */
-  BLI_path_join(path, path_maxncpy, caches_root_path, "blender", SEP_STR);
+  BLI_path_join(path, path_maxncpy, caches_root_path, "blui", SEP_STR);
 #endif
 
   return true;
@@ -401,7 +400,7 @@ static bool get_path_local(char *targetpath,
                            const char *folder_name,
                            const char *subfolder_name)
 {
-  const int version = BLENDER_VERSION;
+  const int version = BLUI_VERSION;
   const bool check_is_dir = true;
   return get_path_local_ex(
       targetpath, targetpath_maxncpy, folder_name, subfolder_name, version, check_is_dir);
@@ -467,7 +466,7 @@ static bool get_path_user_ex(char *targetpath,
 {
   char user_path[FILE_MAX];
 
-  if (test_env_path(user_path, "BLENDER_USER_RESOURCES", check_is_dir)) {
+  if (test_env_path(user_path, "BLUI_USER_RESOURCES", check_is_dir)) {
     /* Pass. */
   }
   else {
@@ -504,7 +503,7 @@ static bool get_path_user(char *targetpath,
                           const char *folder_name,
                           const char *subfolder_name)
 {
-  const int version = BLENDER_VERSION;
+  const int version = BLUI_VERSION;
   const bool check_is_dir = true;
   return get_path_user_ex(
       targetpath, targetpath_maxncpy, folder_name, subfolder_name, version, check_is_dir);
@@ -539,7 +538,7 @@ static bool get_path_system_ex(char *targetpath,
     relfolder[0] = '\0';
   }
 
-  if (test_env_path(system_path, "BLENDER_SYSTEM_RESOURCES", check_is_dir)) {
+  if (test_env_path(system_path, "BLUI_SYSTEM_RESOURCES", check_is_dir)) {
     /* Pass. */
   }
   else {
@@ -571,7 +570,7 @@ static bool get_path_system(char *targetpath,
                             const char *folder_name,
                             const char *subfolder_name)
 {
-  const int version = BLENDER_VERSION;
+  const int version = BLUI_VERSION;
   const bool check_is_dir = true;
   return get_path_system_ex(
       targetpath, targetpath_maxncpy, folder_name, subfolder_name, version, check_is_dir);
@@ -590,13 +589,13 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
 {
   switch (folder_id) {
     case BLENDER_DATAFILES: /* general case */
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_USER_DATAFILES")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_USER_DATAFILES")) {
         break;
       }
       if (get_path_user(path, path_maxncpy, "datafiles", subfolder)) {
         break;
       }
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_SYSTEM_DATAFILES")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_SYSTEM_DATAFILES")) {
         break;
       }
       if (get_path_local(path, path_maxncpy, "datafiles", subfolder)) {
@@ -608,7 +607,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_USER_DATAFILES:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_USER_DATAFILES")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_USER_DATAFILES")) {
         break;
       }
       if (get_path_user(path, path_maxncpy, "datafiles", subfolder)) {
@@ -617,7 +616,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_SYSTEM_DATAFILES:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_SYSTEM_DATAFILES")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_SYSTEM_DATAFILES")) {
         break;
       }
       if (get_path_system(path, path_maxncpy, "datafiles", subfolder)) {
@@ -629,7 +628,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_USER_AUTOSAVE:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_USER_DATAFILES")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_USER_DATAFILES")) {
         break;
       }
       if (get_path_user(path, path_maxncpy, "autosave", subfolder)) {
@@ -638,7 +637,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_USER_CONFIG:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_USER_CONFIG")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_USER_CONFIG")) {
         break;
       }
       if (get_path_user(path, path_maxncpy, "config", subfolder)) {
@@ -647,7 +646,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_USER_SCRIPTS:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_USER_SCRIPTS")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_USER_SCRIPTS")) {
         break;
       }
       if (get_path_user(path, path_maxncpy, "scripts", subfolder)) {
@@ -656,7 +655,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_SYSTEM_SCRIPTS:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_SYSTEM_SCRIPTS")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_SYSTEM_SCRIPTS")) {
         break;
       }
       if (get_path_system(path, path_maxncpy, "scripts", subfolder)) {
@@ -668,7 +667,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     case BLENDER_SYSTEM_PYTHON:
-      if (get_path_environment(path, path_maxncpy, subfolder, "BLENDER_SYSTEM_PYTHON")) {
+      if (get_path_environment(path, path_maxncpy, subfolder, "BLUI_SYSTEM_PYTHON")) {
         break;
       }
       if (get_path_system(path, path_maxncpy, "python", subfolder)) {
@@ -698,35 +697,35 @@ const char *BKE_appdir_folder_id(const int folder_id, const char *subfolder)
 
 const char *BKE_appdir_folder_id_user_notest(const int folder_id, const char *subfolder)
 {
-  const int version = BLENDER_VERSION;
+  const int version = BLUI_VERSION;
   static char path[FILE_MAX] = "";
   const bool check_is_dir = false;
 
   switch (folder_id) {
     case BLENDER_USER_DATAFILES:
       if (get_path_environment_ex(
-              path, sizeof(path), subfolder, "BLENDER_USER_DATAFILES", check_is_dir)) {
+              path, sizeof(path), subfolder, "BLUI_USER_DATAFILES", check_is_dir)) {
         break;
       }
       get_path_user_ex(path, sizeof(path), "datafiles", subfolder, version, check_is_dir);
       break;
     case BLENDER_USER_CONFIG:
       if (get_path_environment_ex(
-              path, sizeof(path), subfolder, "BLENDER_USER_CONFIG", check_is_dir)) {
+              path, sizeof(path), subfolder, "BLUI_USER_CONFIG", check_is_dir)) {
         break;
       }
       get_path_user_ex(path, sizeof(path), "config", subfolder, version, check_is_dir);
       break;
     case BLENDER_USER_AUTOSAVE:
       if (get_path_environment_ex(
-              path, sizeof(path), subfolder, "BLENDER_USER_AUTOSAVE", check_is_dir)) {
+              path, sizeof(path), subfolder, "BLUI_USER_AUTOSAVE", check_is_dir)) {
         break;
       }
       get_path_user_ex(path, sizeof(path), "autosave", subfolder, version, check_is_dir);
       break;
     case BLENDER_USER_SCRIPTS:
       if (get_path_environment_ex(
-              path, sizeof(path), subfolder, "BLENDER_USER_SCRIPTS", check_is_dir)) {
+              path, sizeof(path), subfolder, "BLUI_USER_SCRIPTS", check_is_dir)) {
         break;
       }
       get_path_user_ex(path, sizeof(path), "scripts", subfolder, version, check_is_dir);
@@ -796,7 +795,7 @@ const char *BKE_appdir_resource_path_id_with_version(const int folder_id,
 
 const char *BKE_appdir_resource_path_id(const int folder_id, const bool check_is_dir)
 {
-  return BKE_appdir_resource_path_id_with_version(folder_id, check_is_dir, BLENDER_VERSION);
+  return BKE_appdir_resource_path_id_with_version(folder_id, check_is_dir, BLUI_VERSION);
 }
 
 /** \} */

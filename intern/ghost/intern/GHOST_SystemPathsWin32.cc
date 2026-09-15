@@ -30,7 +30,9 @@ const char *GHOST_SystemPathsWin32::getSystemDir(int, const char *versionstr) co
   if (hResult == S_OK) {
     conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
     CoTaskMemFree(knownpath_16);
-    strcat(knownpath, "\\Blender Foundation\\Blender\\");
+    /* BLUI keeps its machine-wide data in its own root so it never collides
+     * with a Blender installation's `Blender Foundation\Blender` tree. */
+    strcat(knownpath, "\\BLUI\\");
     strcat(knownpath, versionstr);
     return knownpath;
   }
@@ -49,7 +51,11 @@ const char *GHOST_SystemPathsWin32::getUserDir(int, const char *versionstr) cons
   if (hResult == S_OK) {
     conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
     CoTaskMemFree(knownpath_16);
-    strcat(knownpath, "\\Blender Foundation\\Blender\\");
+    /* Per-user configuration lives in `%APPDATA%\BLUI\<version>`.
+     * Intentionally *not* `%APPDATA%\Blender Foundation\Blender\<version>`:
+     * BLUI shares no configuration, preferences, add-ons or keymaps with
+     * Blender 3.6. */
+    strcat(knownpath, "\\BLUI\\");
     strcat(knownpath, versionstr);
     return knownpath;
   }

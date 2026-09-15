@@ -149,7 +149,7 @@ if(WITH_WINDOWS_BUNDLE_CRT)
   set(BUNDLECRT "<dependency><dependentAssembly><assemblyIdentity type=\"win32\" name=\"blender.crt\" version=\"1.0.0.0\" /></dependentAssembly></dependency>")
 endif()
 if(NOT WITH_PYTHON_MODULE)
-  set(BUNDLECRT "${BUNDLECRT}<dependency><dependentAssembly><assemblyIdentity type=\"win32\" name=\"blender.shared\" version=\"1.0.0.0\" /></dependentAssembly></dependency>")
+  set(BUNDLECRT "${BUNDLECRT}<dependency><dependentAssembly><assemblyIdentity type=\"win32\" name=\"blui.shared\" version=\"1.0.0.0\" /></dependentAssembly></dependency>")
 endif()
 configure_file(${CMAKE_SOURCE_DIR}/release/windows/manifest/blender.exe.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/blender.exe.manifest @ONLY)
 
@@ -983,13 +983,13 @@ if(WINDOWS_PYTHON_DEBUG)
 
   # If the user scripts env var is set, include scripts from there otherwise
   # include user scripts in the profile folder.
-  if(DEFINED ENV{BLENDER_USER_SCRIPTS})
-    message(STATUS "Including user scripts from environment BLENDER_USER_SCRIPTS=$ENV{BLENDER_USER_SCRIPTS}")
-    set(USER_SCRIPTS_ROOT "$ENV{BLENDER_USER_SCRIPTS}")
+  if(DEFINED ENV{BLUI_USER_SCRIPTS})
+    message(STATUS "Including user scripts from environment BLUI_USER_SCRIPTS=$ENV{BLUI_USER_SCRIPTS}")
+    set(USER_SCRIPTS_ROOT "$ENV{BLUI_USER_SCRIPTS}")
   else()
     message(STATUS "Including user scripts from the profile folder")
     # Include the user scripts from the profile folder in the blender_python_user_scripts project.
-    set(USER_SCRIPTS_ROOT "$ENV{appdata}/blender foundation/blender/${BLENDER_VERSION}/scripts")
+    set(USER_SCRIPTS_ROOT "$ENV{appdata}/BLUI/${BLUI_VERSION}/scripts")
   endif()
 
   file(TO_CMAKE_PATH ${USER_SCRIPTS_ROOT} USER_SCRIPTS_ROOT)
@@ -1134,5 +1134,5 @@ list(JOIN PLATFORM_BUNDLED_LIBRARY_DIRS ";" _library_paths)
 set(PLATFORM_ENV_BUILD_DIRS "${LIBDIR}/tbb/bin\;${LIBDIR}/OpenImageIO/bin\;${LIBDIR}/boost/lib\;${LIBDIR}/openexr/bin\;${LIBDIR}/imath/bin\;${PATH}")
 set(PLATFORM_ENV_BUILD "PATH=${PLATFORM_ENV_BUILD_DIRS}")
 # Install needs the additional folders from PLATFORM_ENV_BUILD_DIRS as well, as tools like idiff and abcls use the release mode dlls
-set(PLATFORM_ENV_INSTALL "PATH=${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/blender.shared/\;${PLATFORM_ENV_BUILD_DIRS}\;$ENV{PATH}")
+set(PLATFORM_ENV_INSTALL "PATH=${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/blui.shared/\;${PLATFORM_ENV_BUILD_DIRS}\;$ENV{PATH}")
 unset(_library_paths)

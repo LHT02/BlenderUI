@@ -308,7 +308,10 @@ static PyObject *bpy_resource_path(PyObject *UNUSED(self), PyObject *args, PyObj
   };
   struct PyC_StringEnum type = {type_items};
 
-  int major = BLENDER_VERSION / 100, minor = BLENDER_VERSION % 100;
+  /* Default to the *BLUI* version, not the Blender file-format version: this
+   * function reports where BLUI actually keeps its user files, and that
+   * directory is named after `BLUI_VERSION` (see `BKE_appdir`). */
+  int major = BLUI_VERSION / 100, minor = BLUI_VERSION % 100;
   const char *path;
 
   static const char *_keywords[] = {"type", "major", "minor", NULL};

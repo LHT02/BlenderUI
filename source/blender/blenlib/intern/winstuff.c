@@ -52,7 +52,7 @@ static void register_blend_extension_failed(HKEY root, const bool background)
     RegCloseKey(root);
   }
   if (!background) {
-    MessageBox(0, "Could not register file extension.", "Blender error", MB_OK | MB_ICONERROR);
+    MessageBox(0, "Could not register file extension.", "BLUI error", MB_OK | MB_ICONERROR);
   }
 }
 
@@ -73,9 +73,9 @@ bool BLI_windows_register_blend_extension(const bool background)
 
   /* Replace the actual app name with the wrapper. */
   {
-    char *blender_app = strstr(BlPath, "blender.exe");
+    char *blender_app = strstr(BlPath, "BLUI.exe");
     if (blender_app != NULL) {
-      strcpy(blender_app, "blender-launcher.exe");
+      strcpy(blender_app, "BLUI-launcher.exe");
     }
   }
 
@@ -94,7 +94,7 @@ bool BLI_windows_register_blend_extension(const bool background)
   lresult = RegCreateKeyEx(
       root, "blendfile", 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwd);
   if (lresult == ERROR_SUCCESS) {
-    strcpy(buffer, "Blender File");
+    strcpy(buffer, "BLUI File");
     lresult = RegSetValueEx(hkey, NULL, 0, REG_SZ, (BYTE *)buffer, strlen(buffer) + 1);
     RegCloseKey(hkey);
   }
@@ -174,7 +174,7 @@ bool BLI_windows_register_blend_extension(const bool background)
              "File extension registered for %s.",
              usr_mode ? "the current user. To register for all users, run as an administrator" :
                         "all users");
-    MessageBox(0, MBox, "Blender", MB_OK | MB_ICONINFORMATION);
+    MessageBox(0, MBox, "BLUI", MB_OK | MB_ICONINFORMATION);
   }
   return true;
 }

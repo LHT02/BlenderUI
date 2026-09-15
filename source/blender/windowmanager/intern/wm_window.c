@@ -28,6 +28,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_blender_version.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
@@ -474,14 +475,14 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
     if (blendfile_path[0] != '\0') {
       char str[sizeof(((Main *)NULL)->filepath) + 24];
       SNPRINTF(str,
-               "Blender%s [%s%s]",
+               BLUI_PRODUCT_NAME "%s [%s%s]",
                wm->file_saved ? "" : "*",
                blendfile_path,
                G_MAIN->recovered ? " (Recovered)" : "");
       GHOST_SetTitle(win->ghostwin, str);
     }
     else {
-      GHOST_SetTitle(win->ghostwin, "Blender");
+      GHOST_SetTitle(win->ghostwin, BLUI_PRODUCT_NAME);
     }
 
     /* Informs GHOST of unsaved changes, to set window modified visual indicator (macOS)
@@ -770,7 +771,7 @@ static void wm_window_ghostwindow_ensure(wmWindowManager *wm, wmWindow *win, boo
       win->cursor = WM_CURSOR_DEFAULT;
     }
 
-    wm_window_ghostwindow_add(wm, "Blender", win, is_dialog);
+    wm_window_ghostwindow_add(wm, BLUI_PRODUCT_NAME, win, is_dialog);
   }
 
   if (win->ghostwin != NULL) {
@@ -1026,7 +1027,7 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
   ScrArea *area = BKE_screen_find_big_area(CTX_wm_screen(C), SPACE_TYPE_ANY, 0);
 
   bool ok = (WM_window_open(C,
-                            IFACE_("Blender"),
+                            IFACE_(BLUI_PRODUCT_NAME),
                             0,
                             0,
                             win_src->sizex * 0.95f,

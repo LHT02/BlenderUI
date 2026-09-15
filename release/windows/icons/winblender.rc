@@ -49,11 +49,11 @@ BEGIN
     BEGIN
       VALUE "FileVersion", BLEN_VER_RC_STR
       VALUE "ProductVersion", BLEN_VER_RC_STR
-      VALUE "CompanyName", "Blender Foundation"
-      VALUE "FileDescription", "Blender"
-      VALUE "LegalCopyright", "GPLv3 (Blender Foundation)"
-      VALUE "OriginalFilename", "blender.exe"
-      VALUE "ProductName", "Blender"
+      VALUE "CompanyName", "BLUI Project"
+      VALUE "FileDescription", "BLUI"
+      VALUE "LegalCopyright", "GPLv3 - based on Blender, (C) Blender Foundation"
+      VALUE "OriginalFilename", "BLUI.exe"
+      VALUE "ProductName", "BLUI"
     END
   END
   BLOCK "VarFileInfo"
