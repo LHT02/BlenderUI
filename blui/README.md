@@ -616,6 +616,27 @@ The work is staged so the build stays green at every step.
       > `LNK2019`. Let the linker find the second one rather than grepping for
       > the file name.
 
+      **Checked and deliberately kept**, so the analysis does not have to be
+      redone:
+
+      * `versioning_userdef.c` looks like more of the same but is not.
+        `blo_do_versions_userdef()` opens with **unguarded** repairs -
+        `if (userdef->menuthreshold1 == 0) { ... }`, `if (userdef->autokey_mode
+        == 0)` and so on. Those run on every load, including BLUI's own files,
+        and fix up zeroed defaults. This is the "unguarded top-level work" that
+        the guard test cannot see; read the body, do not just count guards.
+      * `versioning_defaults.cc` sets defaults for newly created data and has no
+        version guards at all.
+      * `versioning_dna.c` is a sanity check that the file's DNA matches the
+        build's. Cheap, and still meaningful for BLUI's own files.
+
+      **Checked and rejected as a target:** the `DNA_DEPRECATED_ALLOW` blocks
+      in `makesdna/DNA_*.h`. They look like more compatibility dead weight, but
+      they are read by *current* code - `action.c`, `camera.c`, `constraint.c`,
+      `customdata.cc` and others reference deprecated fields directly - so
+      removing them breaks the build rather than shrinking it. There are only
+      48 markers across 22 headers in any case; it is not the win it looks like.
+
 - [x] **Stage 3 — Component shell.** BLUI boots into its own workspace set
       (*Files*, *Images*, *Text*, *Video*, *Settings*, *Console*) instead of a
       3D viewport, with its own splash and logo art. See
