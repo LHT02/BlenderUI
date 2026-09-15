@@ -664,7 +664,27 @@ The work is staged so the build stays green at every step.
       live in a header, so none of which show up when reading. `space_buttons`
       and `space_clip` both fail that way.
 
-      ### The data editors are interlocked - they cannot be done one at a time
+      ### `space_node`'s coupling runs both ways - it cannot be unblocked in steps
+
+      One direction was fixed: `bf_nodes` no longer calls
+      `ED_init_standard_node_socket_type()` to install the node editor's draw
+      callbacks (Blender's own comment: "XXX bad level call"). That edge is
+      gone.
+
+      The other direction cannot be removed on its own. Excising the
+      `SpaceNodeEditor` RNA from `rna_space.c` - about 445 lines, and roughly ten
+      of the twenty-plus unresolved symbols - fails at the link because
+      `space_node.cc` calls `RNA_enum_node_tree_types_itemf_impl()`, which lives
+      in the RNA block and calls `rna_SpaceNodeEditor_tree_type_poll()`.
+      Restoring the one helper just moves the error to the next symbol.
+
+      So the node RNA and the node editor module are mutually dependent and must
+      be deleted **in the same step**, exactly like the data editors and
+      `object`/`space_view3d`. `rna_Space_refine()` is the one thing in that
+      neighbourhood that must be kept - it refines *every* space type's RNA, not
+      just the node one, and removing it wholesale breaks all of them. Take only
+      its `case SPACE_NODE`.
+
 
       `editors/metaball` is the smallest module in the tree (5 files, 35 KB) and
       was the obvious next try. It leaks seven symbols, and where they land is
