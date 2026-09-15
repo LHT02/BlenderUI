@@ -859,6 +859,35 @@ The work is staged so the build stays green at every step.
       registered from `ED_spacetypes_init()` and is unaffected. Worth writing
       down because the wrong version was believed for part of a round.
 
+      ### The UV mode gate - measured
+
+      Three bags are now blocked on the same thing, not two. `mesh` and `uvedit`
+      were known; `sculpt` joins them, because `km_image_editor_tool_uv_sculpt_stroke`
+      in `blender_default.py` names `sculpt.*` operators. So retiring UV mode
+      from the image editor unblocks all three at once, which makes it the
+      highest-value single piece of work left in this vein.
+
+      Its size, measured rather than estimated: **22 references to `SI_MODE_UV`
+      across 14 files**.
+
+      | Where | Refs |
+      | --- | --- |
+      | `blenkernel/intern` | 8 |
+      | `editors/space_image` | 7 |
+      | `draw/overlay` | 3 |
+      | `editors/uvedit` | 2 |
+      | `makesdna` (the enum itself) | 1 |
+      | `editors/transform` | 1 |
+
+      Plus 6 references to the UV-sculpt keymaps in `blender_default.py` and none
+      in `industry_compatible_data.py`.
+
+      Note what is *not* in that list: the keymap data itself is barely involved
+      (6 references), and the work is mostly in `space_image` and the drawing
+      overlay. That is a different shape from the bag removals - it is a
+      feature retirement, not a registration cut - and it needs the enum, the
+      mode selector, the overlay and the transform code changed together.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
