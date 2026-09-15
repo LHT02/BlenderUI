@@ -1127,6 +1127,35 @@ The work is staged so the build stays green at every step.
       They moved to `DNA_meta_types.h`, which both remaining users already
       include and which already carries the `MB_*` metaball constants.
 
+      ### `ED_spacetypes_init()`'s include list, and the trap a third time
+
+      `space_api/spacetypes.c` is where the removed operator bags left their
+      headers behind, and it had become the densest collection of them: 28 `ED_*`
+      includes in a file that now registers nine space types, fifteen operator
+      bags and ten keymaps. Eleven were dead - `ED_armature.h`, `ED_clip.h`,
+      `ED_curve.h`, `ED_curves.h`, `ED_curves_sculpt.h`, `ED_geometry.h`,
+      `ED_mask.h`, `ED_mesh.h`, `ED_node.h`, `ED_physics.h`, `ED_sculpt.h` - and
+      are gone.
+
+      `ED_gizmo_library.h` was **not** dead, and the way it hid is the point: its
+      symbols are `ED_gizmotypes_button_2d`, `ED_gizmotypes_dial_3d` and so on. A
+      grep for `ED_gizmo_` does not match `ED_gizmotypes_`. That is the third time
+      this session that a naming convention has hidden live code - `ED_uvedit_`
+      missed the unprefixed internals, `ED_mball_` missed the macros, `ED_gizmo_`
+      missed the compounded prefix - and all three were caught by the compiler
+      rather than by reading.
+
+      The method that works here is not grepping harder. Delete the includes and
+      let the build name what was live: it costs one build cycle and the answer is
+      conclusive. Grep is good for finding *candidates* and has now been wrong
+      about all three of these, in both directions.
+
+      These includes create no link dependency, so removing them deletes no code.
+      They matter for the next step: an include of a module's header is exactly
+      what has to be gone before that module can be deleted, and a stale one is
+      invisible until the build breaks on it. `ED_lattice.h` and `ED_mball.h` each
+      had one of these sitting in this very file.
+
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 
       CORRECTED. This section used to say uvedit was "four calls short", on the
