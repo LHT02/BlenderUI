@@ -357,123 +357,6 @@ class EditingPanel:
     bl_context = "editing"
 
 
-class USERPREF_PT_edit_objects(EditingPanel, Panel):
-    bl_label = "Objects"
-
-    def draw(self, context):
-        pass
-
-
-class USERPREF_PT_edit_objects_new(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "New Objects"
-    bl_parent_id = "USERPREF_PT_edit_objects"
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        edit = prefs.edit
-
-        flow = layout.grid_flow(row_major=False, columns=0, even_columns=True, even_rows=False, align=False)
-
-        flow.prop(edit, "material_link", text="Link Materials To")
-        flow.prop(edit, "object_align", text="Align To")
-        flow.prop(edit, "use_enter_edit_mode", text="Enter Edit Mode")
-        flow.prop(edit, "collection_instance_empty_size", text="Instance Empty Size")
-
-
-class USERPREF_PT_edit_objects_duplicate_data(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "Duplicate Data"
-    bl_parent_id = "USERPREF_PT_edit_objects"
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        edit = prefs.edit
-
-        layout.use_property_split = False
-
-        flow = layout.grid_flow(row_major=False, columns=0, even_columns=True, even_rows=False, align=True)
-
-        col = flow.column()
-        col.prop(edit, "use_duplicate_action", text="Action")
-        col.prop(edit, "use_duplicate_armature", text="Armature")
-        col.prop(edit, "use_duplicate_camera", text="Camera")
-        col.prop(edit, "use_duplicate_curve", text="Curve")
-        # col.prop(edit, "use_duplicate_fcurve", text="F-Curve")  # Not implemented.
-        col.prop(edit, "use_duplicate_curves", text="Curves")
-        col.prop(edit, "use_duplicate_grease_pencil", text="Grease Pencil")
-        col.prop(edit, "use_duplicate_lattice", text="Lattice")
-
-        col = flow.column()
-        col.prop(edit, "use_duplicate_light", text="Light")
-        col.prop(edit, "use_duplicate_lightprobe", text="Light Probe")
-        col.prop(edit, "use_duplicate_material", text="Material")
-        col.prop(edit, "use_duplicate_mesh", text="Mesh")
-        col.prop(edit, "use_duplicate_metaball", text="Metaball")
-        col.prop(edit, "use_duplicate_node_tree", text="Node Tree")
-        col.prop(edit, "use_duplicate_particle", text="Particle")
-
-        col = flow.column()
-        if hasattr(edit, "use_duplicate_pointcloud"):
-            col.prop(edit, "use_duplicate_pointcloud", text="Point Cloud")
-        col.prop(edit, "use_duplicate_speaker", text="Speaker")
-        col.prop(edit, "use_duplicate_surface", text="Surface")
-        col.prop(edit, "use_duplicate_text", text="Text")
-        # col.prop(edit, "use_duplicate_texture", text="Texture")  # Not implemented.
-        col.prop(edit, "use_duplicate_volume", text="Volume", text_ctxt=i18n_contexts.id_id)
-
-
-class USERPREF_PT_edit_cursor(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "3D Cursor"
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        edit = prefs.edit
-
-        col = layout.column()
-        col.prop(edit, "use_mouse_depth_cursor")
-        col.prop(edit, "use_cursor_lock_adjust")
-
-
-class USERPREF_PT_edit_gpencil(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "Grease Pencil"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        edit = prefs.edit
-
-        col = layout.column(heading="Distance")
-        col.prop(edit, "grease_pencil_manhattan_distance", text="Manhattan")
-        col.prop(edit, "grease_pencil_euclidean_distance", text="Euclidean")
-
-
-class USERPREF_PT_edit_annotations(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "Annotations"
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        edit = prefs.edit
-
-        col = layout.column()
-        col.prop(edit, "grease_pencil_default_color", text="Default Color")
-        col.prop(edit, "grease_pencil_eraser_radius", text="Eraser Radius")
-
-
-class USERPREF_PT_edit_weight_paint(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "Weight Paint"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        view = prefs.view
-
-        layout.use_property_split = False
-
-        layout.prop(view, "use_weight_color_range", text="Use Custom Colors")
-
-        col = layout.column()
-        col.active = view.use_weight_color_range
-        col.template_color_ramp(view, "weight_color_range", expand=True)
-
 
 class USERPREF_PT_edit_text_editor(EditingPanel, CenterAlignMixIn, Panel):
     bl_label = "Text Editor"
@@ -484,19 +367,6 @@ class USERPREF_PT_edit_text_editor(EditingPanel, CenterAlignMixIn, Panel):
         edit = prefs.edit
 
         layout.prop(edit, "use_text_edit_auto_close")
-
-
-class USERPREF_PT_edit_misc(EditingPanel, CenterAlignMixIn, Panel):
-    bl_label = "Miscellaneous"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        edit = prefs.edit
-
-        col = layout.column()
-        col.prop(edit, "sculpt_paint_overlay_color", text="Sculpt Overlay Color")
-        col.prop(edit, "node_margin", text="Node Auto-Offset Margin")
 
 
 # -----------------------------------------------------------------------------
@@ -1528,47 +1398,24 @@ class SaveLoadPanel:
 
 
 class USERPREF_PT_saveload_blend(SaveLoadPanel, CenterAlignMixIn, Panel):
-    bl_label = "Blend Files"
+    bl_label = "Saving"
 
     def draw_centered(self, context, layout):
         prefs = context.preferences
         paths = prefs.filepaths
         view = prefs.view
 
-        col = layout.column(heading="Save")
-        col.prop(view, "use_save_prompt")
-        col.prop(paths, "file_preview_type")
-
-        col = layout.column(heading="Default To")
-        col.prop(paths, "use_relative_paths")
-        col.prop(paths, "use_file_compression")
-        col.prop(paths, "use_load_ui")
+        # BLUI saves real files one at a time, so every setting here that
+        # described Blender's .blend container went with it: relative paths,
+        # file compression, "Load UI", how many backup versions to keep, how
+        # long the Open Recent list is, and the .blend preview thumbnail.
+        # Auto Save went the same way - it existed to write a recovery .blend.
+        # What is left applies to saving any file, and to the text editor.
+        col = layout.column()
+        col.prop(view, "use_save_prompt", text="Prompt on Overwrite")
 
         col = layout.column(heading="Text Files")
         col.prop(paths, "use_tabs_as_spaces")
-
-        col = layout.column()
-        col.prop(paths, "save_version")
-        col.prop(paths, "recent_files")
-
-
-class USERPREF_PT_saveload_blend_autosave(SaveLoadPanel, CenterAlignMixIn, Panel):
-    bl_label = "Auto Save"
-    bl_parent_id = "USERPREF_PT_saveload_blend"
-
-    def draw_header(self, context):
-        prefs = context.preferences
-        paths = prefs.filepaths
-
-        self.layout.prop(paths, "use_auto_save_temporary_files", text="")
-
-    def draw_centered(self, context, layout):
-        prefs = context.preferences
-        paths = prefs.filepaths
-
-        col = layout.column()
-        col.active = paths.use_auto_save_temporary_files
-        col.prop(paths, "auto_save_time", text="Timer (Minutes)")
 
 
 class USERPREF_PT_saveload_file_browser(SaveLoadPanel, CenterAlignMixIn, Panel):
@@ -2477,12 +2324,11 @@ classes = (
     # preferences sections are gone, so they could never be drawn; registering
     # a panel that can never appear only makes this list harder to read.
 
-    # BLUI: of Blender's Editing panels only Text Editor and Miscellaneous mean
-    # anything here. Objects, New Objects, Duplicate Data, 3D Cursor,
-    # Annotations, Weight Paint and Grease Pencil all configure 3D content
-    # creation, which BLUI does not do.
+    # BLUI: the Editing section is down to its Text Editor panel. Objects, New
+    # Objects, Duplicate Data, 3D Cursor, Annotations, Weight Paint, Grease
+    # Pencil and Miscellaneous all configure 3D content creation, which BLUI
+    # does not do; their panel definitions are gone, not merely unregistered.
     USERPREF_PT_edit_text_editor,
-    USERPREF_PT_edit_misc,
 
     # BLUI: USERPREF_PT_system_cycles_devices is not registered - BLUI has no
     # Cycles, so the panel could only ever draw an empty box.
@@ -2510,8 +2356,9 @@ classes = (
     # other two are for building and browsing 3D assets.
     USERPREF_PT_file_paths_applications,
 
+    # BLUI: "Saving" is what is left of Blender's "Blend Files" panel, and Auto
+    # Save is gone - both described a .blend container BLUI does not have.
     USERPREF_PT_saveload_blend,
-    USERPREF_PT_saveload_blend_autosave,
     USERPREF_PT_saveload_autorun,
     USERPREF_PT_saveload_file_browser,
 
@@ -2522,27 +2369,19 @@ classes = (
     USERPREF_PT_input_tablet,
     USERPREF_PT_input_touchpad,
     USERPREF_PT_input_ndof,
-    USERPREF_PT_navigation_orbit,
-    USERPREF_PT_navigation_zoom,
-    USERPREF_PT_navigation_fly_walk,
-    USERPREF_PT_navigation_fly_walk_navigation,
-    USERPREF_PT_navigation_fly_walk_gravity,
 
     USERPREF_PT_keymap,
     USERPREF_PT_addons,
 
-    USERPREF_PT_studiolight_lights,
-    USERPREF_PT_studiolight_light_editor,
-    USERPREF_PT_studiolight_matcaps,
-    USERPREF_PT_studiolight_world,
+    # BLUI: the Navigation (orbit, zoom, fly/walk) and Lights (studio lights,
+    # matcaps) sections are not registered here either. Both exist to steer and
+    # to light a 3D viewport, which BLUI does not have, and their sections are
+    # gone from `rna_enum_preference_section_items`, so these panels could
+    # never be drawn. The Experimental section went the same way: it was a home
+    # for prototypes of 3D features.
 
     # Popovers.
     USERPREF_PT_ndof_settings,
-
-    USERPREF_PT_experimental_new_features,
-    USERPREF_PT_experimental_prototypes,
-    # USERPREF_PT_experimental_tweaks,
-    USERPREF_PT_experimental_debugging,
 
     # UI lists
     USERPREF_UL_asset_libraries,

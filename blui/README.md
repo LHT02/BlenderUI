@@ -275,6 +275,7 @@ set:
 | --- | --- |
 | `verify_startup.py` | prints the workspace set and each area's active editor |
 | `check_editor_set.py` | asserts only BLUI's editors exist, and that the startup file uses them |
+| `check_preferences.py` | asserts the preferences sections and panels are BLUI's set |
 | `dump_screens.py` | dumps every workspace, screen, area and space |
 | `click_sweep.py` | clicks a grid over the whole window |
 | `interaction_test.py` | right-click, double-click and drag |
@@ -397,6 +398,7 @@ memory. Run them after any change; none of them need a person watching.
 | Shell context menu (bind, populate, enumerate) | `build\shellmenu_selftest.exe` | PASS, 0 failures |
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
+| Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | ISOLATED |
 | Opening a component in its own window | `check_component_window.py` | PASS |
@@ -513,7 +515,7 @@ The work is staged so the build stays green at every step.
         stay where they were. That also mirrors the two-level shape Windows 11
         itself uses, where "Show more options" leads to the full shell menu.
         Operator: `file.shell_context_menu` in `editors/space_file/file_ops.c`.
-- [~] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
+- [x] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
       component set instead of Blender's 3D options.
       - [x] Section list trimmed from 14 tabs to 9. Blender's Viewport, Lights,
         Animation, Navigation and Experimental sections exist to tune a 3D
@@ -522,16 +524,31 @@ The work is staged so the build stays green at every step.
         and none of them have anything to configure for a file browser, an image
         viewer or a text editor. They are removed from
         `rna_enum_preference_section_items`, and a panel whose context is not in
-        that list is never drawn, so their panels become unreachable without
-        being deleted. Add-ons is kept on purpose: BLUI ships none of its own,
-        but leaving the section in keeps the product extensible.
+        that list is never drawn. Add-ons is kept on purpose: BLUI ships none of
+        its own, but leaving the section in keeps the product extensible.
         Verified: the live enum reports `INTERFACE, THEMES, EDITING, INPUT,
         KEYMAP, SYSTEM, SAVE_LOAD, FILE_PATHS, ADDONS`.
       - [x] The "Cycles Render Devices" panel is no longer registered - BLUI has
         no Cycles, so it could only ever draw an empty box.
-      - [ ] Trim the remaining 3D panels inside *Editing* (only its Text Editor
-        panel is meaningful) and *Save & Load* (Blend Files and Auto Save are
-        about a document BLUI does not have).
+      - [x] The panels behind those removed sections are no longer *registered*
+        either. Being undrawable is not the same as not existing: the Navigation
+        (orbit, zoom, fly/walk), Lights (studio lights, matcaps) and Experimental
+        panels were still in `classes`, and Blender warns about each one at
+        startup. They are gone, not merely unreachable.
+      - [x] *Editing* is down to its **Text Editor** panel. Objects, New Objects,
+        Duplicate Data, 3D Cursor, Annotations, Weight Paint, Grease Pencil and
+        Miscellaneous all configure 3D content creation, which BLUI does not do;
+        their panel definitions are deleted, not just unregistered.
+      - [x] *Save & Load*: "Blend Files" became **Saving** and keeps only what
+        applies to a real file - the overwrite prompt and "Tabs as Spaces" for
+        the text editor. Relative paths, file compression, "Load UI", the number
+        of backup versions, the Open Recent list length and the `.blend` preview
+        thumbnail all described Blender's container. **Auto Save** is gone with
+        them: it existed to write a recovery `.blend`. The **File Browser**
+        panel is untouched - that one is BLUI's own subject matter.
+        Verified by `blui/tools/check_preferences.py`, which walks the registered
+        panel classes and asserts the whole set: nine sections, nothing in the
+        dropped ones, Editing holding exactly one panel.
 
 ### Licensing
 
