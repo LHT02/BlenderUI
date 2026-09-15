@@ -1469,13 +1469,6 @@ void ED_operatortypes_paint(void)
   WM_operatortype_append(PALETTE_OT_join);
 
   /* paint curve */
-  WM_operatortype_append(PAINTCURVE_OT_new);
-  WM_operatortype_append(PAINTCURVE_OT_add_point);
-  WM_operatortype_append(PAINTCURVE_OT_delete_point);
-  WM_operatortype_append(PAINTCURVE_OT_select);
-  WM_operatortype_append(PAINTCURVE_OT_slide);
-  WM_operatortype_append(PAINTCURVE_OT_draw);
-  WM_operatortype_append(PAINTCURVE_OT_cursor);
 
   /* brush */
   WM_operatortype_append(BRUSH_OT_add);

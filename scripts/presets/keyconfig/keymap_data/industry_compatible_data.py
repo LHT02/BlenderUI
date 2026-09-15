@@ -2063,38 +2063,6 @@ def km_object_mode(params):
     return keymap
 
 
-def km_paint_curve(params):
-    items = []
-    keymap = (
-        "Paint Curve",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("paintcurve.add_point_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-        ("paintcurve.select", {"type": 'LEFTMOUSE', "value": 'PRESS'},
-         {"properties": [("extend", False)]}),
-        ("paintcurve.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-         {"properties": [("extend", True)]}),
-        ("paintcurve.slide", {"type": 'LEFTMOUSE', "value": 'PRESS'},
-         {"properties": [("align", False)]}),
-        ("paintcurve.slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-         {"properties": [("align", True)]}),
-        ("paintcurve.select", {"type": 'A', "value": 'PRESS'},
-         {"properties": [("toggle", True)]}),
-        ("paintcurve.cursor", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ("paintcurve.delete_point", {"type": 'BACK_SPACE', "value": 'PRESS'}, None),
-        ("paintcurve.delete_point", {"type": 'DEL', "value": 'PRESS'}, None),
-        ("paintcurve.draw", {"type": 'RET', "value": 'PRESS'}, None),
-        ("paintcurve.draw", {"type": 'NUMPAD_ENTER', "value": 'PRESS'}, None),
-        ("transform.translate", {"type": 'W', "value": 'PRESS'}, None),
-        ("transform.translate", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
-        ("transform.rotate", {"type": 'E', "value": 'PRESS'}, None),
-        ("transform.resize", {"type": 'R', "value": 'PRESS'}, None),
-    ])
-
-    return keymap
 
 
 
@@ -2636,7 +2604,6 @@ def generate_keymaps_impl(params=None):
         km_face_mask(params),
         km_weight_paint_vertex_selection(params),
         km_object_mode(params),
-        km_paint_curve(params),
         km_image_paint(params),
         km_vertex_paint(params),
         km_weight_paint(params),

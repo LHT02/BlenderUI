@@ -172,7 +172,6 @@ void ED_spacemacros_init(void)
    * keeps, so they stay. */
   ED_operatormacros_file();
   ED_operatormacros_sequencer();
-  ED_operatormacros_paint();
   ED_operatormacros_gpencil();
 
   /* Register dropboxes (can use macros). */
