@@ -182,7 +182,10 @@ static const EnumPropertyItem *rna_Area_ui_type_itemf(bContext *C,
   }
 
   for (; item_from->identifier; item_from++) {
-    if (ELEM(item_from->value, SPACE_TOPBAR, SPACE_STATUSBAR)) {
+    /* Global areas and the Info space are machinery rather than editors: they
+     * are named in `rna_enum_space_type_items` so that `Area.type` can identify
+     * them, but they are never offered as a type to switch an area to. */
+    if (ELEM(item_from->value, SPACE_TOPBAR, SPACE_STATUSBAR, SPACE_INFO)) {
       continue;
     }
 
@@ -226,7 +229,9 @@ static int rna_Area_ui_type_get(PointerRNA *ptr)
   if (type == NULL || area_changing) {
     type = BKE_spacetype_from_id(area_type);
     if (type == NULL) {
-      type = BKE_spacetype_from_id(SPACE_VIEW3D);
+      /* BLUI registers no 3D viewport, so there is no "default editor" to fall
+       * back to; its landing component is the file browser. */
+      type = BKE_spacetype_from_id(SPACE_FILE);
     }
     BLI_assert(type != NULL);
   }
@@ -277,7 +282,10 @@ static PointerRNA rna_Region_data_get(PointerRNA *ptr)
     if (region->regiontype == RGN_TYPE_WINDOW) {
       /* We could make this static, it won't change at run-time. */
       SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
-      if (region->type == BKE_regiontype_from_id(st, region->regiontype)) {
+      /* BLUI does not register the 3D viewport, so `st` is normally NULL and
+       * `Region.data` is simply None. The lookup stays so that a region which
+       * is *not* a 3D view window never gets its data handed out as one. */
+      if (st != NULL && region->type == BKE_regiontype_from_id(st, region->regiontype)) {
         PointerRNA newptr;
         RNA_pointer_create(&screen->id, &RNA_RegionView3D, region->regiondata, &newptr);
         return newptr;
@@ -381,7 +389,8 @@ static void rna_def_area(BlenderRNA *brna)
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "spacetype");
   RNA_def_property_enum_items(prop, rna_enum_space_type_items);
-  RNA_def_property_enum_default(prop, SPACE_VIEW3D);
+  /* BLUI has no 3D viewport to default to; a new area is a file browser. */
+  RNA_def_property_enum_default(prop, SPACE_FILE);
   RNA_def_property_enum_funcs(prop, "rna_Area_type_get", "rna_Area_type_set", NULL);
   RNA_def_property_ui_text(prop, "Editor Type", "Current editor type for this area");
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
@@ -390,7 +399,7 @@ static void rna_def_area(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "ui_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, DummyRNA_NULL_items); /* in fact dummy */
-  RNA_def_property_enum_default(prop, SPACE_VIEW3D << 16);
+  RNA_def_property_enum_default(prop, SPACE_FILE << 16);
   RNA_def_property_enum_funcs(
       prop, "rna_Area_ui_type_get", "rna_Area_ui_type_set", "rna_Area_ui_type_itemf");
   RNA_def_property_ui_text(prop, "Editor Type", "Current editor type for this area");

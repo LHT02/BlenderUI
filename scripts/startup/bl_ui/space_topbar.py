@@ -92,101 +92,6 @@ class TOPBAR_PT_tool_settings_extra(Panel):
         item.draw_settings(context, layout, tool, extra=True)
 
 
-class TOPBAR_PT_tool_fallback(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'HEADER'
-    bl_label = "Layers"
-    bl_ui_units_x = 8
-
-    def draw(self, context):
-        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
-        layout = self.layout
-
-        tool_settings = context.tool_settings
-        ToolSelectPanelHelper.draw_fallback_tool_items(layout, context)
-        if tool_settings.workspace_tool_type == 'FALLBACK':
-            tool = context.tool
-            ToolSelectPanelHelper.draw_active_tool_fallback(
-                context, layout, tool)
-
-
-class TOPBAR_PT_gpencil_layers(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'HEADER'
-    bl_label = "Layers"
-    bl_ui_units_x = 14
-
-    @classmethod
-    def poll(cls, context):
-        if context.gpencil_data is None:
-            return False
-
-        ob = context.object
-        if ob is not None and ob.type == 'GPENCIL':
-            return True
-
-        return False
-
-    def draw(self, context):
-        layout = self.layout
-        gpd = context.gpencil_data
-
-        # Grease Pencil data...
-        if (gpd is None) or (not gpd.layers):
-            layout.operator("gpencil.layer_add", text="New Layer")
-        else:
-            self.draw_layers(context, layout, gpd)
-
-    def draw_layers(self, context, layout, gpd):
-        row = layout.row()
-
-        col = row.column()
-        layer_rows = 10
-        col.template_list("GPENCIL_UL_layer", "", gpd, "layers", gpd.layers, "active_index",
-                          rows=layer_rows, sort_reverse=True, sort_lock=True)
-
-        gpl = context.active_gpencil_layer
-        if gpl:
-            srow = col.row(align=True)
-            srow.prop(gpl, "blend_mode", text="Blend")
-
-            srow = col.row(align=True)
-            srow.prop(gpl, "opacity", text="Opacity", slider=True)
-            srow.prop(gpl, "use_mask_layer", text="",
-                      icon='MOD_MASK' if gpl.use_mask_layer else 'LAYER_ACTIVE')
-
-            srow = col.row(align=True)
-            srow.prop(gpl, "use_lights")
-
-        col = row.column()
-
-        sub = col.column(align=True)
-        sub.operator("gpencil.layer_add", icon='ADD', text="")
-        sub.operator("gpencil.layer_remove", icon='REMOVE', text="")
-
-        gpl = context.active_gpencil_layer
-        if gpl:
-            sub.menu("GPENCIL_MT_layer_context_menu",
-                     icon='DOWNARROW_HLT', text="")
-
-            if len(gpd.layers) > 1:
-                col.separator()
-
-                sub = col.column(align=True)
-                sub.operator("gpencil.layer_move",
-                             icon='TRIA_UP', text="").type = 'UP'
-                sub.operator("gpencil.layer_move",
-                             icon='TRIA_DOWN', text="").type = 'DOWN'
-
-                col.separator()
-
-                sub = col.column(align=True)
-                sub.operator("gpencil.layer_isolate", icon='HIDE_OFF',
-                             text="").affect_visibility = True
-                sub.operator("gpencil.layer_isolate", icon='LOCKED',
-                             text="").affect_visibility = False
-
-
 class TOPBAR_MT_editor_menus(Menu):
     bl_idname = "TOPBAR_MT_editor_menus"
     bl_label = ""
@@ -775,20 +680,6 @@ class TOPBAR_MT_workspace_menu(Menu):
         props.direction = 'NEXT'
 
 
-# Grease Pencil Object - Primitive curve
-class TOPBAR_PT_gpencil_primitive(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'HEADER'
-    bl_label = "Primitives"
-
-    def draw(self, context):
-        settings = context.tool_settings.gpencil_sculpt
-
-        layout = self.layout
-        # Curve
-        layout.template_curve_mapping(
-            settings, "thickness_primitive_curve", brush=True)
-
 
 # Only a popover
 class TOPBAR_PT_name(Panel):
@@ -941,10 +832,7 @@ classes = (
     TOPBAR_MT_render,
     TOPBAR_MT_window,
     TOPBAR_MT_help,
-    TOPBAR_PT_tool_fallback,
     TOPBAR_PT_tool_settings_extra,
-    TOPBAR_PT_gpencil_layers,
-    TOPBAR_PT_gpencil_primitive,
     TOPBAR_PT_name,
     TOPBAR_PT_name_marker,
 )

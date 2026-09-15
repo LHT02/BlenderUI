@@ -204,7 +204,10 @@ void view3d_operatortypes(void)
   WM_operatortype_append(VIEW3D_OT_ruler_add);
   WM_operatortype_append(VIEW3D_OT_ruler_remove);
 
-  transform_operatortypes();
+  /* `transform_operatortypes()` used to be called here. It is a shared
+   * facility - the sequencer's slide tool needs it - so it moved to
+   * `ED_spacetypes_init()`, which runs whether or not this space type is
+   * registered. */
 }
 
 void view3d_keymap(wmKeyConfig *keyconf)

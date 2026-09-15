@@ -594,6 +594,13 @@ bool screen_area_close(struct bContext *C, bScreen *screen, ScrArea *area)
 void screen_area_spacelink_add(Scene *scene, ScrArea *area, eSpace_Type space_type)
 {
   SpaceType *stype = BKE_spacetype_from_id(space_type);
+  if (stype == NULL) {
+    /* BLUI does not register every space type Blender has. A caller asking for
+     * one it does not have gets the file browser, which is the component BLUI
+     * opens on, rather than a NULL dereference here. */
+    space_type = SPACE_FILE;
+    stype = BKE_spacetype_from_id(space_type);
+  }
   SpaceLink *slink = stype->create(area, scene);
 
   area->regionbase = slink->regionbase;

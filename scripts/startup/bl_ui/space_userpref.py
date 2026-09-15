@@ -1289,8 +1289,21 @@ class ThemeGenericClassGenerator:
     def generate_panel_classes_from_theme_areas():
         from bpy.types import Theme
 
+        # A theme panel is generated per theme area, and a theme area names the
+        # editor it styles. BLUI does not have Blender's 3D viewport, node
+        # editor, graph editor, dope sheet, NLA, outliner, properties or clip
+        # editor, so generating panels for them would offer settings for editors
+        # that cannot be opened - and the panel's space type no longer exists to
+        # attach to. Only the areas BLUI actually has get a panel.
+        valid_areas = {
+            item.identifier for item in Panel.bl_rna.properties["bl_space_type"].enum_items_static
+        }
+
         for theme_area in Theme.bl_rna.properties["theme_area"].enum_items_static:
             if theme_area.identifier in {'USER_INTERFACE', 'STYLE', 'BONE_COLOR_SETS'}:
+                continue
+
+            if theme_area.identifier not in valid_areas:
                 continue
 
             panel_id = "USERPREF_PT_theme_" + theme_area.identifier.lower()

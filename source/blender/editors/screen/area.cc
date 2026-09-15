@@ -1923,7 +1923,10 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
   area->type = BKE_spacetype_from_id(area->spacetype);
 
   if (area->type == nullptr) {
-    area->spacetype = SPACE_VIEW3D;
+    /* BLUI registers no 3D viewport, so there is no "default editor" to fall
+     * back to. An area whose type cannot be resolved becomes the file browser,
+     * which is the component BLUI opens on. */
+    area->spacetype = SPACE_FILE;
     area->type = BKE_spacetype_from_id(area->spacetype);
   }
 
@@ -1994,7 +1997,10 @@ static void area_offscreen_init(ScrArea *area)
   area->type = BKE_spacetype_from_id(area->spacetype);
 
   if (area->type == nullptr) {
-    area->spacetype = SPACE_VIEW3D;
+    /* BLUI registers no 3D viewport, so there is no "default editor" to fall
+     * back to. An area whose type cannot be resolved becomes the file browser,
+     * which is the component BLUI opens on. */
+    area->spacetype = SPACE_FILE;
     area->type = BKE_spacetype_from_id(area->spacetype);
   }
 
@@ -2481,6 +2487,14 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_regi
     }
 
     SpaceType *st = BKE_spacetype_from_id(type);
+    if (st == nullptr) {
+      /* The requested editor is not part of BLUI - the 3D viewport, node
+       * editor, outliner and the rest are deliberately not registered. Fall
+       * back to the file browser rather than leaving the area with no type at
+       * all, which every later `area->type->` dereference would fault on. */
+      type = SPACE_FILE;
+      st = BKE_spacetype_from_id(type);
+    }
 
     area->spacetype = type;
     area->type = st;

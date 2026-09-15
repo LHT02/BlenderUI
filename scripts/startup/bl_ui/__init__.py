@@ -8,52 +8,25 @@ if "bpy" in locals():
     _modules_loaded[:] = [reload(val) for val in _modules_loaded]
     del reload
 
+# BLUI registers UI only for the editors it has.
+#
+# A panel's `bl_space_type` is validated against `rna_enum_space_type_items`, so
+# a module that declares panels for an editor BLUI does not register (the 3D
+# viewport, the node editor, the properties editor, the outliner, the clip
+# editor, the dope sheet, the graph editor, the NLA editor, the spreadsheet)
+# would raise on registration. Those modules are gone from this list rather than
+# left to fail quietly at startup.
+#
+# The helper modules that remain are the ones the surviving editors actually
+# import: `utils` (shared panel mixins), `properties_paint_common` and
+# `properties_grease_pencil_common` (used by the image editor and the
+# sequencer), `properties_mask_common` (mixin bases the image editor subclasses
+# for its mask panels), and the tool-system pair.
 _modules = [
-    "node_add_menu",
-    "node_add_menu_geometry",
-    "properties_animviz",
-    "properties_constraint",
-    "properties_data_armature",
-    "properties_data_bone",
-    "properties_data_camera",
-    "properties_data_curve",
-    "properties_data_curves",
-    "properties_data_empty",
-    "properties_data_gpencil",
-    "properties_data_light",
-    "properties_data_lattice",
-    "properties_data_mesh",
-    "properties_data_metaball",
-    "properties_data_modifier",
-    "properties_data_pointcloud",
-    "properties_data_shaderfx",
-    "properties_data_lightprobe",
-    "properties_data_speaker",
-    "properties_data_volume",
-    "properties_mask_common",
-    "properties_material",
-    "properties_material_gpencil",
-    "properties_object",
-    "properties_paint_common",
-    "properties_grease_pencil_common",
-    "properties_particle",
-    "properties_physics_cloth",
-    "properties_physics_common",
-    "properties_physics_dynamicpaint",
-    "properties_physics_field",
-    "properties_physics_geometry_nodes",
-    "properties_physics_rigidbody",
-    "properties_physics_rigidbody_constraint",
-    "properties_physics_fluid",
-    "properties_physics_softbody",
-    "properties_render",
-    "properties_output",
-    "properties_view_layer",
-    "properties_scene",
-    "properties_texture",
-    "properties_world",
-    "properties_collection",
     "generic_ui_list",
+    "properties_grease_pencil_common",
+    "properties_mask_common",
+    "properties_paint_common",
 
     # Generic Space Modules
     #
@@ -61,32 +34,18 @@ _modules = [
     "space_toolsystem_common",
     "space_toolsystem_toolbar",
 
-    "space_clip",
     "space_console",
-    "space_dopesheet",
     "space_filebrowser",
-    "space_graph",
     "space_image",
     "space_info",
-    "space_nla",
-    "space_node",
-    "space_outliner",
-    "space_properties",
     "space_sequencer",
-    "space_spreadsheet",
     "space_statusbar",
     "space_text",
-    "space_time",
     "space_topbar",
     "space_userpref",
-    "space_view3d",
-    "space_view3d_toolbar",
 
     # BLUI's own headers (application menus, since there is no top bar).
     "space_blui",
-
-    # XXX, keep last so panels show after all other tool options.
-    "properties_workspace",
 ]
 
 import bpy

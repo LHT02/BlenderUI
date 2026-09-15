@@ -174,6 +174,61 @@ written as a timer-driven state machine on purpose: `window.workspace = ...`
 does not update `window.screen` inside a single script run, so each step has to
 happen in its own pass through the event loop.
 
+### Only BLUI's editors exist
+
+Blender registers eleven space types, and every one of them is reachable from
+an area's *Editor Type* menu. BLUI's five 3D-editing editors are not part of
+the product, so they are not registered, and the editor set is cut off at both
+gates that matter:
+
+* **The registry.** `ED_spacetypes_init()` no longer creates the 3D viewport,
+  node editor, properties, outliner, clip editor, dope sheet, graph editor, NLA
+  editor or spreadsheet space types. An unregistered space type cannot be
+  opened, cannot be scripted, and is not offered by the operator search menu.
+* **The enum.** `rna_enum_space_type_items` drives the Editor Type menu, the
+  `SCREEN_OT_space_type_set_or_cycle` operator, `Area.type`, `Area.ui_type` and
+  `Panel.bl_space_type` - it is the product's editor set, and it now names only
+  the six components.
+
+Info, Top Bar and Status Bar stay in that array so `Area.type` can still
+identify them from Python, and `rna_Area_ui_type_itemf()` skips them, exactly
+as it already skipped the two global areas. Three registrations are also kept
+although they are not editors: `SPACE_SCRIPT` is a deprecated space id whose
+only job is to carry the script operators, `SPACE_INFO` is what the `.blend`
+reader falls back to for an area with no space data at all, and Top Bar /
+Status Bar are the global areas BLUI does not create.
+
+Everything that hard-coded `SPACE_VIEW3D` as "the default editor" now falls
+back to the **file browser**, which is the component BLUI opens on:
+`area_offscreen_init()` and `ED_area_init()`, `rna_Area_type_get()`, and the
+two enum defaults in `rna_screen.c`. `screen_area_spacelink_add()` and
+`ED_area_newspace()` also gained the NULL guard they were missing, so asking
+for an editor BLUI does not have degrades to the file browser instead of
+dereferencing NULL.
+
+> **A trap worth knowing about.** `transform_operatortypes()` was called from
+> `view3d_ops.c` - that is, it was registered as a side effect of the 3D
+> viewport's space type callback. It is a *shared* facility, not a 3D one: the
+> video sequencer's slide tool is the macro `TRANSFORM_OT_seq_slide`. Removing
+> the 3D viewport would have silently taken the sequencer's slide operator with
+> it. It now lives in `ED_spacetypes_init()`, which runs regardless of which
+> space types exist. The same trap applies to any operator registered from a
+> space type callback rather than directly.
+
+The gesture modal keymaps in `wm_operators.c` no longer assign themselves to
+operators from the removed spaces. `WM_modalkeymap_assign()` reports each
+unknown operator by name, and it was reporting 22 of them on every start.
+
+Python followed the same cut: `bl_ui._modules` imports only the component
+editors, and the keymap tree (`bl_keymap_utils/keymap_hierarchy.py`), the
+default and industry-compatible keymap data, and the theme panel generator were
+trimmed to the same set. `space_type` is validated when a keymap, a panel or a
+theme area is created, so these were raising `TypeError` at startup rather than
+merely going unused - the editor set is not a cosmetic list.
+
+Verified by `blui/tools/check_editor_set.py`, which checks the enum, the menu
+operator, `Panel.bl_space_type` and the startup file together.
+
 ### No top bar, no status bar
 
 Blender's top bar carries the workspace tabs plus the scene and view-layer
@@ -219,6 +274,7 @@ set:
 | Script | Purpose |
 | --- | --- |
 | `verify_startup.py` | prints the workspace set and each area's active editor |
+| `check_editor_set.py` | asserts only BLUI's editors exist, and that the startup file uses them |
 | `dump_screens.py` | dumps every workspace, screen, area and space |
 | `click_sweep.py` | clicks a grid over the whole window |
 | `interaction_test.py` | right-click, double-click and drag |
@@ -340,6 +396,7 @@ memory. Run them after any change; none of them need a person watching.
 | OLE drop source (`CF_HDROP` payload + COM contract) | `build\dragsource_selftest.exe` | PASS, 0 failures |
 | Shell context menu (bind, populate, enumerate) | `build\shellmenu_selftest.exe` | PASS, 0 failures |
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
+| Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | ISOLATED |
 | Opening a component in its own window | `check_component_window.py` | PASS |
@@ -352,6 +409,22 @@ Two things are deliberately *not* covered, and are worth doing by hand:
   closed - that needs a real click on the icon;
 * whether a drag from the file browser lands in another application - the OLE
   loop cannot be driven by injected events.
+
+### Known cosmetic issue
+
+Starting BLUI prints ten lines of the form
+
+```
+RNA_boolean_set: OperatorProperties.extend not found.
+Warning: property 'mode' not found in item 'OperatorProperties'
+```
+
+They come from the C keymap registration: `ED_spacetypes_keymap()` still calls
+`ED_keymap_anim()`, `ED_keymap_object()`, `ED_keymap_mesh()` and friends, which
+create keymaps for operators that BLUI no longer registers. They are harmless -
+an operator property that is not found is skipped, and nothing is disabled by
+it - but they will go away with the same strip that removes those `ED_keymap_*`
+and `ED_operatortypes_*` calls.
 
 ## Roadmap
 
@@ -372,16 +445,33 @@ The work is staged so the build stays green at every step.
         — the 3D import/export UI
       - `source/blender/blendthumb` — the `.blend` thumbnail handler
 
-      Remaining: the 3D editor modules (`space_view3d`, `object`, `mesh`,
-      `sculpt_paint`, `uvedit`, `armature`, `metaball`, `lattice`, `curve`,
-      `curves`, `physics`, `space_node`, `space_outliner`,
-      `space_spreadsheet`, `space_clip`, `mask`, `transform`,
-      `gizmo_library`), together with their RNA, operator registration and
-      UI scripts. This is the large part of the job: even the smallest space
-      type (`space_spreadsheet`) is referenced from ~146 places across DNA,
-      RNA, the screen API, the search menu and the Python bridge, because
-      removing a `SpaceType` means removing it from every registry that
-      enumerates spaces.
+      Second batch: **the editor set is now BLUI's own** (~4,600 lines across
+      14 files, but nothing deleted yet). The ten Blender editors are no longer
+      registered, no longer named in the space-type enum, and no longer
+      referenced by the keymap data, the keymap tree, the UI modules or the
+      `.blend`-facing defaults. Nothing is reachable from the Editor Type menu,
+      from the operator search, or from Python. See *Only BLUI's editors exist*
+      above, and `blui/tools/check_editor_set.py`.
+
+      That is the reversible half. What remains is to **delete the now
+      unreachable source**: `space_view3d`, `space_node`, `space_outliner`,
+      `space_spreadsheet`, `space_clip`, `space_action`, `space_graph`,
+      `space_nla`, `space_buttons`, `space_info`, `space_script`,
+      `space_statusbar`, `space_topbar`, `object`, `mesh`, `sculpt_paint`,
+      `uvedit`, `armature`, `metaball`, `lattice`, `curve`, `curves`,
+      `physics`, `transform`, `gizmo_library`, `mask`, `animation` and their
+      RNA, operator registration and UI scripts. Two things have to be checked
+      first, and they are where the remaining work is:
+
+      * **Operators the surviving components need but that are registered from
+        a doomed module.** `transform_operatortypes()` was one (see the trap
+        above). `ED_operatortypes_gpencil()`, `_paint()`, `_uvedit()`,
+        `_marker()`, `_sound()`, `_render()` and `_asset()` are all still
+        called from `ED_spacetypes_init()` and should be traced the same way
+        before their modules go.
+      * **The `ED_keymap_*` / `ED_operatortypes_*` calls themselves.** Cutting
+        them is also what removes the ten lines of `OperatorProperties.* not
+        found` noise described under *Known cosmetic issue*.
 
       > **Note for whoever continues this.** "Guarded by a `WITH_*` option"
       > does *not* mean "safe to delete". Several intern libraries build a

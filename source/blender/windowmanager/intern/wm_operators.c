@@ -3877,14 +3877,12 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
   keymap = WM_modalkeymap_ensure(keyconf, "View3D Gesture Circle", modal_items);
 
   /* assign map to operators */
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_select_circle");
+  /* BLUI only assigns this to operators that exist: the 3D viewport, clip
+   * editor, node editor, graph editor and dope sheet are not registered, so
+   * naming their operators here would be a startup error. */
   WM_modalkeymap_assign(keymap, "UV_OT_select_circle");
-  WM_modalkeymap_assign(keymap, "CLIP_OT_select_circle");
   WM_modalkeymap_assign(keymap, "MASK_OT_select_circle");
-  WM_modalkeymap_assign(keymap, "NODE_OT_select_circle");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_circle");
-  WM_modalkeymap_assign(keymap, "GRAPH_OT_select_circle");
-  WM_modalkeymap_assign(keymap, "ACTION_OT_select_circle");
 }
 
 /* straight line modal operators */
@@ -3939,36 +3937,25 @@ static void gesture_box_modal_keymap(wmKeyConfig *keyconf)
   keymap = WM_modalkeymap_ensure(keyconf, "Gesture Box", modal_items);
 
   /* assign map to operators */
-  WM_modalkeymap_assign(keymap, "ACTION_OT_select_box");
+  /* Only the box-select operators BLUI actually registers - see the note in
+   * `gesture_circle_modal_keymap`. */
   WM_modalkeymap_assign(keymap, "ANIM_OT_channels_select_box");
   WM_modalkeymap_assign(keymap, "ANIM_OT_previewrange_set");
   WM_modalkeymap_assign(keymap, "INFO_OT_select_box");
   WM_modalkeymap_assign(keymap, "FILE_OT_select_box");
-  WM_modalkeymap_assign(keymap, "GRAPH_OT_select_box");
   WM_modalkeymap_assign(keymap, "MARKER_OT_select_box");
-  WM_modalkeymap_assign(keymap, "NLA_OT_select_box");
-  WM_modalkeymap_assign(keymap, "NODE_OT_select_box");
-  WM_modalkeymap_assign(keymap, "NODE_OT_viewer_border");
   WM_modalkeymap_assign(keymap, "PAINT_OT_hide_show");
-  WM_modalkeymap_assign(keymap, "OUTLINER_OT_select_box");
 #if 0 /* Template. */
   WM_modalkeymap_assign(keymap, "SCREEN_OT_box_select");
 #endif
   WM_modalkeymap_assign(keymap, "SEQUENCER_OT_select_box");
   WM_modalkeymap_assign(keymap, "SEQUENCER_OT_view_ghost_border");
   WM_modalkeymap_assign(keymap, "UV_OT_select_box");
-  WM_modalkeymap_assign(keymap, "CLIP_OT_select_box");
-  WM_modalkeymap_assign(keymap, "CLIP_OT_graph_select_box");
   WM_modalkeymap_assign(keymap, "MASK_OT_select_box");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_box_gesture");
   WM_modalkeymap_assign(keymap, "SCULPT_OT_face_set_box_gesture");
   WM_modalkeymap_assign(keymap, "SCULPT_OT_trim_box_gesture");
   WM_modalkeymap_assign(keymap, "VIEW2D_OT_zoom_border");
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_clip_border");
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_render_border");
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_select_box");
-  /* XXX TODO: zoom border should perhaps map right-mouse to zoom out instead of in+cancel. */
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_zoom_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_render_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_view_zoom_border");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_box");
@@ -3992,17 +3979,14 @@ static void gesture_lasso_modal_keymap(wmKeyConfig *keyconf)
   keymap = WM_modalkeymap_ensure(keyconf, "Gesture Lasso", modal_items);
 
   /* assign map to operators */
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_select_lasso");
+  /* Only the lasso operators BLUI actually registers - see the note in
+   * `gesture_circle_modal_keymap`. */
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_stroke_cutter");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_lasso");
   WM_modalkeymap_assign(keymap, "MASK_OT_select_lasso");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_lasso_gesture");
   WM_modalkeymap_assign(keymap, "SCULPT_OT_face_set_lasso_gesture");
   WM_modalkeymap_assign(keymap, "SCULPT_OT_trim_lasso_gesture");
-  WM_modalkeymap_assign(keymap, "ACTION_OT_select_lasso");
-  WM_modalkeymap_assign(keymap, "CLIP_OT_select_lasso");
-  WM_modalkeymap_assign(keymap, "GRAPH_OT_select_lasso");
-  WM_modalkeymap_assign(keymap, "NODE_OT_select_lasso");
   WM_modalkeymap_assign(keymap, "UV_OT_select_lasso");
 }
 
@@ -4028,7 +4012,6 @@ static void gesture_zoom_border_modal_keymap(wmKeyConfig *keyconf)
 
   /* assign map to operators */
   WM_modalkeymap_assign(keymap, "VIEW2D_OT_zoom_border");
-  WM_modalkeymap_assign(keymap, "VIEW3D_OT_zoom_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_view_zoom_border");
 }
 

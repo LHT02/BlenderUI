@@ -60,26 +60,29 @@ void ED_spacetypes_init(void)
   /* UI unit is a variable, may be used in some space type initialization. */
   U.widget_unit = 20;
 
-  /* Create space types. */
-  ED_spacetype_outliner();
-  ED_spacetype_view3d();
-  ED_spacetype_ipo();
+  /* Create space types.
+   *
+   * BLUI registers only the editors its own component set is made of. The
+   * editors that exist to model, sculpt, animate, shade or track have no
+   * workspace here and no entry in the editor-type menu, so they are never
+   * created at all - and an unregistered space type cannot be reached from the
+   * editor-type menu, from the operator search menu, or from Python.
+   *
+   * Four registrations are kept for machinery rather than for a user:
+   * `script` (SPACE_SCRIPT) is a deprecated space id whose only purpose is to
+   * carry the script operators, `info` is the space type the .blend reader
+   * falls back to for an area with no space data at all, and `topbar` /
+   * `statusbar` are the global areas. None of them is offered as an editor. */
   ED_spacetype_image();
-  ED_spacetype_node();
-  ED_spacetype_buttons();
   ED_spacetype_info();
   ED_spacetype_file();
-  ED_spacetype_action();
-  ED_spacetype_nla();
   ED_spacetype_script();
   ED_spacetype_text();
   ED_spacetype_sequencer();
   ED_spacetype_console();
   ED_spacetype_userpref();
-  ED_spacetype_clip();
   ED_spacetype_statusbar();
   ED_spacetype_topbar();
-  ED_spacetype_spreadsheet();
 
   /* Register operator types for screen and all spaces. */
   ED_operatortypes_userpref();
@@ -108,6 +111,13 @@ void ED_spacetypes_init(void)
   ED_operatortypes_render();
   ED_operatortypes_mask();
   ED_operatortypes_edutils();
+
+  /* Transform is a shared facility, not a 3D-view one: the video sequencer's
+   * slide tool is the macro `TRANSFORM_OT_seq_slide`. Blender registers these
+   * from the 3D viewport's space type callback - which BLUI does not create -
+   * so they are registered here instead. Without this the sequencer's slide
+   * macro silently loses its operator. */
+  transform_operatortypes();
 
   ED_operatortypes_view2d();
   ED_operatortypes_ui();

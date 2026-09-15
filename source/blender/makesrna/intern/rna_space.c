@@ -88,42 +88,19 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
     /* empty must be here for python, is skipped for UI */
     {SPACE_EMPTY, "EMPTY", ICON_NONE, "Empty", ""},
 
-    /* General. */
+    /* BLUI's component set.
+     *
+     * This array is what the editor-type menu offers and what
+     * `bpy.types.Area.type` accepts, so it *is* the product's editor set:
+     * anything not named here cannot be opened, scripted, or reached from the
+     * operator search menu. Blender's modelling, sculpting, animation, shading,
+     * node, outliner, spreadsheet and motion-tracking editors are absent by
+     * design - their space types are not registered either (see
+     * `ED_spacetypes_init`). */
     RNA_ENUM_ITEM_HEADING(N_("General"), NULL),
-    {SPACE_VIEW3D,
-     "VIEW_3D",
-     ICON_VIEW3D,
-     "3D Viewport",
-     "Manipulate objects in a 3D environment"},
-    {SPACE_IMAGE,
-     "IMAGE_EDITOR",
-     ICON_IMAGE,
-     "UV/Image Editor",
-     "View and edit images and UV Maps"},
-    {SPACE_NODE,
-     "NODE_EDITOR",
-     ICON_NODETREE,
-     "Node Editor",
-     "Editor for node-based shading and compositing tools"},
+    {SPACE_FILE, "FILE_BROWSER", ICON_FILEBROWSER, "File Browser", "Browse for files and assets"},
+    {SPACE_IMAGE, "IMAGE_EDITOR", ICON_IMAGE, "Image Editor", "View and edit images"},
     {SPACE_SEQ, "SEQUENCE_EDITOR", ICON_SEQUENCE, "Video Sequencer", "Video editing tools"},
-    {SPACE_CLIP, "CLIP_EDITOR", ICON_TRACKER, "Movie Clip Editor", "Motion tracking tools"},
-
-    /* Animation. */
-    RNA_ENUM_ITEM_HEADING(N_("Animation"), NULL),
-#if 0
-    {SPACE_ACTION,
-     "TIMELINE",
-     ICON_TIME,
-     "Timeline",
-     "Timeline and playback controls (NOTE: Switch to 'Timeline' mode)"}, /* XXX */
-#endif
-    {SPACE_ACTION, "DOPESHEET_EDITOR", ICON_ACTION, "Dope Sheet", "Adjust timing of keyframes"},
-    {SPACE_GRAPH,
-     "GRAPH_EDITOR",
-     ICON_GRAPH,
-     "Graph Editor",
-     "Edit drivers and keyframe interpolation"},
-    {SPACE_NLA, "NLA_EDITOR", ICON_NLA, "Nonlinear Animation", "Combine and layer Actions"},
 
     /* Scripting. */
     RNA_ENUM_ITEM_HEADING(N_("Scripting"), NULL),
@@ -138,8 +115,20 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Python Console",
      "Interactive programmatic console for "
      "advanced editing and script development"},
+
+    /* Configuration, and the spaces that are machinery rather than editors. */
+    RNA_ENUM_ITEM_HEADING(N_("System"), NULL),
+    {SPACE_USERPREF,
+     "PREFERENCES",
+     ICON_PREFERENCES,
+     "Preferences",
+     "Edit persistent configuration settings"},
+
+    /* The three below are never offered as editors - `rna_Area_ui_type_itemf()`
+     * skips them, exactly as Blender skipped the global areas. They stay in
+     * this array so that `Area.type` can still name them from Python, which is
+     * how the .blend reader and the global-area code identify an area. */
     {SPACE_INFO, "INFO", ICON_INFO, "Info", "Log of operations, warnings and error messages"},
-    /* Special case: Top-bar and Status-bar aren't supposed to be a regular editor for the user. */
     {SPACE_TOPBAR,
      "TOPBAR",
      ICON_NONE,
@@ -152,30 +141,6 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Status Bar",
      "Global bar at the bottom of the "
      "screen for general status information"},
-
-    /* Data. */
-    RNA_ENUM_ITEM_HEADING(N_("Data"), NULL),
-    {SPACE_OUTLINER,
-     "OUTLINER",
-     ICON_OUTLINER,
-     "Outliner",
-     "Overview of scene graph and all available data-blocks"},
-    {SPACE_PROPERTIES,
-     "PROPERTIES",
-     ICON_PROPERTIES,
-     "Properties",
-     "Edit properties of active object and related data-blocks"},
-    {SPACE_FILE, "FILE_BROWSER", ICON_FILEBROWSER, "File Browser", "Browse for files and assets"},
-    {SPACE_SPREADSHEET,
-     "SPREADSHEET",
-     ICON_SPREADSHEET,
-     "Spreadsheet",
-     "Explore geometry data in a table"},
-    {SPACE_USERPREF,
-     "PREFERENCES",
-     ICON_PREFERENCES,
-     "Preferences",
-     "Edit persistent configuration settings"},
     {0, NULL, 0, NULL, NULL},
 };
 
