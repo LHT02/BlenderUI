@@ -582,6 +582,38 @@ The work is staged so the build stays green at every step.
       `git checkout -- .` in `source/`, which restores deleted files as well as
       edits.
 
+      ### Measure link symbols too, not just functions
+
+      `space_buttons` (the Properties editor) was picked next on the corrected
+      method, and it looked genuinely cheap: 7 public functions in
+      `ED_buttons.h`, only 3 external calls, and exactly one of those in a
+      module that stays (`screen/area.cc`).
+
+      It still failed. The build got all the way to the link, and then wanted
+      three symbols nothing declares in a header:
+
+      ```
+      bf_rna.lib(rna_ui_gen.c.obj)                : uiTemplateTextureUser
+      bf_python.lib(bpy.c.obj)                    : buttons_context_dir
+      bf_editor_interface.lib(interface_templates): uiTemplateTextureShow
+      ```
+
+      The Properties editor also exports **UI template callbacks** and a context
+      directory - things reached through the RNA/template layer rather than
+      through a header anyone greps for. Counting header functions cannot see
+      them.
+
+      So there are three counts to take before choosing a module, not two:
+      the space-type enum and DNA struct references, the calls to functions in
+      its **public header**, and the symbols its **object file** supplies that
+      other targets link. The third one only shows up at link time, which means
+      the cheap-looking module is not identified by reading - it is identified
+      by trying, and reverting when the link fails.
+
+      Both the outliner and space_buttons attempts were started and reverted.
+      Two modules measured, two rejected, one deleted (`space_spreadsheet`, the
+      one whose link surface turned out to be empty).
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
