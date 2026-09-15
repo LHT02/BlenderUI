@@ -225,6 +225,15 @@ void GHOST_TrayRemove(void)
 #endif
 }
 
+bool GHOST_TrayIsActive(void)
+{
+#ifdef WIN32
+  return GHOST_TrayWin32_IsActive();
+#else
+  return false;
+#endif
+}
+
 GHOST_EventConsumerHandle GHOST_CreateEventConsumer(GHOST_EventCallbackProcPtr eventCallback,
                                                     GHOST_TUserDataPtr userdata)
 {

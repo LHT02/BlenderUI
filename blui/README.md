@@ -316,24 +316,19 @@ operation, not a tab strip.
 desktop shell, it should be reachable without a window being open: a tray icon
 whose menu can open a specific component directly, Settings in particular.
 
-Status: the tray icon itself is written and builds.
-`intern/ghost/intern/GHOST_TrayWin32.cc` creates a hidden window, installs the
-icon with `Shell_NotifyIcon`, and shows a `TrackPopupMenu` built from a list of
-(label, command) pairs. Choosing an entry does not run anything there - the
-callback fires on the Win32 message loop, where running application code is
-unsafe - so it pushes a `GHOST_kEventTrayCommand` carrying the command string.
-Reached from Python through `GHOST_TrayAdd()` / `GHOST_TrayRemove()`.
+Wired up. `wm_ghost_init()` installs the icon, `ghost_event_proc()` turns a
+`GHOST_kEventTrayCommand` into the matching action (`component:<name>` runs
+`wm.window_new` with that workspace; `quit` quits), and the menu lists Files,
+Images, Text, Video, Settings and Quit.
 
-Not yet wired to the application. Two things are needed:
+Closing the last window no longer quits while the tray is up: `wm_window_close`
+keeps the process alive, which is what makes the tray worth having. Without a
+window to copy, `wm.window_new` now builds a fresh one instead of failing, and
+its poll accepts "no window but a tray is active".
 
-* an `wm_event_add_ghostevent()` case that turns `GHOST_kEventTrayCommand` into
-  the matching action, which means building a `bContext` because the tray has no
-  window of its own;
-* BLUI must stop quitting when the last window closes, otherwise the tray is
-  only reachable while a window is already open - which defeats the point.
-  Blender exits on last-window-close today.
-
-Nothing calls `GHOST_TrayAdd()` yet, so no icon appears.
+Verified: builds, starts, and the existing checks still pass. **The
+close-every-window-then-use-the-tray path is not covered by an automated test** -
+it needs a real click on the tray icon - so that is worth exercising by hand.
 
 ## Roadmap
 

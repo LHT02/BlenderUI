@@ -156,6 +156,9 @@ extern GHOST_TSuccess GHOST_TrayAdd(const char *tooltip,
 /** Remove the tray icon. Safe to call when none is installed. */
 extern void GHOST_TrayRemove(void);
 
+/** True while a tray icon is installed. */
+extern bool GHOST_TrayIsActive(void);
+
 /**
  * Creates an event consumer object
  * \param eventCallback: The event callback routine.

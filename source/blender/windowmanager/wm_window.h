@@ -135,6 +135,28 @@ void wm_quit_with_optional_confirmation_prompt(bContext *C, wmWindow *win) ATTR_
 int wm_window_new_exec(bContext *C, struct wmOperator *op);
 int wm_window_new_main_exec(bContext *C, struct wmOperator *op);
 
+/* -------------------------------------------------------------------- */
+/** \name System tray (BLUI)
+ *
+ * BLUI sits alongside the desktop shell, so it has a tray icon whose menu can
+ * bring up a component. Blender has no tray support of its own; the icon lives
+ * in GHOST and these are the application side of it.
+ * \{ */
+
+/** Install the tray icon. A no-op where the platform has no tray. */
+void wm_tray_init(void);
+/** Remove the tray icon. */
+void wm_tray_exit(void);
+/**
+ * True while an icon is installed. This is what keeps BLUI alive with no
+ * windows open - without a tray there would be no way back.
+ */
+bool wm_tray_is_active(void);
+/** Run the action behind a command string delivered by the tray. */
+void wm_tray_run_command(bContext *C, const char *command);
+
+/** \} */
+
 void wm_test_autorun_revert_action_set(struct wmOperatorType *ot, struct PointerRNA *ptr);
 void wm_test_autorun_warning(bContext *C);
 

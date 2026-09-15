@@ -424,8 +424,14 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
   }
 
   if (win->parent == NULL && win_other == NULL) {
-    wm_quit_with_optional_confirmation_prompt(C, win);
-    return;
+    /* BLUI: with a tray icon installed, closing the last window only closes the
+     * window. Quitting would take the tray with it, and being able to close
+     * every window and still reach BLUI is the entire point of the tray. Quit
+     * lives on the tray menu. */
+    if (!wm_tray_is_active()) {
+      wm_quit_with_optional_confirmation_prompt(C, win);
+      return;
+    }
   }
 
   /* Close child windows */
@@ -1026,20 +1032,28 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
 {
   wmWindow *win_src = CTX_wm_window(C);
   Main *bmain = CTX_data_main(C);
+  wmWindowManager *wm = CTX_wm_manager(C);
 
-  /* BLUI: every new window gets its own layout.
-   *
-   * Blender's wm.window_new shares the source window's layout, a layout owns
-   * the screen, and the screen owns the areas and their spaces. Two windows on
-   * one layout are therefore two views of the same editor: two text editor
-   * windows would share a single SpaceText, so opening a file in one would
-   * change what the other is editing, and the same goes for the image viewer.
-   *
-   * Duplicating the layout is what turns "another window" into "another
-   * component". Verified with blui/tools/check_window_isolation.py, which
-   * compares the SpaceText pointers of two Text windows.
-   */
-  wmWindow *win_new = wm_window_copy_test(C, win_src, true, false);
+  wmWindow *win_new = NULL;
+  if (win_src != NULL) {
+    win_new = wm_window_copy_test(C, win_src, true, false);
+  }
+  else {
+    /* BLUI: the tray can ask for a component when every window has been closed,
+     * so there is nothing to copy. Build a plain window and let the code below
+     * put the requested component in it. */
+    wmWindow *win_fresh = wm_window_new(bmain, wm, NULL, false);
+    if (win_fresh != NULL) {
+      WM_check(C);
+      if (win_fresh->ghostwin != NULL) {
+        win_new = win_fresh;
+      }
+      else {
+        wm_window_close(C, wm, win_fresh);
+      }
+    }
+  }
+
   if (win_new == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Failed to create window");
     return OPERATOR_CANCELLED;
@@ -1224,6 +1238,83 @@ void wm_window_reset_drawable(void)
   }
 }
 
+/* -------------------------------------------------------------------- */
+/** \name System tray (BLUI)
+ *
+ * BLUI sits alongside the desktop shell, so it has a tray icon whose menu can
+ * bring up a component without one of its windows already being open. Blender
+ * has no tray support at all; the icon itself lives in GHOST, and this is the
+ * application half - what the menu contains and what its entries do.
+ * \{ */
+
+/** Tray menu: one entry per BLUI component, then Quit. */
+static const struct {
+  const char *label;
+  const char *command;
+} g_tray_items[] = {
+    {"Files", "component:Files"},
+    {"Images", "component:Images"},
+    {"Text", "component:Text"},
+    {"Video", "component:Video"},
+    {"Settings", "component:Settings"},
+    {NULL, NULL}, /* separator */
+    {"Quit BLUI", "quit"},
+};
+
+void wm_tray_init(void)
+{
+  const char *labels[ARRAY_SIZE(g_tray_items)];
+  const char *commands[ARRAY_SIZE(g_tray_items)];
+
+  for (int i = 0; i < ARRAY_SIZE(g_tray_items); i++) {
+    labels[i] = g_tray_items[i].label;
+    commands[i] = g_tray_items[i].command;
+  }
+
+  /* Failure is normal where there is no tray, and nothing depends on the icon
+   * existing: it only changes what closing the last window does. */
+  GHOST_TrayAdd(BLUI_PRODUCT_NAME, labels, commands, ARRAY_SIZE(g_tray_items));
+}
+
+void wm_tray_exit(void)
+{
+  GHOST_TrayRemove();
+}
+
+bool wm_tray_is_active(void)
+{
+  return GHOST_TrayIsActive();
+}
+
+void wm_tray_run_command(bContext *C, const char *command)
+{
+  if (command == NULL) {
+    return;
+  }
+
+  if (STRPREFIX(command, "component:")) {
+    /* Opening a component is the same operation as the app menu's
+     * "New Window > <component>", so there is one path to keep working. */
+    wmOperatorType *ot = WM_operatortype_find("WM_OT_window_new", true);
+    if (ot == NULL) {
+      return;
+    }
+    PointerRNA props;
+    WM_operator_properties_create_ptr(&props, ot);
+    RNA_string_set(&props, "workspace", command + strlen("component:"));
+    WM_operator_name_call_ptr(C, ot, WM_OP_EXEC_DEFAULT, &props, NULL);
+    WM_operator_properties_free(&props);
+  }
+  else if (STREQ(command, "quit")) {
+    wmOperatorType *ot = WM_operatortype_find("WM_OT_quit_blender", true);
+    if (ot != NULL) {
+      WM_operator_name_call_ptr(C, ot, WM_OP_EXEC_DEFAULT, NULL, NULL);
+    }
+  }
+}
+
+/** \} */
+
 /**
  * Called by ghost, here we handle events for windows themselves or send to event system.
  *
@@ -1238,6 +1329,13 @@ static bool ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr C_void_pt
   /* We may want to use time from ghost, currently `PIL_check_seconds_timer` is used instead. */
   uint64_t time = GHOST_GetEventTime(evt);
 #endif
+
+  if (type == GHOST_kEventTrayCommand) {
+    /* BLUI: a tray menu entry was chosen. The tray has no window of its own, so
+     * this is the one place a context exists to act on it. */
+    wm_tray_run_command(C, (const char *)GHOST_GetEventData(evt));
+    return true;
+  }
 
   if (type == GHOST_kEventQuitRequest) {
     /* Find an active window to display quit dialog in. */
@@ -1715,6 +1813,10 @@ void wm_ghost_init(bContext *C)
   }
 
   GHOST_UseWindowFocus(wm_init_state.window_focus);
+
+  /* BLUI: install the tray icon once the system exists. It has to outlive every
+   * window, which is what makes closing the last window non-fatal. */
+  wm_tray_init();
 }
 
 void wm_ghost_init_background(void)
@@ -1739,6 +1841,8 @@ void wm_ghost_init_background(void)
 void wm_ghost_exit(void)
 {
   if (g_system) {
+    /* BLUI: drop the tray icon before the system that pumps its messages. */
+    wm_tray_exit();
     GHOST_DisposeSystem(g_system);
   }
   g_system = NULL;

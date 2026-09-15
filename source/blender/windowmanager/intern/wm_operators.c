@@ -2023,6 +2023,13 @@ static void WM_OT_window_close(wmOperatorType *ot)
   ot->poll = WM_operator_winactive;
 }
 
+static bool wm_window_new_poll(bContext *C)
+{
+  /* BLUI: the tray can ask for a component when every window has been closed,
+   * so an existing window is not strictly required. */
+  return CTX_wm_window(C) != NULL || wm_tray_is_active();
+}
+
 static void WM_OT_window_new(wmOperatorType *ot)
 {
   ot->name = "New Window";
@@ -2030,7 +2037,7 @@ static void WM_OT_window_new(wmOperatorType *ot)
   ot->description = "Create a new window, optionally showing a named component";
 
   ot->exec = wm_window_new_exec;
-  ot->poll = wm_operator_winactive_normal;
+  ot->poll = wm_window_new_poll;
 
   /* BLUI: naming a component (workspace) opens that component in its own
    * window instead of copying whatever this window was showing. */
