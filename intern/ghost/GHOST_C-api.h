@@ -66,6 +66,34 @@ extern void GHOST_ShowMessageBox(GHOST_SystemHandle systemhandle,
                                  GHOST_DialogOptions dialog_options);
 
 /**
+ * Start a platform file drag-and-drop operation, so files can be dragged out of
+ * the application and into other programs.
+ *
+ * On Windows this runs an OLE drag (`DoDragDrop` with a `CF_HDROP` data
+ * object). It **blocks until the user drops the files or cancels**, because the
+ * OLE drag loop owns the mouse for the duration.
+ *
+ * Platforms without an implementation return #GHOST_kFailure, which callers
+ * should treat as "this platform cannot drag files out" rather than as an
+ * error.
+ *
+ * \param windowhandle: The window the drag belongs to, and whose HWND the drop
+ *        target will see.
+ * \param filepaths: Array of NUL terminated UTF-8 file paths.
+ * \param filepath_count: Number of entries in \a filepaths.
+ * \param r_started: Optional. Set to true when a drag actually ran, meaning the
+ *        mouse gesture was consumed. It is false when the platform has no
+ *        implementation, in which case the caller should fall back to its own
+ *        internal drag.
+ * \return #GHOST_kSuccess if the files were handed to a drop target,
+ *         #GHOST_kFailure if the drag was cancelled or never started.
+ */
+extern GHOST_TSuccess GHOST_StartDragFiles(GHOST_WindowHandle windowhandle,
+                                           const char *const *filepaths,
+                                           int filepath_count,
+                                           bool *r_started);
+
+/**
  * Creates an event consumer object
  * \param eventCallback: The event callback routine.
  * \param userdata: Pointer to user data returned to the callback routine.

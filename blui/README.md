@@ -214,6 +214,38 @@ Changing it means editing that SVG and regenerating the icon sheet with
 `release/datafiles/blender_icons_update.py`, which itself needs a working BLUI
 binary to run.
 
+## Product requirements
+
+These are what BLUI is being built to be. They cut against Blender's original
+design in specific ways, so they are written down here rather than inferred.
+
+**Work on real files, not on a self-built document model.** BLUI is a file
+browser, an image viewer and a text editor. It must reference files by their
+ordinary OS paths and let other programs see the same files. Nothing should
+live only inside BLUI's own container: no asset-library indirection, no
+"libraries" that only BLUI can resolve, no importing a file into an internal
+store before it can be used. If a user opens `D:\photos\a.png`, that file is
+the document.
+
+**Windows are independent of each other.** Blender is single-document: every
+window edits the same `Main`, and `File ▸ Save` writes one `.blend` holding
+everything. That is wrong for this product. Each window should stand on its
+own — an image viewer showing a photo, a text editor on a file, a file browser
+on a folder — and closing or saving one must not touch the others.
+
+**Saving is per file, and isolated.** Saving in the image editor writes the
+image, saving in the text editor writes the text file, and neither writes a
+container that the other could clobber. Blender's `.blend` remains only as
+BLUI's internal startup/preferences format, never as a user-facing document.
+
+**No splash screen.** BLUI opens straight into the Files workspace. A splash
+announces a product; here it is only something to dismiss. Implemented by
+setting `USER_SPLASH_DISABLE` in `BKE_blendfile_userdef_from_defaults()`.
+
+**A system tray entry point.** Because BLUI is meant to sit alongside the
+desktop shell, it should be reachable without a window being open: a tray icon
+whose menu can open a specific component directly, Settings in particular.
+
 ## Roadmap
 
 The work is staged so the build stays green at every step.
@@ -256,15 +288,17 @@ The work is staged so the build stays green at every step.
       (*Files*, *Images*, *Text*, *Video*, *Settings*, *Console*) instead of a
       3D viewport, with its own splash and logo art. See
       *The component shell* above.
-- [ ] **Stage 4 — Explorer.** Rework the file browser into a real file manager.
-      - *Drag out to other applications* does not exist yet and has to be
-        written: Blender 3.6 implements an OLE **drop target**
-        (`intern/ghost/intern/GHOST_DropTargetWin32.cc`, `IDropTarget`) but
-        has no OLE **drop source**. What is missing is an `IDropSource` +
-        `IDataObject` pair and a `GHOST_StartDrag()` entry point that the
-        file browser calls when a drag begins, with `CF_HDROP` as the
-        payload.
-      - *Windows 11 style shell context menu* — the secondary "Show more
+- [~] **Stage 4 — Explorer.** Rework the file browser into a real file manager.
+      - [x] *Drag out to other applications.* Blender 3.6 implements only the
+        OLE **drop target** half (`intern/ghost/intern/GHOST_DropTargetWin32.cc`,
+        `IDropTarget`): it can receive files dragged in from other programs but
+        cannot hand files to them, so dragging a file out of the file browser
+        did nothing. BLUI adds the other half —
+        `intern/ghost/intern/GHOST_DragSourceWin32.cc`, an `IDataObject`
+        carrying `CF_HDROP` plus the `IDropSource` that drives it — exposed as
+        `GHOST_StartDragFiles()` and called from `ui_but_drag_start()` for
+        `WM_DRAG_PATH` drags.
+      - [ ] *Windows 11 style shell context menu* — the secondary "Show more
         options" menu.
 - [ ] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
       component set instead of Blender's 3D options.

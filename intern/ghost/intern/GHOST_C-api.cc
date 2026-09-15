@@ -22,6 +22,12 @@
 #include "intern/GHOST_CallbackEventConsumer.hh"
 #include "intern/GHOST_XrException.hh"
 
+#ifdef WIN32
+/* GHOST_StartDragFiles needs the Win32 window handle and the OLE drop source. */
+#  include "intern/GHOST_DragSourceWin32.hh"
+#  include "intern/GHOST_WindowWin32.hh"
+#endif
+
 GHOST_SystemHandle GHOST_CreateSystem(void)
 {
   GHOST_ISystem::createSystem(true, false);
@@ -69,6 +75,35 @@ void GHOST_ShowMessageBox(GHOST_SystemHandle systemhandle,
 {
   GHOST_ISystem *system = (GHOST_ISystem *)systemhandle;
   system->showMessageBox(title, message, help_label, continue_label, link, dialog_options);
+}
+
+GHOST_TSuccess GHOST_StartDragFiles(GHOST_WindowHandle windowhandle,
+                                    const char *const *filepaths,
+                                    int filepath_count,
+                                    bool *r_started)
+{
+#ifdef WIN32
+  if (windowhandle == nullptr || filepaths == nullptr || filepath_count <= 0) {
+    if (r_started != nullptr) {
+      *r_started = false;
+    }
+    return GHOST_kFailure;
+  }
+  /* The drop source only needs the HWND that owns the drag. */
+  GHOST_WindowWin32 *window = (GHOST_WindowWin32 *)windowhandle;
+  if (r_started != nullptr) {
+    *r_started = true;
+  }
+  return GHOST_DragSourceWin32_StartDrag((void *)window->getHWND(), filepaths, filepath_count);
+#else
+  (void)windowhandle;
+  (void)filepaths;
+  (void)filepath_count;
+  if (r_started != nullptr) {
+    *r_started = false;
+  }
+  return GHOST_kFailure;
+#endif
 }
 
 GHOST_EventConsumerHandle GHOST_CreateEventConsumer(GHOST_EventCallbackProcPtr eventCallback,

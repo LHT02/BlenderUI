@@ -777,6 +777,11 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
     BLI_addtail(&userdef->themes, btheme);
   }
 
+  /* BLUI opens straight into its workspace. A splash screen exists to announce
+   * a product and show a version number; as a file browser and image viewer it
+   * is just something to dismiss before the window is usable. */
+  userdef->uiflag |= USER_SPLASH_DISABLE;
+
 #ifdef WITH_PYTHON_SECURITY
   /* use alternative setting for security nuts
    * otherwise we'd need to patch the binary blob - startup.blend.c */
