@@ -175,7 +175,8 @@ void ED_spacemacros_init(void)
   ED_operatormacros_object();
   ED_operatormacros_file();
   ED_operatormacros_graph();
-  ED_operatormacros_action();
+  /* `ED_operatormacros_action()` went with the Dope Sheet module, and
+   * `ED_operatormacros_nla()` with the NLA module. */
   ED_operatormacros_clip();
   ED_operatormacros_curve();
   ED_operatormacros_mask();
