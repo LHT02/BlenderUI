@@ -276,6 +276,7 @@ set:
 | `verify_startup.py` | prints the workspace set and each area's active editor |
 | `check_editor_set.py` | asserts only BLUI's editors exist, and that the startup file uses them |
 | `check_preferences.py` | asserts the preferences sections and panels are BLUI's set |
+| `check_keymap_config.py` | asserts the key configuration loads and still has Ctrl+S and Shift+F1..F6 |
 | `dump_screens.py` | dumps every workspace, screen, area and space |
 | `click_sweep.py` | clicks a grid over the whole window |
 | `interaction_test.py` | right-click, double-click and drag |
@@ -399,6 +400,7 @@ memory. Run them after any change; none of them need a person watching.
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
+| Key configuration (loads fully, Ctrl+S, Shift+F1..F6) | `check_keymap_config.py` | PASS, 135 keymaps |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | ISOLATED |
 | Opening a component in its own window | `check_component_window.py` | PASS |
@@ -436,6 +438,12 @@ first keymap item naming a missing macro aborts the load -
 `("TRANSFORM_OT_edge_slide", ...)` in the mesh keymap, from `mesh_ops.c:225`.
 The operator registration and the keymap data that names it have to be removed
 in the same step, and that is the shape of the remaining Stage 2 work.
+
+Nothing in the suite noticed at the time, which is why `check_keymap_config.py`
+now exists. It was verified against the failure on purpose: dropping
+`ED_operatormacros_mesh()` alone takes the key configuration from 135 keymaps to
+7, and the check reports 11 failures and exits 1. Restoring it returns 135
+keymaps, PASS and exit 0.
 
 ## Roadmap
 
