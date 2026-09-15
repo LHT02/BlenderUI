@@ -2288,111 +2288,6 @@ def km_weight_paint(params):
     return keymap
 
 
-def km_sculpt(params):
-    items = []
-    keymap = (
-        "Sculpt",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        # Brush strokes
-        ("sculpt.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS'},
-         {"properties": [("mode", 'NORMAL')]}),
-        ("sculpt.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True},
-         {"properties": [("mode", 'INVERT')]}),
-        ("sculpt.brush_stroke", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-         {"properties": [("mode", 'SMOOTH')]}),
-        # Partial Visibility Show/hide
-        ("paint.hide_show", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("action", 'SHOW'), ("area", 'INSIDE')]}),
-        ("paint.hide_show", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("action", 'HIDE'), ("area", 'INSIDE')]}),
-        ("paint.hide_show", {"type": 'H', "value": 'PRESS', "alt": True},
-         {"properties": [("action", 'SHOW'), ("area", 'ALL')]}),
-        # Subdivision levels
-        *_template_items_object_subdivision_set(),
-        ("object.subdivision_set", {"type": 'PAGE_UP', "value": 'PRESS', "repeat": True},
-         {"properties": [("level", 1), ("relative", True)]}),
-        ("object.subdivision_set", {"type": 'PAGE_DOWN', "value": 'PRESS', "repeat": True},
-         {"properties": [("level", -1), ("relative", True)]}),
-        # Mask
-        ("paint.mask_flood_fill", {"type": 'A', "value": 'PRESS', "ctrl": True},
-         {"properties": [("mode", 'VALUE'), ("value", 0.0)]}),
-        ("paint.mask_flood_fill", {"type": 'A', "value": 'PRESS', "ctrl": True, "shift": True},
-         {"properties": [("mode", 'VALUE'), ("value", 1.0)]}),
-        ("paint.mask_flood_fill", {"type": 'I', "value": 'PRESS', "ctrl": True},
-         {"properties": [("mode", 'INVERT')]}),
-        ("paint.mask_box_gesture", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("mode", 'VALUE'), ("value", 0.0)]}),
-        ("paint.mask_lasso_gesture", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True}, None),
-        ("wm.context_toggle", {"type": 'M', "value": 'PRESS', "ctrl": True},
-         {"properties": [("data_path", 'scene.tool_settings.sculpt.show_mask')]}),
-        # Dynamic topology
-        ("sculpt.dynamic_topology_toggle", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
-        ("sculpt.dyntopo_detail_size_edit", {"type": 'D', "value": 'PRESS', "shift": True}, None),
-        ("sculpt.set_detail_size", {"type": 'D', "value": 'PRESS', "shift": True, "alt": True}, None),
-        # Remesh
-        ("object.voxel_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True}, None),
-        ("object.voxel_size_edit", {"type": 'R', "value": 'PRESS', "shift": True}, None),
-        ("object.quadriflow_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True, "alt": True}, None),
-        # Brush properties
-        ("brush.scale_size", {"type": 'LEFT_BRACKET', "value": 'PRESS', "repeat": True},
-         {"properties": [("scalar", 0.9)]}),
-        ("brush.scale_size", {"type": 'RIGHT_BRACKET', "value": 'PRESS', "repeat": True},
-         {"properties": [("scalar", 1.0 / 0.9)]}),
-        *_template_paint_radial_control("sculpt", rotation=True),
-        # Stencil
-        ("brush.stencil_control", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
-         {"properties": [("mode", 'TRANSLATION')]}),
-        ("brush.stencil_control", {"type": 'RIGHTMOUSE', "value": 'PRESS', "shift": True},
-         {"properties": [("mode", 'SCALE')]}),
-        ("brush.stencil_control", {"type": 'RIGHTMOUSE', "value": 'PRESS', "ctrl": True},
-         {"properties": [("mode", 'ROTATION')]}),
-        ("brush.stencil_control", {"type": 'RIGHTMOUSE', "value": 'PRESS', "alt": True},
-         {"properties": [("mode", 'TRANSLATION'), ("texmode", 'SECONDARY')]}),
-        ("brush.stencil_control", {"type": 'RIGHTMOUSE', "value": 'PRESS', "shift": True, "alt": True},
-         {"properties": [("mode", 'SCALE'), ("texmode", 'SECONDARY')]}),
-        ("brush.stencil_control", {"type": 'RIGHTMOUSE', "value": 'PRESS', "ctrl": True, "alt": True},
-         {"properties": [("mode", 'ROTATION'), ("texmode", 'SECONDARY')]}),
-        # Tools
-        ("paint.brush_select", {"type": 'S', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'SMOOTH')]}),
-        ("paint.brush_select", {"type": 'P', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'PINCH')]}),
-        ("paint.brush_select", {"type": 'I', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'INFLATE')]}),
-        ("paint.brush_select", {"type": 'G', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'GRAB')]}),
-        ("paint.brush_select", {"type": 'L', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'LAYER')]}),
-        ("paint.brush_select", {"type": 'T', "value": 'PRESS', "shift": True},
-         {"properties": [("sculpt_tool", 'FLATTEN')]}),
-        ("paint.brush_select", {"type": 'C', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'CLAY')]}),
-        ("paint.brush_select", {"type": 'C', "value": 'PRESS', "shift": True},
-         {"properties": [("sculpt_tool", 'CREASE')]}),
-        ("paint.brush_select", {"type": 'M', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'MASK'), ("toggle", True), ("create_missing", True)]}),
-        ("paint.brush_select", {"type": 'R', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'ROTATE')]}),
-        ("paint.brush_select", {"type": 'N', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'NUDGE')]}),
-        ("paint.brush_select", {"type": 'T', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'THUMB')]}),
-        ("paint.brush_select", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'SNAKE_HOOK')]}),
-        ("paint.brush_select", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'BLOB')]}),
-        ("paint.brush_select", {"type": 'D', "value": 'PRESS'},
-         {"properties": [("sculpt_tool", 'DRAW')]}),
-
-        # Menus
-        *_template_items_context_panel("VIEW3D_PT_sculpt_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-    ])
-
-    return keymap
 
 
 # Mesh edit mode.
@@ -2745,7 +2640,6 @@ def generate_keymaps_impl(params=None):
         km_image_paint(params),
         km_vertex_paint(params),
         km_weight_paint(params),
-        km_sculpt(params),
         km_object_non_modal(params),
 
         # Modal maps.

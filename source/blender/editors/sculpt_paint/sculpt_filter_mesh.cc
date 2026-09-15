@@ -729,7 +729,6 @@ wmKeyMap *filter_mesh_modal_keymap(wmKeyConfig *keyconf)
 
   keymap = WM_modalkeymap_ensure(keyconf, "Mesh Filter Modal Map", modal_items);
 
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_mesh_filter");
 
   return keymap;
 }

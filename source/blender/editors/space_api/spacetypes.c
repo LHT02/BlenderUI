@@ -94,8 +94,6 @@ void ED_spacetypes_init(void)
   ED_operatortypes_asset();
   ED_operatortypes_gpencil();
   ED_operatortypes_object();
-  ED_operatortypes_sculpt();
-  ED_operatortypes_uvedit();
   ED_operatortypes_paint();
   ED_operatortypes_marker();
   ED_operatortypes_sound();
@@ -194,10 +192,8 @@ void ED_spacetypes_keymap(wmKeyConfig *keyconf)
   ED_keymap_animchannels(keyconf);
   ED_keymap_gpencil(keyconf);
   ED_keymap_object(keyconf);
-  ED_keymap_uvedit(keyconf);
   ED_keymap_paint(keyconf);
   ED_keymap_marker(keyconf);
-  ED_keymap_sculpt(keyconf);
 
   ED_keymap_view2d(keyconf);
   ED_keymap_ui(keyconf);

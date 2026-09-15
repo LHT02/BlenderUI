@@ -2320,7 +2320,6 @@ void sculpt_expand_modal_keymap(wmKeyConfig *keyconf)
   }
 
   keymap = WM_modalkeymap_ensure(keyconf, name, modal_items);
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_expand");
 }
 
 void SCULPT_OT_expand(wmOperatorType *ot)

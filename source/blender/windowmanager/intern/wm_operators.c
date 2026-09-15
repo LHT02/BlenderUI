@@ -3880,7 +3880,6 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
   /* BLUI only assigns this to operators that exist: the 3D viewport, clip
    * editor, node editor, graph editor and dope sheet are not registered, so
    * naming their operators here would be a startup error. */
-  WM_modalkeymap_assign(keymap, "UV_OT_select_circle");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_circle");
 }
 
@@ -3910,7 +3909,6 @@ static void gesture_straightline_modal_keymap(wmKeyConfig *keyconf)
   WM_modalkeymap_assign(keymap, "IMAGE_OT_sample_line");
   WM_modalkeymap_assign(keymap, "PAINT_OT_weight_gradient");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_line_gesture");
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_project_line_gesture");
 }
 
 /* box_select-like modal operators */
@@ -3948,10 +3946,7 @@ static void gesture_box_modal_keymap(wmKeyConfig *keyconf)
 #endif
   WM_modalkeymap_assign(keymap, "SEQUENCER_OT_select_box");
   WM_modalkeymap_assign(keymap, "SEQUENCER_OT_view_ghost_border");
-  WM_modalkeymap_assign(keymap, "UV_OT_select_box");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_box_gesture");
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_face_set_box_gesture");
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_trim_box_gesture");
   WM_modalkeymap_assign(keymap, "VIEW2D_OT_zoom_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_render_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_view_zoom_border");
@@ -3981,9 +3976,6 @@ static void gesture_lasso_modal_keymap(wmKeyConfig *keyconf)
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_stroke_cutter");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_lasso");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_lasso_gesture");
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_face_set_lasso_gesture");
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_trim_lasso_gesture");
-  WM_modalkeymap_assign(keymap, "UV_OT_select_lasso");
 }
 
 /* zoom to border modal operators */

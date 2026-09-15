@@ -1588,7 +1588,6 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 
   /* paint stroke */
   keymap = paint_stroke_modal_keymap(keyconf);
-  WM_modalkeymap_assign(keymap, "SCULPT_OT_brush_stroke");
 
   /* Curves Sculpt mode. */
   keymap = WM_keymap_ensure(keyconf, "Sculpt Curves", 0, 0);
