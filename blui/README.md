@@ -402,7 +402,8 @@ memory. Run them after any change; none of them need a person watching.
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
 | Key configuration (loads fully, Ctrl+S, Shift+F1..F6) | `check_keymap_config.py` | PASS, 135 keymaps |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
-| Window / editor isolation (two Text windows) | `check_window_isolation.py` | ISOLATED |
+| Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
+| Open-document isolation (item 4's target) | `check_window_isolation.py -- --strict` | FAILS today, by design |
 | Opening a component in its own window | `check_component_window.py` | PASS |
 | Click sweep, 144 points, whole window | `click_sweep.py` | no crash, no crash log |
 | Configuration isolation | — | `%APPDATA%\Blender Foundation` untouched |
@@ -590,6 +591,29 @@ The work is staged so the build stays green at every step.
         Verified by `blui/tools/check_preferences.py`, which walks the registered
         panel classes and asserts the whole set: nine sections, nothing in the
         dropped ones, Editing holding exactly one panel.
+
+- [ ] **Stage 6 — Isolate the open-document list.** Blender is one document:
+      every window edits one `Main`, so `bpy.data.texts` and `bpy.data.images`
+      are common to all of them. Two text editor windows are genuinely separate
+      *editors* now - distinct screens, distinct `SpaceText` - but they share
+      one list of open documents, so either window can see, and switch to, the
+      file the other has open.
+
+      This is measured, not assumed: `check_window_isolation.py` opens one text
+      per window and reports that window A can see 2 open texts including
+      window B's.
+
+      - [ ] Target: a window's open-document list holds only its own documents.
+        `check_window_isolation.py -- --strict` asserts exactly that and
+        **fails today**, on purpose. The work has a test to flip rather than a
+        description to interpret; until it is flipped the suite runs the
+        non-strict mode, which reports the measurement and passes.
+      - [ ] Not started. This is where Blender's architecture resists hardest:
+        `Main` is reached through `G.main` and through the context nearly
+        everywhere, so "one `Main` per window" is not a local change. A narrower
+        first step worth weighing is to leave storage alone and give the text and
+        image editors a per-window *view* of the datablock list, so the dropdown
+        and the browse list are per window even though the storage is not.
 
 ### Licensing
 
