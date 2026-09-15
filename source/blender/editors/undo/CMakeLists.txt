@@ -32,7 +32,6 @@ set(LIB
   bf_editor_curve
   bf_editor_curves
   bf_editor_mesh
-  bf_editor_metaball
   bf_editor_physics
 )
 

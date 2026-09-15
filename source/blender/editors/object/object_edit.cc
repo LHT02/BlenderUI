@@ -76,7 +76,6 @@
 #include "ED_gpencil_legacy.h"
 #include "ED_image.h"
 #include "ED_keyframes_keylist.h"
-#include "ED_mball.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
@@ -671,20 +670,6 @@ static bool ED_object_editmode_load_free_ex(Main *bmain,
       BKE_editlattice_free(obedit);
     }
   }
-  else if (obedit->type == OB_MBALL) {
-    const MetaBall *mb = static_cast<const MetaBall *>(obedit->data);
-    if (mb->editelems == nullptr) {
-      return false;
-    }
-
-    if (load_data) {
-      ED_mball_editmball_load(obedit);
-    }
-
-    if (free_data) {
-      ED_mball_editmball_free(obedit);
-    }
-  }
   else if (obedit->type == OB_CURVES) {
     /* Curves don't have specific edit mode data, so pass. */
   }
@@ -850,16 +835,6 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
     ED_curve_editfont_make(ob);
 
     WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_TEXT, scene);
-  }
-  else if (ob->type == OB_MBALL) {
-    MetaBall *mb = static_cast<MetaBall *>(ob->data);
-
-    ok = true;
-    ED_mball_editmball_make(ob);
-
-    mb->needs_flush_to_id = 0;
-
-    WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_MBALL, scene);
   }
   else if (ob->type == OB_LATTICE) {
     ok = true;

@@ -61,7 +61,6 @@ set(SRC
   ../include/ED_keyframing.h
   ../include/ED_markers.h
   ../include/ED_mask.h
-  ../include/ED_mball.h
   ../include/ED_mesh.h
   ../include/ED_node.h
   ../include/ED_node.hh

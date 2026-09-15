@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 6 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice` (999 KB) |
+      | Editor modules deleted | 7 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball` (1,034 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -1029,7 +1029,7 @@ The work is staged so the build stays green at every step.
       | Module | Size | Consumers left |
       | --- | --- | --- |
       | `lattice` | 40 KB | **deleted** - see below |
-      | `metaball` | 35 KB | `space_view3d`, 1 site; `object`, 4 sites |
+      | `metaball` | 35 KB | **deleted** - see below |
 
       (The other four - `armature` 583 KB, `mesh` 1334 KB, `curve` 486 KB,
       `curves` 84 KB - were not re-measured site by site. Do that before quoting
@@ -1092,6 +1092,40 @@ The work is staged so the build stays green at every step.
       survivor (`view3d_select.cc(4522)`), which is the cheapest possible way to
       find it, but a `replace_all` across differently-formatted copies of the
       same block is worth not trusting.
+
+      ### `editors/metaball/` is deleted, and one "dead include" was not dead
+
+      Five live sites: the metaball branch of the edit-mode click dispatch in
+      `space_view3d`, plus `ED_mball_editmball_load` / `_free` in `object`'s
+      edit-mode enter and exit and `ED_mball_editmball_make` on enter. All
+      unreachable, and both `object_edit.cc` chains end in a fallthrough, so
+      deleting the `OB_MBALL` branches is enough - metaball edit mode is now
+      simply refused, which is what BLUI wants.
+
+      `OBJECT_OT_metaball_add` could not be cut so cleanly, because
+      `ED_mball_add_primitive` is the whole point of the operator. It now creates
+      the metaball object and stops there, with a comment saying so. It is
+      unreachable from any BLUI menu, so that is tidying rather than behaviour.
+
+      **The lesson is the include.** `ED_mball.h` looked dead in
+      `overlay_metaball.cc` and `space_view3d/view3d_select.cc` - neither called
+      an `ED_mball_*` function - so both includes were removed, and the build
+      then failed on `MBALLSEL_RADIUS`, `MBALLSEL_STIFF` and `MBALLSEL_ANY`. A
+      header can be live through constants alone, and grepping for its function
+      prefix says nothing about that.
+
+      That is the uvedit under-count in a new disguise, and it generalises the
+      rule: **when deciding whether an include is dead, read the header's whole
+      contents, not its naming convention.** The `ED_uvedit_` grep missed 17 of
+      33 call sites because the symbols were not prefixed; this one missed three
+      call sites because the symbols were macros. Both times the compiler found
+      it and the grep did not.
+
+      The three flags are select-buffer id bits (`1u << 30`, `1u << 31`), not
+      editor state - the editor layer was only where they sat, because the file
+      was named after the data type rather than after what the constants mean.
+      They moved to `DNA_meta_types.h`, which both remaining users already
+      include and which already carries the `MB_*` metaball constants.
 
       ### `editors/uvedit/`: the kept-module calls are gone, 29 sites remain
 

@@ -72,7 +72,6 @@
 #include "ED_curve.h"
 #include "ED_curves.h"
 #include "ED_gpencil_legacy.h"
-#include "ED_mball.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
@@ -3167,9 +3166,6 @@ static int view3d_select_exec(bContext *C, wmOperator *op)
     else if (ELEM(obedit->type, OB_CURVES_LEGACY, OB_SURF)) {
       changed = ED_curve_editnurb_select_pick(
           C, mval, ED_view3d_select_dist_px(), vert_without_handles, &params);
-    }
-    else if (obedit->type == OB_MBALL) {
-      changed = ED_mball_select_pick(C, mval, &params);
     }
     else if (obedit->type == OB_FONT) {
       changed = ED_curve_editfont_select_pick(C, mval, &params);

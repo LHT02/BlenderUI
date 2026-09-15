@@ -13,8 +13,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "ED_mball.h"
-
 #include "overlay_private.hh"
 
 void OVERLAY_metaball_cache_init(OVERLAY_Data *vedata)

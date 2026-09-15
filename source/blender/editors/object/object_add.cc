@@ -102,7 +102,6 @@
 #include "ED_curve.h"
 #include "ED_curves.h"
 #include "ED_gpencil_legacy.h"
-#include "ED_mball.h"
 #include "ED_mesh.h"
 #include "ED_node.h"
 #include "ED_object.h"
@@ -1010,14 +1009,9 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
     DEG_id_tag_update(&obedit->id, ID_RECALC_GEOMETRY);
   }
 
-  float mat[4][4];
-  ED_object_new_primitive_matrix(C, obedit, loc, rot, nullptr, mat);
-  /* Halving here is done to account for constant values from #BKE_mball_element_add.
-   * While the default radius of the resulting meta element is 2,
-   * we want to pass in 1 so other values such as resolution are scaled by 1.0. */
-  float dia = RNA_float_get(op->ptr, "radius") / 2;
-
-  ED_mball_add_primitive(C, obedit, newob, mat, dia, RNA_enum_get(op->ptr, "type"));
+  /* BLUI removed `editors/metaball`, so there is no primitive to add: the
+   * operator still creates the metaball object, which is all that is left of
+   * it now that no metaball editor exists to put elements into it. */
 
   /* userdef */
   if (newob && !enter_editmode) {

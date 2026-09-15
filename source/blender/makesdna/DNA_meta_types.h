@@ -126,6 +126,17 @@ enum {
 #define MB_HIDE 8
 #define MB_SCALE_RAD 16
 
+/* Select-buffer id bits for meta-elements.
+ *
+ * These lived in `ED_mball.h` until BLUI deleted the metaball editor. They are
+ * not editor state: the only users are the overlay draw engine and the viewport
+ * selection code, and both already include this header. The editor layer was
+ * simply where they happened to sit, because the file was named after the data
+ * type rather than after what the constants mean. */
+#define MBALLSEL_STIFF (1u << 30)
+#define MBALLSEL_RADIUS (1u << 31)
+#define MBALLSEL_ANY (MBALLSEL_STIFF | MBALLSEL_RADIUS)
+
 #ifdef __cplusplus
 }
 #endif
