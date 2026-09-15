@@ -102,7 +102,6 @@ void ED_spacetypes_init(void)
   ED_operatortypes_uvedit();
   ED_operatortypes_paint();
   ED_operatortypes_physics();
-  ED_operatortypes_curve();
   ED_operatortypes_curves();
   ED_operatortypes_armature();
   ED_operatortypes_marker();
@@ -207,7 +206,6 @@ void ED_spacetypes_keymap(wmKeyConfig *keyconf)
   ED_keymap_lattice(keyconf);
   ED_keymap_mesh(keyconf);
   ED_keymap_uvedit(keyconf);
-  ED_keymap_curve(keyconf);
   ED_keymap_curves(keyconf);
   ED_keymap_armature(keyconf);
   ED_keymap_physics(keyconf);

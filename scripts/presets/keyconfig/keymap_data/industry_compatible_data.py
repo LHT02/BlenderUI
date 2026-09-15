@@ -2281,47 +2281,6 @@ def km_paint_curve(params):
     return keymap
 
 
-def km_curve(params):
-    items = []
-    keymap = (
-        "Curve",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("curve.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("curve.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("curve.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("curve.select_row", {"type": 'R', "value": 'PRESS', "shift": True}, None),
-        ("curve.select_more", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("curve.select_less", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("curve.select_linked", {"type": 'RIGHT_BRACKET', "value": 'PRESS'}, None),
-        ("curve.shortest_path_pick", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True, "shift": True}, None),
-        ("curve.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
-        op_menu("VIEW3D_MT_edit_curve_delete", {"type": 'BACK_SPACE', "value": 'PRESS'}),
-        op_menu("VIEW3D_MT_edit_curve_delete", {"type": 'DEL', "value": 'PRESS'}),
-        ("curve.dissolve_verts", {"type": 'BACK_SPACE', "value": 'PRESS', "ctrl": True}, None),
-        ("curve.dissolve_verts", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
-        ("curve.tilt_clear", {"type": 'T', "value": 'PRESS', "alt": True}, None),
-        ("curve.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("curve.hide", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("curve.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        *_template_items_context_menu("VIEW3D_MT_edit_curve_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_proportional_edit')]}),
-        # Tools
-        *_template_items_basic_tools(),
-        op_tool_cycle("builtin.extrude", {"type": 'E', "value": 'PRESS', "ctrl": True}),
-        op_tool_cycle("builtin.tilt", {"type": 'Y', "value": 'PRESS'}),
-        op_tool_cycle("builtin.radius", {"type": 'U', "value": 'PRESS'}),
-
-    ])
-
-    return keymap
 
 # Radial control setup helpers, this operator has a lot of properties.
 
@@ -2856,101 +2815,6 @@ def km_particle(params):
 
 
 # Text edit mode.
-def km_font(params):
-    items = []
-    keymap = (
-        "Font",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("font.style_toggle", {"type": 'B', "value": 'PRESS', "ctrl": True},
-         {"properties": [("style", 'BOLD')]}),
-        ("font.style_toggle", {"type": 'I', "value": 'PRESS', "ctrl": True},
-         {"properties": [("style", 'ITALIC')]}),
-        ("font.style_toggle", {"type": 'U', "value": 'PRESS', "ctrl": True},
-         {"properties": [("style", 'UNDERLINE')]}),
-        ("font.style_toggle", {"type": 'P', "value": 'PRESS', "ctrl": True},
-         {"properties": [("style", 'SMALL_CAPS')]}),
-        ("font.delete", {"type": 'DEL', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'NEXT_OR_SELECTION')]}),
-        ("font.delete", {"type": 'DEL', "value": 'PRESS', "ctrl": True, "repeat": True},
-         {"properties": [("type", 'NEXT_WORD')]}),
-        ("font.delete", {"type": 'BACK_SPACE', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'PREVIOUS_OR_SELECTION')]}),
-        ("font.delete", {"type": 'BACK_SPACE', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_OR_SELECTION')]}),
-        ("font.delete", {"type": 'BACK_SPACE', "value": 'PRESS', "ctrl": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_WORD')]}),
-        ("font.move", {"type": 'HOME', "value": 'PRESS'},
-         {"properties": [("type", 'LINE_BEGIN')]}),
-        ("font.move", {"type": 'END', "value": 'PRESS'},
-         {"properties": [("type", 'LINE_END')]}),
-        ("font.move", {"type": 'LEFT_ARROW', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'PREVIOUS_CHARACTER')]}),
-        ("font.move", {"type": 'RIGHT_ARROW', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'NEXT_CHARACTER')]}),
-        ("font.move", {"type": 'LEFT_ARROW', "value": 'PRESS', "ctrl": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_WORD')]}),
-        ("font.move", {"type": 'RIGHT_ARROW', "value": 'PRESS', "ctrl": True, "repeat": True},
-         {"properties": [("type", 'NEXT_WORD')]}),
-        ("font.move", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'PREVIOUS_LINE')]}),
-        ("font.move", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'NEXT_LINE')]}),
-        ("font.move", {"type": 'PAGE_UP', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'PREVIOUS_PAGE')]}),
-        ("font.move", {"type": 'PAGE_DOWN', "value": 'PRESS', "repeat": True},
-         {"properties": [("type", 'NEXT_PAGE')]}),
-        ("font.move", {"type": 'HOME', "value": 'PRESS', "ctrl": True, "repeat": True},
-         {"properties": [("type", 'TEXT_BEGIN')]}),
-        ("font.move", {"type": 'END', "value": 'PRESS', "ctrl": True, "repeat": True},
-         {"properties": [("type", 'TEXT_END')]}),
-        ("font.move_select", {"type": 'HOME', "value": 'PRESS', "shift": True},
-         {"properties": [("type", 'LINE_BEGIN')]}),
-        ("font.move_select", {"type": 'END', "value": 'PRESS', "shift": True},
-         {"properties": [("type", 'LINE_END')]}),
-        ("font.move_select", {"type": 'LEFT_ARROW', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_CHARACTER')]}),
-        ("font.move_select", {"type": 'RIGHT_ARROW', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'NEXT_CHARACTER')]}),
-        ("font.move_select", {"type": 'LEFT_ARROW', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_WORD')]}),
-        ("font.move_select", {"type": 'RIGHT_ARROW', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True},
-         {"properties": [("type", 'NEXT_WORD')]}),
-        ("font.move_select", {"type": 'UP_ARROW', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_LINE')]}),
-        ("font.move_select", {"type": 'DOWN_ARROW', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'NEXT_LINE')]}),
-        ("font.move_select", {"type": 'PAGE_UP', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_PAGE')]}),
-        ("font.move_select", {"type": 'PAGE_DOWN', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'NEXT_PAGE')]}),
-        ("font.move_select", {"type": 'HOME', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True},
-         {"properties": [("type", 'TEXT_BEGIN')]}),
-        ("font.move_select", {"type": 'END', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True},
-         {"properties": [("type", 'TEXT_END')]}),
-        ("font.change_spacing", {"type": 'LEFT_ARROW', "value": 'PRESS', "alt": True, "repeat": True},
-         {"properties": [("delta", -1)]}),
-        ("font.change_spacing", {"type": 'RIGHT_ARROW', "value": 'PRESS', "alt": True, "repeat": True},
-         {"properties": [("delta", 1)]}),
-        ("font.change_character", {"type": 'UP_ARROW', "value": 'PRESS', "alt": True, "repeat": True},
-         {"properties": [("delta", 1)]}),
-        ("font.change_character", {"type": 'DOWN_ARROW', "value": 'PRESS', "alt": True, "repeat": True},
-         {"properties": [("delta", -1)]}),
-        ("font.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, None),
-        ("font.text_copy", {"type": 'C', "value": 'PRESS', "ctrl": True}, None),
-        ("font.text_cut", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
-        ("font.text_paste", {"type": 'V', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("font.line_break", {"type": 'RET', "value": 'PRESS'}, None),
-        ("font.text_insert", {"type": 'TEXTINPUT', "value": 'ANY', "any": True}, None),
-        ("font.text_insert", {"type": 'BACK_SPACE', "value": 'PRESS', "alt": True},
-         {"properties": [("accent", True)]}),
-        *_template_items_context_menu("VIEW3D_MT_edit_font_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-    ])
-
-    return keymap
 
 
 def km_object_non_modal(params):
@@ -3291,7 +3155,6 @@ def generate_keymaps_impl(params=None):
         km_pose(params),
         km_object_mode(params),
         km_paint_curve(params),
-        km_curve(params),
         km_image_paint(params),
         km_vertex_paint(params),
         km_weight_paint(params),
@@ -3301,7 +3164,6 @@ def generate_keymaps_impl(params=None):
         km_metaball(params),
         km_lattice(params),
         km_particle(params),
-        km_font(params),
         km_object_non_modal(params),
 
         # Modal maps.
