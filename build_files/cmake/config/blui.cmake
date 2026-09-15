@@ -102,6 +102,10 @@ set(WITH_FREETYPE            ON  CACHE BOOL "" FORCE)
 # Build info embeds the git revision, which forces a relink of the executable
 # on every commit. Disabled so iteration on the UI stays fast.
 set(WITH_BUILDINFO           OFF CACHE BOOL "" FORCE)
+# Blender's CMake default is ON, which makes every failed BLI_assert call
+# abort() - fine for a development build, wrong for something we hand to a user
+# as a file browser. Blender's own release profile turns it off; so does BLUI's.
+set(WITH_ASSERT_ABORT        OFF CACHE BOOL "" FORCE)
 # Bundle the CRT only when producing a redistributable package; not needed for
 # development builds and it requires the CRT merge modules to be installed.
 set(WITH_WINDOWS_BUNDLE_CRT  OFF CACHE BOOL "" FORCE)

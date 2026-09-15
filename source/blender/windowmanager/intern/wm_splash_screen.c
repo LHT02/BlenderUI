@@ -314,7 +314,7 @@ static uiBlock *wm_block_create_about(bContext *C, ARegion *region, void *UNUSED
 
   uiLayout *col = uiLayoutColumn(layout, true);
 
-  uiItemL_ex(col, IFACE_("Blender"), ICON_NONE, true, false);
+  uiItemL_ex(col, BLUI_PRODUCT_NAME, ICON_NONE, true, false);
 
   MenuType *mt = WM_menutype_find("WM_MT_splash_about", true);
   if (mt) {
@@ -335,9 +335,9 @@ static int wm_about_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *U
 
 void WM_OT_splash_about(wmOperatorType *ot)
 {
-  ot->name = "About Blender";
+  ot->name = "About " BLUI_PRODUCT_NAME;
   ot->idname = "WM_OT_splash_about";
-  ot->description = "Open a window with information about Blender";
+  ot->description = "Open a window with information about " BLUI_PRODUCT_NAME;
 
   ot->invoke = wm_about_invoke;
   ot->poll = WM_operator_winactive;
