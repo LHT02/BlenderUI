@@ -879,6 +879,35 @@ The work is staged so the build stays green at every step.
       | `makesdna` (the enum itself) | 1 |
       | `editors/transform` | 1 |
 
+      The full list, so the next attempt does not have to re-derive it:
+
+      ```
+      makesdna/DNA_space_types.h:1297            SI_MODE_UV = 3   (the enum)
+      makesrna/intern/rna_space.c:253            the "UV Editor" item
+      blenkernel/intern/paint.cc:540,571,634
+      blenloader/intern/versioning_defaults.cc:127
+      draw/engines/overlay/overlay_edit_uv.cc:47,110
+      draw/engines/overlay/overlay_grid.cc:46
+      draw/intern/draw_view.c:215
+      editors/space_image/image_edit.c:49,97,467
+      editors/space_image/space_image.c:804,1018,1024,1025
+      editors/transform/transform_snap.cc:942
+      editors/uvedit/uvedit_buttons.c:244
+      editors/uvedit/uvedit_select.c:5611
+      windowmanager/intern/wm_keymap_utils.c:161
+      windowmanager/intern/wm_toolsystem.c:432
+      ```
+
+      Four are `case SI_MODE_UV:` in switches and have to go with the enum
+      (`paint.cc:634`, `draw_view.c:215`, `space_image.c:804`,
+      `wm_keymap_utils.c:161`); the rest are `== SI_MODE_UV` tests that become
+      dead once the mode cannot be set.
+
+      One looks removable and is not: `versioning_defaults.cc:127` fires when a
+      workspace named "UV Editing" is created, and `WM_OT_workspace_add` can
+      still create one even though BLUI has no top bar. Checked rather than
+      assumed, because it read like dead code.
+
       Plus 6 references to the UV-sculpt keymaps in `blender_default.py` and none
       in `industry_compatible_data.py`.
 
