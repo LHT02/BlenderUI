@@ -650,10 +650,21 @@ The work is staged so the build stays green at every step.
       | --- | --- |
       | `space_outliner` | ~50 `ED_outliner_select_sync_*` call sites in ~15 files, several that stay |
       | `space_buttons` | 3 link symbols reached via RNA/templates, not headers |
-      | `space_nla` | **six single call sites - the one to take next** |
+      | `space_clip` | 15+ symbols across mask, transform, screen, gpencil, RNA and Python - UI templates (`uiTemplateMovieClip`, `uiTemplateTrack`, `uiTemplateMarker`, `uiTemplateMovieclipInformation`), context dirs (`clip_context_dir`) and `ED_space_clip_get/set_clip/mask` |
+      | `space_nla` | **done - six single call sites** |
 
-      `space_spreadsheet` is deleted. It was the only one whose link surface was
-      empty, which is why it worked and the others did not.
+      Deleted so far: `space_spreadsheet` (132 KB, three attempts), `space_nla`
+      (217 KB), `space_action` (220 KB, one line), `space_graph` (377 KB, four
+      call sites). 947 KB of editor source.
+
+      The pattern in the rejections is consistent: a module is cheap when
+      nothing outside it calls in, and expensive when it exports **UI template
+      callbacks**, **context directories** or **context members** - none of which
+      live in a header, so none of which show up when reading. `space_buttons`
+      and `space_clip` both fail that way. The next candidates worth trying are
+      the data editors (`object`, `mesh`, `armature`, ...), which are expected
+      to be expensive for the opposite reason - they have large public headers -
+      and the remaining space types, tried one at a time against the linker.
 
       ### What deleting a module actually involves
 
