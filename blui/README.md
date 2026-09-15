@@ -563,26 +563,44 @@ The work is staged so the build stays green at every step.
       (The "~146 places" this section used to quote was the general problem, not
       this module. Measure before believing a number.)
 
-      The whole job, in order:
+      The job, in order, with the line numbers an attempt at it established.
+      **This is one atomic change**: there is no green intermediate state, so it
+      has to be done in a single pass and cannot be committed half way.
 
       1. `ED_spacetype_spreadsheet()` is **already uncalled** - it went with the
-         space-type registry in the first batch - so deleting the
-         implementation cannot break the editor set. Nothing outside
+         space-type registry in the first batch - and nothing outside
          `space_spreadsheet/` calls `spreadsheet_operatortypes()` or
-         `spreadsheet_keymap()` either.
-      2. Delete `source/blender/editors/space_spreadsheet/` (23 files) and its
-         `add_subdirectory` in `source/blender/editors/CMakeLists.txt`.
-      3. The four external touch points, which are why this is not a
-         one-line job: `ED_space_api.h` (the declaration),
-         **`rna_space.c`** and **`MOD_nodes.cc`** (both `#include
-         "ED_spreadsheet.h"` - the geometry-nodes modifier has a spreadsheet
-         inspection feature), then `SpaceSpreadsheet` in `DNA_space_types.h`,
-         `SPACE_SPREADSHEET` in the `eSpace_Type` enum, `RNA_SpaceSpreadsheet`
-         in `rna_space.c`, and the theme references in `DNA_userdef_types.h`,
-         `rna_userdef.c`, `resources.cc`, `screen_ops.c` and
-         `bpy_rna_callback.c`.
-      4. Build, run the suite, commit. Only then start the next module, and
-         commit it separately - each module is one green step.
+         `spreadsheet_keymap()`. Deleting the implementation cannot disturb the
+         editor set.
+      2. Delete `source/blender/editors/space_spreadsheet/` (24 files,
+         132 KB), `source/blender/editors/include/ED_spreadsheet.h`, the
+         `add_subdirectory(space_spreadsheet)` line in
+         `editors/CMakeLists.txt`, and the declaration in `ED_space_api.h`.
+      3. `modifiers/intern/MOD_nodes.cc`: drop `#include "ED_spreadsheet.h"`
+         (line 85) and the `SPACE_SPREADSHEET` branch of the viewer-path scan
+         (lines 964-968).
+      4. `makesrna/intern/rna_space.c`: drop `#include "ED_spreadsheet.h"`
+         (line 25), `case SPACE_SPREADSHEET:` in the space-type RNA lookup
+         (line 584), `rna_SpaceSpreadsheet_geometry_component_type_update`
+         (3213) and `rna_SpaceSpreadsheet_attribute_domain_itemf` (3250), the
+         whole RNA block from `rna_def_spreadsheet_column_id` (7878) to the end
+         of `rna_def_space_spreadsheet` (~8205), and its call (8206).
+      5. `DNA_space_types.h`: the `SpaceSpreadsheet` struct and its
+         `SPREADSHEET_*` defines.
+      6. Build, run the suite, commit.
+
+      **Scope reduction found by attempting it:** leave `SPACE_SPREADSHEET` in
+      the `eSpace_Type` enum and leave the theme colours alone. That keeps
+      `resources.cc`, `screen_ops.c`, `bpy_rna_callback.c`,
+      `DNA_userdef_types.h` and `rna_userdef.c` compiling untouched - five files
+      out of the job - at the cost of one dead enum value and some unused theme
+      data, both of which can go in a later sweep once the modules are gone.
+
+      An attempt at the above was started and **reverted** rather than left half
+      applied: the repo requires the build to stay green at every step, and this
+      change has no green intermediate. Undo is `git checkout -- .` in
+      `source/`, which restores the deleted files as well as the edits.
+
 
       > **Note for whoever continues this.** "Guarded by a `WITH_*` option"
       > does *not* mean "safe to delete". Several intern libraries build a
