@@ -2110,68 +2110,6 @@ def km_weight_paint_vertex_selection(params):
     return keymap
 
 
-def km_pose(params):
-    items = []
-    keymap = (
-        "Pose",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        *_template_items_animation(),
-        ("object.parent_set", {"type": 'P', "value": 'PRESS'}, None),
-        ("pose.hide", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("pose.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("pose.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("pose.rot_clear", {"type": 'E', "value": 'PRESS', "alt": True}, None),
-        ("pose.loc_clear", {"type": 'W', "value": 'PRESS', "alt": True}, None),
-        ("pose.scale_clear", {"type": 'R', "value": 'PRESS', "alt": True}, None),
-        ("pose.copy", {"type": 'C', "value": 'PRESS', "ctrl": True}, None),
-        ("pose.paste", {"type": 'V', "value": 'PRESS', "ctrl": True},
-         {"properties": [("flipped", False)]}),
-        ("pose.paste", {"type": 'V', "value": 'PRESS', "shift": True, "ctrl": True},
-         {"properties": [("flipped", True)]}),
-        ("pose.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("pose.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("pose.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("pose.select_parent", {"type": 'UP_ARROW', "value": 'PRESS', "ctrl": True}, None),
-        ("pose.select_hierarchy", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True},
-         {"properties": [("direction", 'PARENT'), ("extend", False)]}),
-        ("pose.select_hierarchy", {"type": 'UP_ARROW', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("direction", 'PARENT'), ("extend", True)]}),
-        ("pose.select_hierarchy", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True},
-         {"properties": [("direction", 'CHILD'), ("extend", False)]}),
-        ("pose.select_hierarchy", {"type": 'DOWN_ARROW', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("direction", 'CHILD'), ("extend", True)]}),
-        ("pose.select_linked", {"type": 'RIGHT_BRACKET', "value": 'PRESS'}, None),
-        ("pose.bone_layers", {"type": 'G', "value": 'PRESS'}, None),
-        ("anim.keyframe_insert_menu", {"type": 'S', "value": 'PRESS', "shift": True}, None),
-        ("anim.keyframe_insert_by_name", {"type": 'S', "value": 'PRESS'},
-         {"properties": [("type", 'LocRotScale')]}),
-        ("anim.keyframe_insert_by_name", {"type": 'W', "value": 'PRESS', "shift": True},
-         {"properties": [("type", 'Location')]}),
-        ("anim.keyframe_insert_by_name", {"type": 'E', "value": 'PRESS', "shift": True},
-         {"properties": [("type", 'Rotation')]}),
-        ("anim.keyframe_insert_by_name", {"type": 'R', "value": 'PRESS', "shift": True},
-         {"properties": [("type", 'Scaling')]}),
-
-        ("anim.keyframe_delete_v3d", {"type": 'S', "value": 'PRESS', "alt": True}, None),
-        ("anim.keying_set_active_set", {"type": 'S', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
-        *_template_items_context_menu("VIEW3D_MT_pose_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        # Tools
-        op_tool_cycle("builtin.select_box", {"type": 'Q', "value": 'PRESS'}),
-        op_tool_cycle("builtin.move", {"type": 'W', "value": 'PRESS'}),
-        op_tool_cycle("builtin.rotate", {"type": 'E', "value": 'PRESS'}),
-        op_tool_cycle("builtin.scale", {"type": 'R', "value": 'PRESS'}),
-        op_tool_cycle("builtin.transform", {"type": 'T', "value": 'PRESS'}),
-        op_tool_cycle("builtin.measure", {"type": 'M', "value": 'PRESS'}),
-    ])
-
-    return keymap
 
 
 def km_object_mode(params):
@@ -2647,64 +2585,6 @@ def km_mesh(params):
 
 
 # Armature edit mode
-def km_armature(params):
-    items = []
-    keymap = (
-        "Armature",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        # Hide/reveal.
-        ("armature.hide", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("armature.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("armature.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        # Parenting.
-        ("armature.parent_set", {"type": 'P', "value": 'PRESS'}, None),
-        ("armature.parent_clear", {"type": 'P', "value": 'PRESS', "shift": True}, None),
-        # Selection.
-        ("armature.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("armature.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("armature.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-
-        ("armature.select_hierarchy", {"type": 'LEFT_BRACKET', "value": 'PRESS'},
-         {"properties": [("direction", 'PARENT'), ("extend", False)]}),
-        ("armature.select_hierarchy", {"type": 'LEFT_BRACKET', "value": 'PRESS', "shift": True},
-         {"properties": [("direction", 'PARENT'), ("extend", True)]}),
-        ("armature.select_hierarchy", {"type": 'RIGHT_BRACKET', "value": 'PRESS'},
-         {"properties": [("direction", 'CHILD'), ("extend", False)]}),
-        ("armature.select_hierarchy", {"type": 'RIGHT_BRACKET', "value": 'PRESS', "shift": True},
-         {"properties": [("direction", 'CHILD'), ("extend", True)]}),
-
-        ("armature.select_more", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("armature.select_less", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True}, None),
-
-        ("armature.select_similar", {"type": 'G', "value": 'PRESS', "shift": True}, None),
-        ("armature.select_linked_pick", {"type": 'RIGHT_BRACKET', "value": 'PRESS'},
-         {"properties": [("deselect", False)]}),
-
-        ("armature.shortest_path_pick", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True, "shift": True}, None),
-
-        # Editing.
-        op_menu("VIEW3D_MT_edit_armature_delete", {"type": 'DEL', "value": 'PRESS'}),
-        op_menu("VIEW3D_MT_edit_armature_delete", {"type": 'BACK_SPACE', "value": 'PRESS'}),
-        ("armature.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
-        ("armature.dissolve", {"type": 'BACK_SPACE', "value": 'PRESS', "ctrl": True}, None),
-        ("armature.dissolve", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
-        # Menus.
-        *_template_items_context_menu("VIEW3D_MT_armature_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        # Tools.
-        *_template_items_basic_tools(),
-        op_tool_cycle("builtin.roll", {"type": 'Y', "value": 'PRESS'}),
-        op_tool_cycle("builtin.extrude", {"type": 'E', "value": 'PRESS', "ctrl": True}),
-
-    ])
-
-    return keymap
 
 
 # Metaball edit mode.
@@ -3093,7 +2973,6 @@ def generate_keymaps_impl(params=None):
         km_grease_pencil_stroke_vertex_replace(params),
         km_face_mask(params),
         km_weight_paint_vertex_selection(params),
-        km_pose(params),
         km_object_mode(params),
         km_paint_curve(params),
         km_image_paint(params),
@@ -3101,7 +2980,6 @@ def generate_keymaps_impl(params=None):
         km_weight_paint(params),
         km_sculpt(params),
         km_mesh(params),
-        km_armature(params),
         km_particle(params),
         km_object_non_modal(params),
 
