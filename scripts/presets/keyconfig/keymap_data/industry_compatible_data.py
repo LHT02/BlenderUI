@@ -416,67 +416,6 @@ def km_user_interface(params):
 # Editors
 
 
-def km_uv_editor(params):
-    items = []
-    keymap = (
-        "UV Editor",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        op_panel("TOPBAR_PT_name", {"type": 'RET', "value": 'PRESS'}, [("keep_open", False)]),
-        ("wm.search_menu", {"type": 'TAB', "value": 'PRESS'}, None),
-        # Selection modes.
-        *_template_items_editmode_mesh_select_mode(params),
-        ("uv.select_mode", {"type": 'ONE', "value": 'PRESS'},
-         {"properties": [("type", 'VERTEX')]}),
-        ("uv.select_mode", {"type": 'TWO', "value": 'PRESS'},
-         {"properties": [("type", 'EDGE')]}),
-        ("uv.select_mode", {"type": 'THREE', "value": 'PRESS'},
-         {"properties": [("type", 'FACE')]}),
-        ("uv.select_mode", {"type": 'FOUR', "value": 'PRESS'},
-         {"properties": [("type", 'ISLAND')]}),
-
-        ("uv.select", {"type": 'LEFTMOUSE', "value": 'CLICK'},
-         {"properties": [("deselect_all", True)]}),
-        ("uv.select", {"type": 'LEFTMOUSE', "value": 'CLICK', "shift": True},
-         {"properties": [("toggle", True), ("deselect_all", False)]}),
-
-        ("transform.translate", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
-        ("uv.select_loop", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "shift": True},
-         {"properties": [("extend", True)]}),
-        ("uv.select_loop", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'},
-         {"properties": [("extend", False)]}),
-        ("uv.select_linked", {"type": 'RIGHT_BRACKET', "value": 'PRESS'}, None),
-        ("uv.select_more", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("uv.select_less", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("uv.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("uv.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("uv.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("uv.hide", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("uv.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("uv.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        op_menu_pie("IMAGE_MT_uvs_snap_pie", {"type": 'X', "value": 'PRESS', "shift": True}),
-        *_template_items_context_menu("IMAGE_MT_uvs_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_proportional_edit')]}),
-        ("wm.context_toggle", {"type": 'X', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_snap')]}),
-        # Tools
-        op_tool_cycle("builtin.select_box", {"type": 'Q', "value": 'PRESS'}),
-        op_tool_cycle("builtin.move", {"type": 'W', "value": 'PRESS'}),
-        op_tool_cycle("builtin.rotate", {"type": 'E', "value": 'PRESS'}),
-        op_tool_cycle("builtin.scale", {"type": 'R', "value": 'PRESS'}),
-        op_tool_cycle("builtin.transform", {"type": 'T', "value": 'PRESS'}),
-        op_tool_cycle("builtin.cursor", {"type": 'C', "value": 'PRESS'}),
-        op_tool_cycle("builtin.annotate", {"type": 'D', "value": 'PRESS'}),
-    ])
-
-    return keymap
 
 
 # 3D View: all regions.
@@ -2740,12 +2679,6 @@ def km_transform_modal_map(_params):
 # Named are auto-generated based on the tool name and it's toolbar.
 
 
-def km_image_editor_tool_uv_select(params):
-    return (
-        "Image Editor Tool: Uv, Tweak",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select(params, "uv.select", extend="extend")},
-    )
 
 
 # NOTE: duplicated from `blender_default.py`.
@@ -2820,7 +2753,6 @@ def generate_keymaps_impl(params=None):
         km_user_interface(params),
 
         # Editors.
-        km_uv_editor(params),
         km_markers(params),
         km_image_generic(params),
         km_image(params),
@@ -2892,7 +2824,6 @@ def generate_keymaps_impl(params=None):
         km_generic_gizmo_maybe_drag(params),
 
         # Tool System.
-        km_image_editor_tool_uv_select(params),
     ]
 
 

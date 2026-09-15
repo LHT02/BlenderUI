@@ -991,140 +991,6 @@ def km_time_scrub(_params):
 # ------------------------------------------------------------------------------
 # Editor (UV Editor)
 
-def km_uv_editor(params):
-    items = []
-    keymap = (
-        "UV Editor",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        # Selection modes.
-        *_template_items_uv_select_mode(params),
-        *_template_uv_select(
-            type=params.select_mouse,
-            value=params.select_mouse_value_fallback,
-            select_passthrough=params.use_tweak_select_passthrough,
-            legacy=params.legacy,
-        ),
-        ("uv.mark_seam", {"type": 'E', "value": 'PRESS', "ctrl": True}, None),
-        ("uv.select_loop",
-         {"type": params.select_mouse, "value": params.select_mouse_value, "alt": True}, None),
-        ("uv.select_loop",
-         {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "alt": True},
-         {"properties": [("extend", True)]}),
-        ("uv.select_edge_ring",
-         {"type": params.select_mouse, "value": params.select_mouse_value, "ctrl": True, "alt": True}, None),
-        ("uv.select_edge_ring",
-         {"type": params.select_mouse, "value": params.select_mouse_value, "ctrl": True, "shift": True, "alt": True},
-         {"properties": [("extend", True)]}),
-        ("uv.shortest_path_pick",
-         {"type": params.select_mouse, "value": params.select_mouse_value_fallback, "ctrl": True},
-         {"properties": [("use_fill", False)]}),
-        ("uv.shortest_path_pick",
-         {"type": params.select_mouse, "value": params.select_mouse_value_fallback, "ctrl": True, "shift": True},
-         {"properties": [("use_fill", True)]}),
-        ("uv.select_split", {"type": 'Y', "value": 'PRESS'}, None),
-        op_tool_optional(
-            ("uv.select_box", {"type": 'B', "value": 'PRESS'},
-             {"properties": [("pinned", False)]}),
-            (op_tool, "builtin.select_box"), params),
-        ("uv.select_box", {"type": 'B', "value": 'PRESS', "ctrl": True},
-         {"properties": [("pinned", True)]}),
-        op_tool_optional(
-            ("uv.select_circle", {"type": 'C', "value": 'PRESS'}, None),
-            (op_tool, "builtin.select_circle"), params),
-        ("uv.select_lasso", {"type": params.action_mouse, "value": 'CLICK_DRAG', "ctrl": True},
-         {"properties": [("mode", 'ADD')]}),
-        ("uv.select_lasso", {"type": params.action_mouse, "value": 'CLICK_DRAG', "shift": True, "ctrl": True},
-         {"properties": [("mode", 'SUB')]}),
-        ("uv.select_linked", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
-        ("uv.select_linked_pick", {"type": 'L', "value": 'PRESS'},
-         {"properties": [("extend", True), ("deselect", False)]}),
-        ("uv.select_linked_pick", {"type": 'L', "value": 'PRESS', "shift": True},
-         {"properties": [("deselect", True)]}),
-        ("uv.select_more", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("uv.select_less", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("uv.select_similar", {"type": 'G', "value": 'PRESS', "shift": True}, None),
-        *_template_items_select_actions(params, "uv.select_all"),
-        *_template_items_hide_reveal_actions("uv.hide", "uv.reveal"),
-        ("uv.select_pinned", {"type": 'P', "value": 'PRESS', "shift": True}, None),
-        op_menu("IMAGE_MT_uvs_merge", {"type": 'M', "value": 'PRESS'}),
-        op_menu("IMAGE_MT_uvs_split", {"type": 'M', "value": 'PRESS', "alt": True}),
-        op_menu("IMAGE_MT_uvs_align", {"type": 'W', "value": 'PRESS', "shift": True}),
-        ("uv.stitch", {"type": 'V', "value": 'PRESS', "alt": True}, None),
-        ("uv.rip_move", {"type": 'V', "value": 'PRESS'}, None),
-        ("uv.pin", {"type": 'P', "value": 'PRESS'},
-         {"properties": [("clear", False)]}),
-        ("uv.pin", {"type": 'P', "value": 'PRESS', "alt": True},
-         {"properties": [("clear", True)]}),
-        op_menu("IMAGE_MT_uvs_unwrap", {"type": 'U', "value": 'PRESS'}),
-        (
-            op_menu_pie("IMAGE_MT_uvs_snap_pie", {"type": 'S', "value": 'PRESS', "shift": True})
-            if not params.legacy else
-            op_menu("IMAGE_MT_uvs_snap", {"type": 'S', "value": 'PRESS', "shift": True})
-        ),
-        *_template_items_proportional_editing(
-            params, connected=False, toggle_data_path='tool_settings.use_proportional_edit'),
-        ("transform.translate", {"type": params.select_mouse, "value": 'CLICK_DRAG'}, None),
-        op_tool_optional(
-            ("transform.translate", {"type": 'G', "value": 'PRESS'}, None),
-            (op_tool_cycle, "builtin.move"), params),
-        op_tool_optional(
-            ("transform.rotate", {"type": 'R', "value": 'PRESS'}, None),
-            (op_tool_cycle, "builtin.rotate"), params),
-        op_tool_optional(
-            ("transform.resize", {"type": 'S', "value": 'PRESS'}, None),
-            (op_tool_cycle, "builtin.scale"), params),
-        ("transform.shear", {"type": 'S', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
-        ("transform.mirror", {"type": 'M', "value": 'PRESS', "ctrl": True}, None),
-        ("wm.context_toggle", {"type": 'TAB', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path", 'tool_settings.use_snap_uv')]}),
-        ("wm.context_menu_enum", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
-         {"properties": [("data_path", 'tool_settings.snap_uv_element')]}),
-        ("wm.context_toggle", {"type": 'ACCENT_GRAVE', "value": 'PRESS', "ctrl": True},
-         {"properties": [("data_path", 'space_data.show_gizmo')]}),
-        ("wm.context_toggle", {"type": 'Z', "value": 'PRESS', "alt": True, "shift": True},
-         {"properties": [("data_path", "space_data.overlay.show_overlays")]}),
-        *_template_items_context_menu("IMAGE_MT_uvs_context_menu", params.context_menu_event),
-    ])
-
-    # Fallback for MMB emulation
-    if params.use_mouse_emulate_3_button and params.select_mouse == 'LEFTMOUSE':
-        items.extend([
-            ("uv.select_loop", {"type": params.select_mouse, "value": 'DOUBLE_CLICK'}, None),
-            ("uv.select_loop", {"type": params.select_mouse, "value": 'DOUBLE_CLICK', "alt": True},
-             {"properties": [("extend", True)]}),
-        ])
-
-    # 3D cursor
-    if params.cursor_tweak_event:
-        items.extend([
-            ("uv.cursor_set", params.cursor_set_event, None),
-            ("transform.translate", params.cursor_tweak_event,
-             {"properties": [("release_confirm", True), ("cursor_transform", True)]}),
-        ])
-    else:
-        items.extend([
-            ("uv.cursor_set", params.cursor_set_event, None),
-        ])
-
-    if params.legacy:
-        items.extend([
-            ("uv.minimize_stretch", {"type": 'V', "value": 'PRESS', "ctrl": True}, None),
-            ("uv.pack_islands", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
-            ("uv.average_islands_scale", {"type": 'A', "value": 'PRESS', "ctrl": True}, None),
-        ])
-
-    if params.select_mouse == 'LEFTMOUSE' and not params.legacy:
-        # Quick switch to select tool, since left select can't easily
-        # select with any tool active.
-        items.extend([
-            op_tool_cycle("builtin.select_box", {"type": 'W', "value": 'PRESS'}),
-        ])
-
-    return keymap
 
 
 # ------------------------------------------------------------------------------
@@ -4785,144 +4651,24 @@ def km_image_editor_tool_generic_sample(params):
 # ------------------------------------------------------------------------------
 # Tool System (UV Editor)
 
-def km_image_editor_tool_uv_cursor(params):
-    return (
-        "Image Editor Tool: Uv, Cursor",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("uv.cursor_set", {"type": params.tool_mouse, "value": 'PRESS'}, None),
-            # Don't use `tool_maybe_tweak_event` since it conflicts with `PRESS` that places the cursor.
-            ("transform.translate", params.tool_tweak_event,
-             {"properties": [("release_confirm", True), ("cursor_transform", True)]}),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_select(params, *, fallback):
-    return (
-        _fallback_id("Image Editor Tool: Uv, Tweak", fallback),
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            *([] if (fallback and (params.select_mouse == 'RIGHTMOUSE')) else _template_items_tool_select(
-                params, "uv.select", "uv.cursor_set", fallback=fallback)),
-            *([] if params.use_fallback_tool_select_handled else
-              _template_uv_select(
-                  type=params.select_mouse,
-                  value=params.select_mouse_value,
-                  select_passthrough=params.use_tweak_select_passthrough,
-                  legacy=params.legacy,
-            )),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_select_box(params, *, fallback):
-    return (
-        _fallback_id("Image Editor Tool: Uv, Select Box", fallback),
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions_simple(
-                "uv.select_box",
-                # Don't use `tool_maybe_tweak_event`, see comment for this slot.
-                **(params.select_tweak_event if (fallback and params.use_fallback_tool_select_mouse) else
-                   params.tool_tweak_event))),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_select_circle(params, *, fallback):
-    return (
-        _fallback_id("Image Editor Tool: Uv, Select Circle", fallback),
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions_simple(
-                "uv.select_circle",
-                **(params.select_tweak_event if (fallback and params.use_fallback_tool_select_mouse) else
-                   {"type": params.tool_mouse, "value": 'PRESS'}),
-                properties=[("wait_for_input", False)])),
-            # No selection fallback since this operates on press.
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_select_lasso(params, *, fallback):
-    return (
-        _fallback_id("Image Editor Tool: Uv, Select Lasso", fallback),
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-
-        {"items": [
-            *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions_simple(
-                "uv.select_lasso",
-                **(params.select_tweak_event if (fallback and params.use_fallback_tool_select_mouse) else
-                   params.tool_tweak_event))),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_rip_region(params):
-    return (
-        "Image Editor Tool: Uv, Rip Region",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            # BLUI removed the nested `TRANSFORM_OT_translate` macro
-            # sub-property here. `uv.rip_move` is a UV macro, and the loader
-            # raises on a macro sub-property whose macro is no longer
-            # registered, which takes the whole key configuration with it.
-            ("uv.rip_move", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_sculpt_stroke(params):
-    return (
-        "Image Editor Tool: Uv, Sculpt Stroke",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("sculpt.uv_sculpt_stroke", {"type": params.tool_mouse, "value": 'PRESS'}, None),
-            ("sculpt.uv_sculpt_stroke", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("mode", 'INVERT')]}),
-            ("sculpt.uv_sculpt_stroke", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
-             {"properties": [("mode", 'RELAX')]}),
-            ("brush.scale_size", {"type": 'LEFT_BRACKET', "value": 'PRESS', "repeat": True},
-             {"properties": [("scalar", 0.9)]}),
-            ("brush.scale_size", {"type": 'RIGHT_BRACKET', "value": 'PRESS', "repeat": True},
-             {"properties": [("scalar", 1.0 / 0.9)]}),
-            *_template_paint_radial_control("uv_sculpt"),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_move(params):
-    return (
-        "Image Editor Tool: Uv, Move",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("transform.translate", {**params.tool_maybe_tweak_event, **params.tool_modifier},
-             {"properties": [("release_confirm", True)]}),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_rotate(params):
-    return (
-        "Image Editor Tool: Uv, Rotate",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("transform.rotate", {**params.tool_maybe_tweak_event, **params.tool_modifier},
-             {"properties": [("release_confirm", True)]}),
-        ]},
-    )
 
 
-def km_image_editor_tool_uv_scale(params):
-    return (
-        "Image Editor Tool: Uv, Scale",
-        {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("transform.resize", {**params.tool_maybe_tweak_event, **params.tool_modifier},
-             {"properties": [("release_confirm", True)]}),
-        ]},
-    )
 
 
 # ------------------------------------------------------------------------------
@@ -5096,7 +4842,6 @@ def generate_keymaps(params=None):
         km_user_interface(params),
 
         # Editors.
-        km_uv_editor(params),
         km_markers(params),
         km_time_scrub(params),
         km_image_generic(params),
@@ -5203,16 +4948,6 @@ def generate_keymaps(params=None):
         km_generic_tool_annotate_eraser(params),
 
         km_image_editor_tool_generic_sample(params),
-        km_image_editor_tool_uv_cursor(params),
-        *(km_image_editor_tool_uv_select(params, fallback=fallback) for fallback in (False, True)),
-        *(km_image_editor_tool_uv_select_box(params, fallback=fallback) for fallback in (False, True)),
-        *(km_image_editor_tool_uv_select_circle(params, fallback=fallback) for fallback in (False, True)),
-        *(km_image_editor_tool_uv_select_lasso(params, fallback=fallback) for fallback in (False, True)),
-        km_image_editor_tool_uv_rip_region(params),
-        km_image_editor_tool_uv_sculpt_stroke(params),
-        km_image_editor_tool_uv_move(params),
-        km_image_editor_tool_uv_rotate(params),
-        km_image_editor_tool_uv_scale(params),
         *(km_sequencer_editor_tool_generic_select(params, fallback=fallback) for fallback in (False, True)),
         *(km_sequencer_editor_tool_generic_select_box(params, fallback=fallback) for fallback in (False, True)),
         km_sequencer_editor_tool_generic_cursor(params),
