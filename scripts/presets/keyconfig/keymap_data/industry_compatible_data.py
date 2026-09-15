@@ -2594,45 +2594,6 @@ def km_mesh(params):
 
 
 # Particle edit mode.
-def km_particle(params):
-    items = []
-    keymap = (
-        "Particle",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        ("particle.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
-        ("particle.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True,
-         "shift": True}, {"properties": [("action", 'DESELECT')]}),
-        ("particle.select_all", {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
-        ("particle.select_more", {"type": 'UP_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("particle.select_less", {"type": 'DOWN_ARROW', "value": 'PRESS', "repeat": True}, None),
-        ("particle.select_linked_pick", {"type": 'RIGHT_BRACKET', "value": 'PRESS'},
-         {"properties": [("deselect", False)]}),
-        ("particle.select_linked_pick", {"type": 'RIGHT_BRACKET', "value": 'PRESS', "shift": True},
-         {"properties": [("deselect", True)]}),
-        ("particle.select_linked", {"type": 'RIGHT_BRACKET', "value": 'PRESS', "ctrl": True}, None),
-        ("particle.delete", {"type": 'BACK_SPACE', "value": 'PRESS'}, None),
-        ("particle.delete", {"type": 'DEL', "value": 'PRESS'}, None),
-        ("particle.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("particle.hide", {"type": 'H', "value": 'PRESS', "ctrl": True},
-         {"properties": [("unselected", False)]}),
-        ("particle.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("particle.brush_edit", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ("particle.brush_edit", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True}, None),
-        ("wm.radial_control", {"type": 'S', "value": 'PRESS'},
-         {"properties": [("data_path_primary", 'tool_settings.particle_edit.brush.size')]}),
-        ("wm.radial_control", {"type": 'U', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path_primary", 'tool_settings.particle_edit.brush.strength')]}),
-        ("wm.context_toggle", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("data_path", 'tool_settings.use_proportional_edit')]}),
-        *_template_items_context_menu("VIEW3D_MT_particle_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-    ])
-
-    return keymap
 
 
 # Text edit mode.
@@ -2980,7 +2941,6 @@ def generate_keymaps_impl(params=None):
         km_weight_paint(params),
         km_sculpt(params),
         km_mesh(params),
-        km_particle(params),
         km_object_non_modal(params),
 
         # Modal maps.
