@@ -2570,14 +2570,6 @@ void uiTemplateNodeView(uiLayout *layout,
                         struct bNode *node,
                         struct bNodeSocket *input);
 void uiTemplateNodeAssetMenuItems(uiLayout *layout, struct bContext *C, const char *catalog_path);
-void uiTemplateTextureUser(uiLayout *layout, struct bContext *C);
-/**
- * Button to quickly show texture in Properties Editor texture tab.
- */
-void uiTemplateTextureShow(uiLayout *layout,
-                           const struct bContext *C,
-                           struct PointerRNA *ptr,
-                           struct PropertyRNA *prop);
 
 void uiTemplateMovieClip(struct uiLayout *layout,
                          struct bContext *C,

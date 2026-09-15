@@ -528,7 +528,6 @@ static const EnumPropertyItem rna_enum_curve_display_handle_items[] = {
 
 #  include "ED_anim_api.h"
 #  include "ED_asset.h"
-#  include "ED_buttons.h"
 #  include "ED_clip.h"
 #  include "ED_fileselect.h"
 #  include "ED_image.h"
@@ -2010,38 +2009,16 @@ static void rna_SpaceProperties_context_set(PointerRNA *ptr, int value)
 }
 
 static const EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSED(C),
-                                                                 PointerRNA *ptr,
+                                                                 PointerRNA *UNUSED(ptr),
                                                                  PropertyRNA *UNUSED(prop),
                                                                  bool *r_free)
 {
-  SpaceProperties *sbuts = (SpaceProperties *)(ptr->data);
-  EnumPropertyItem *item = NULL;
-
-  /* Although it would never reach this amount, a theoretical maximum number of tabs
-   * is BCONTEXT_TOT * 2, with every tab displayed and a spacer in every other item. */
-  short context_tabs_array[BCONTEXT_TOT * 2];
-  int totitem = ED_buttons_tabs_list(sbuts, context_tabs_array);
-  BLI_assert(totitem <= ARRAY_SIZE(context_tabs_array));
-
-  int totitem_added = 0;
-  for (int i = 0; i < totitem; i++) {
-    if (context_tabs_array[i] == -1) {
-      RNA_enum_item_add_separator(&item, &totitem_added);
-      continue;
-    }
-
-    RNA_enum_items_add_value(&item, &totitem_added, buttons_context_items, context_tabs_array[i]);
-
-    /* Add the object data icon dynamically for the data tab. */
-    if (context_tabs_array[i] == BCONTEXT_DATA) {
-      (item + totitem_added - 1)->icon = sbuts->dataicon;
-    }
-  }
-
-  RNA_enum_item_end(&item, &totitem);
-  *r_free = true;
-
-  return item;
+  /* BLUI removed `editors/space_buttons`, and with it `ED_buttons_tabs_list()`.
+   * The dynamic tab list is gone; the static table is what this RNA advertised
+   * anyway and is already the one registered at `RNA_def_property_enum_items()`
+   * below, so it is returned directly and nothing is allocated. */
+  *r_free = false;
+  return buttons_context_items;
 }
 
 static void rna_SpaceProperties_context_update(Main *UNUSED(bmain),
@@ -2055,51 +2032,34 @@ static void rna_SpaceProperties_context_update(Main *UNUSED(bmain),
   }
 }
 
-static int rna_SpaceProperties_tab_search_results_getlength(const PointerRNA *ptr,
+static int rna_SpaceProperties_tab_search_results_getlength(const PointerRNA *UNUSED(ptr),
                                                             int length[RNA_MAX_ARRAY_DIMENSION])
 {
-  SpaceProperties *sbuts = ptr->data;
-
-  short context_tabs_array[BCONTEXT_TOT * 2]; /* Dummy variable. */
-  const int tabs_len = ED_buttons_tabs_list(sbuts, context_tabs_array);
-
-  length[0] = tabs_len;
-
+  /* No tabs exist to search, so there can be no results. */
+  length[0] = 0;
   return length[0];
 }
 
-static void rna_SpaceProperties_tab_search_results_get(PointerRNA *ptr, bool *values)
+static void rna_SpaceProperties_tab_search_results_get(PointerRNA *UNUSED(ptr),
+                                                       bool *UNUSED(values))
 {
-  SpaceProperties *sbuts = ptr->data;
-
-  short context_tabs_array[BCONTEXT_TOT * 2]; /* Dummy variable. */
-  const int tabs_len = ED_buttons_tabs_list(sbuts, context_tabs_array);
-
-  for (int i = 0; i < tabs_len; i++) {
-    values[i] = ED_buttons_tab_has_search_result(sbuts, i);
-  }
+  /* No tabs exist to search. */
 }
 
-static void rna_SpaceProperties_search_filter_get(PointerRNA *ptr, char *value)
+static void rna_SpaceProperties_search_filter_get(PointerRNA *UNUSED(ptr), char *value)
 {
-  SpaceProperties *sbuts = ptr->data;
-  const char *search_filter = ED_buttons_search_string_get(sbuts);
-
-  strcpy(value, search_filter);
+  value[0] = '\0';
 }
 
-static int rna_SpaceProperties_search_filter_length(PointerRNA *ptr)
+static int rna_SpaceProperties_search_filter_length(PointerRNA *UNUSED(ptr))
 {
-  SpaceProperties *sbuts = ptr->data;
-
-  return ED_buttons_search_string_length(sbuts);
+  return 0;
 }
 
-static void rna_SpaceProperties_search_filter_set(struct PointerRNA *ptr, const char *value)
+static void rna_SpaceProperties_search_filter_set(struct PointerRNA *UNUSED(ptr),
+                                                  const char *UNUSED(value))
 {
-  SpaceProperties *sbuts = ptr->data;
-
-  ED_buttons_search_string_set(sbuts, value);
+  /* No tabs exist to filter. */
 }
 
 static void rna_SpaceProperties_search_filter_update(Main *UNUSED(bmain),

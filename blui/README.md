@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 7 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball` (1,034 KB) |
+      | Editor modules deleted | 8 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons` (1,139 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -1192,7 +1192,7 @@ The work is staged so the build stays green at every step.
       the directory - which is the same lesson as the include sweeps, arrived at
       from the other direction.
 
-      ### `space_buttons` is NOT fully scoped: it hosts shared UI templates
+      ### `editors/space_buttons/` is deleted, in four layers
 
       CORRECTION, one round later. The heading here used to claim this module was
       "fully scoped" - seven RNA callbacks plus one call in `screen/area.cc`.
@@ -1214,18 +1214,28 @@ The work is staged so the build stays green at every step.
       `uiTemplateTextureUser` are the image-user template for texture datablocks:
       a 3D feature BLUI has no use for, whose *callers* are in modules BLUI keeps.
 
-      The attempt was reverted rather than left half-finished - the tree is back
-      at `c19fc60` with a green build. Never leave a red tree; a lost round is
-      cheaper than a broken fork.
+      The first attempt cut only layer 1 and was reverted - the tree was put back
+      at `c19fc60` rather than left red. The second cut all four and is green.
 
-      The measurement below is still correct, but it is layer 1 of four:
-
-      2. the `uiTemplateTexture*` definitions and their entries in `UI_interface.h`;
-      3. the RNA definition in `rna_ui.c` that generates `uiTemplateTextureUser`,
-         plus its call in `interface_templates.cc`;
+      1. the seven `rna_SpaceProperties_*` callbacks in `makesrna/rna_space.c`,
+         the `ED_buttons_search_string_get()` call in `screen/area.cc`, and the
+         two `ED_buttons_*` calls in the doomed outliner;
+      2. the `uiTemplateTexture*` definitions and their entries in
+         `UI_interface.h`;
+      3. the `UILayout.template_texture_user` RNA definition in `rna_ui_api.c`
+         that generates the wrapper in `rna_ui_gen.c`, plus its one call in
+         `interface_templates.cc`;
       4. `buttons_context_dir` in `buttons_context.c` and its name in `bpy.c`.
 
-      Layer 1, which is measured and necessary but not sufficient:
+      Layers 2-4 are the point: `space_buttons` was not only the Properties
+      editor. It also owned UI *templates* that the interface layer and the
+      generated RNA call, and a Python context directory. That is shared
+      machinery which sat here because the module was named after the space it
+      served rather than after what it provides. `uiTemplateTextureShow` /
+      `uiTemplateTextureUser` are the image-user template for texture datablocks -
+      a 3D feature BLUI has no use for, whose callers were in modules BLUI keeps.
+
+      Layer 1 alone, for the record - necessary, but not sufficient:
 
       The Properties editor is unregistered, so it is unreachable - but unlike
       `lattice` and `metaball` it is not held in place by doomed code. Both

@@ -22,7 +22,6 @@ set(SRC
 
 set(LIB
   bf_editor_geometry
-  bf_editor_space_buttons
   bf_editor_space_clip
   bf_editor_space_console
   bf_editor_space_file

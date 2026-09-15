@@ -465,7 +465,6 @@ PyDoc_STRVAR(
     "   :rtype: dict\n");
 static PyObject *bpy_context_members(PyObject *UNUSED(self))
 {
-  extern const char *buttons_context_dir[];
   extern const char *clip_context_dir[];
   extern const char *file_context_dir[];
   extern const char *image_context_dir[];
@@ -479,7 +478,6 @@ static PyObject *bpy_context_members(PyObject *UNUSED(self))
     const char *name;
     const char **dir;
   } context_members_all[] = {
-      {"buttons", buttons_context_dir},
       {"clip", clip_context_dir},
       {"file", file_context_dir},
       {"image", image_context_dir},

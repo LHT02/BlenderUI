@@ -33,7 +33,6 @@
 #include "WM_toolsystem.h"
 #include "WM_types.h"
 
-#include "ED_buttons.h"
 #include "ED_screen.h"
 #include "ED_screen_types.h"
 #include "ED_space_api.h"
@@ -755,14 +754,10 @@ void ED_area_tag_refresh(ScrArea *area)
 
 const char *ED_area_region_search_filter_get(const ScrArea *area, const ARegion *region)
 {
-  /* Only the properties editor has a search string for now. */
-  if (area->spacetype == SPACE_PROPERTIES) {
-    SpaceProperties *sbuts = static_cast<SpaceProperties *>(area->spacedata.first);
-    if (region->regiontype == RGN_TYPE_WINDOW) {
-      return ED_buttons_search_string_get(sbuts);
-    }
-  }
-
+  (void)area;
+  (void)region;
+  /* BLUI removed `editors/space_buttons`. The Properties editor was the only
+   * space with a region search string, so there is nothing to return now. */
   return nullptr;
 }
 

@@ -1632,9 +1632,6 @@ static void template_ID(const bContext *C,
     }
   }
 
-  if (template_ui->idcode == ID_TE) {
-    uiTemplateTextureShow(layout, C, &template_ui->ptr, template_ui->prop);
-  }
   UI_block_align_end(block);
 }
 

@@ -43,7 +43,6 @@
 #include "DEG_depsgraph_build.h"
 
 #include "ED_armature.h"
-#include "ED_buttons.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
 #include "ED_screen.h"
@@ -1188,15 +1187,17 @@ static void outliner_sync_to_properties_editors(const bContext *C,
   bScreen *screen = CTX_wm_screen(C);
 
   LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+    /* BLUI removed `editors/space_buttons`. A Properties area - the only thing
+     * this loop ever acted on - can no longer exist, so there is nothing to
+     * sync. The loop is kept rather than deleted because it is `space_outliner`
+     * code and dies with that module. */
     if (area->spacetype != SPACE_PROPERTIES) {
       continue;
     }
-
-    SpaceProperties *sbuts = (SpaceProperties *)area->spacedata.first;
-    if (ED_buttons_should_sync_with_outliner(C, sbuts, area)) {
-      ED_buttons_set_context(C, sbuts, ptr, context);
-    }
   }
+
+  (void)ptr;
+  (void)context;
 }
 
 static void outliner_set_properties_tab(bContext *C, TreeElement *te, TreeStoreElem *tselem)
