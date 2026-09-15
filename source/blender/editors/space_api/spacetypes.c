@@ -96,11 +96,9 @@ void ED_spacetypes_init(void)
   ED_operatortypes_object();
   ED_operatortypes_mesh();
   ED_operatortypes_sculpt();
-  ED_operatortypes_sculpt_curves();
   ED_operatortypes_uvedit();
   ED_operatortypes_paint();
   ED_operatortypes_physics();
-  ED_operatortypes_curves();
   ED_operatortypes_marker();
   ED_operatortypes_sound();
   ED_operatortypes_render();
@@ -201,7 +199,6 @@ void ED_spacetypes_keymap(wmKeyConfig *keyconf)
   ED_keymap_object(keyconf);
   ED_keymap_mesh(keyconf);
   ED_keymap_uvedit(keyconf);
-  ED_keymap_curves(keyconf);
   ED_keymap_physics(keyconf);
   ED_keymap_paint(keyconf);
   ED_keymap_mask(keyconf);
