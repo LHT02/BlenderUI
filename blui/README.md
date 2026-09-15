@@ -258,6 +258,17 @@ everything. That is wrong for this product. Each window should stand on its
 own — an image viewer showing a photo, a text editor on a file, a file browser
 on a folder — and closing or saving one must not touch the others.
 
+Started: `wm.window_new` takes a `workspace` argument, so a component can be
+opened in a window of its own rather than as a tab in someone else's. Reachable
+from the BLUI app menu under *New Window ▸ Files / Images / Text / Video /
+Settings / Console*, and it is what a system tray entry would call.
+Verified: `wm.window_new(workspace="Settings")` produces a second window whose
+workspace is `Settings` holding a `PREFERENCES` area, while `wm.window_new()`
+with no argument still copies the current component.
+
+Still shared: all windows read one `Main`, so they are independent in what they
+*show* but not yet in the data they hold.
+
 **Saving is per file, and isolated.** Saving in the image editor writes the
 image, saving in the text editor writes the text file, and neither writes a
 container that the other could clobber. Blender's `.blend` remains only as

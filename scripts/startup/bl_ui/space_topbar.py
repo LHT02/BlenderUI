@@ -209,21 +209,30 @@ class TOPBAR_MT_editor_menus(Menu):
         layout.menu("TOPBAR_MT_help")
 
 
+class TOPBAR_MT_blui_components(Menu):
+    """Open a BLUI component in a window of its own.
+
+    BLUI has no workspace tab strip: a component *is* a window. This is the
+    list a system tray entry would offer too.
+    """
+
+    bl_label = "New Window"
+
+    def draw(self, _context):
+        layout = self.layout
+        for name in ("Files", "Images", "Text", "Video", "Settings", "Console"):
+            props = layout.operator("wm.window_new", text=name)
+            props.workspace = name
+
+
 class TOPBAR_MT_blender(Menu):
     bl_label = "BLUI"
 
     def draw(self, _context):
         layout = self.layout
 
-        # BLUI: the splash is disabled (USER_SPLASH_DISABLE), and its only other
-        # route was into the app-template / New File menus, which are built
-        # around .blend documents BLUI does not use. About stays.
+        layout.menu("TOPBAR_MT_blui_components", icon='ADD')
         layout.operator("wm.splash_about")
-
-        layout.separator()
-
-        layout.operator("preferences.app_template_install",
-                        text="Install Application Template...")
 
         layout.separator()
 
@@ -913,6 +922,7 @@ classes = (
     TOPBAR_MT_editor_menus,
     TOPBAR_MT_blender,
     TOPBAR_MT_blender_system,
+    TOPBAR_MT_blui_components,
     TOPBAR_MT_file,
     TOPBAR_MT_file_new,
     TOPBAR_MT_file_recover,

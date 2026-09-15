@@ -2027,10 +2027,20 @@ static void WM_OT_window_new(wmOperatorType *ot)
 {
   ot->name = "New Window";
   ot->idname = "WM_OT_window_new";
-  ot->description = "Create a new window";
+  ot->description = "Create a new window, optionally showing a named component";
 
   ot->exec = wm_window_new_exec;
   ot->poll = wm_operator_winactive_normal;
+
+  /* BLUI: naming a component (workspace) opens that component in its own
+   * window instead of copying whatever this window was showing. */
+  RNA_def_string(ot->srna,
+                 "workspace",
+                 NULL,
+                 MAX_NAME,
+                 "Component",
+                 "Name of the component to show in the new window, such as \"Files\" "
+                 "or \"Settings\". Leave empty to copy the current one");
 }
 
 static void WM_OT_window_new_main(wmOperatorType *ot)

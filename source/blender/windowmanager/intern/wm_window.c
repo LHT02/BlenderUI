@@ -23,6 +23,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_listbase.h"
 #include "BLI_system.h"
 #include "BLI_utildefines.h"
 
@@ -1026,22 +1027,47 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
   wmWindow *win_src = CTX_wm_window(C);
   ScrArea *area = BKE_screen_find_big_area(CTX_wm_screen(C), SPACE_TYPE_ANY, 0);
 
-  bool ok = (WM_window_open(C,
-                            IFACE_(BLUI_PRODUCT_NAME),
-                            0,
-                            0,
-                            win_src->sizex * 0.95f,
-                            win_src->sizey * 0.9f,
-                            area->spacetype,
-                            false,
-                            false,
-                            false,
-                            WIN_ALIGN_PARENT_CENTER) != NULL);
+  wmWindow *win_new = WM_window_open(C,
+                                     IFACE_(BLUI_PRODUCT_NAME),
+                                     0,
+                                     0,
+                                     win_src->sizex * 0.95f,
+                                     win_src->sizey * 0.9f,
+                                     area->spacetype,
+                                     false,
+                                     false,
+                                     false,
+                                     WIN_ALIGN_PARENT_CENTER);
 
-  if (!ok) {
+  if (win_new == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Failed to create window");
     return OPERATOR_CANCELLED;
   }
+
+  /* BLUI: let the caller choose which component the new window shows.
+   *
+   * Blender opens a new window on the same workspace and treats workspaces as
+   * tabs within one document. BLUI has no such document: a component is a
+   * window, so "open Settings" means a window running the Settings component.
+   * Naming the workspace is what makes that possible, and it is also what a
+   * system tray entry would call.
+   */
+  char workspace_name[MAX_NAME];
+  RNA_string_get(op->ptr, "workspace", workspace_name);
+  if (workspace_name[0] != '\0') {
+    Main *bmain = CTX_data_main(C);
+    /* Workspace names carry the two character ID prefix, hence the `+ 2`. */
+    WorkSpace *workspace = BLI_findstring(
+        &bmain->workspaces, workspace_name, offsetof(ID, name) + 2);
+    if (workspace != NULL) {
+      BKE_workspace_active_set(win_new->workspace_hook, workspace);
+    }
+    else {
+      BKE_reportf(
+          op->reports, RPT_WARNING, "No component named \"%s\"", workspace_name);
+    }
+  }
+
   return OPERATOR_FINISHED;
 }
 
