@@ -171,18 +171,20 @@ void ED_spacemacros_init(void)
   ED_operatormacros_mesh();
   ED_operatormacros_uvedit();
   ED_operatormacros_metaball();
-  ED_operatormacros_node();
+  /* `ED_operatormacros_node()` went with the node editor. Its macros are built
+   * from node operators that are no longer registered, and that is where the
+   * ten `OperatorProperties.* not found` lines at startup came from. The keymap
+   * data names no node operator outside a helper nothing calls. */
   ED_operatormacros_object();
   ED_operatormacros_file();
-  /* `ED_operatormacros_action()` went with the Dope Sheet module, and
-   * `ED_operatormacros_nla()` with the NLA module. */
+  /* `ED_operatormacros_action()` went with the Dope Sheet module,
+   * `ED_operatormacros_nla()` with the NLA editor. */
   ED_operatormacros_clip();
   ED_operatormacros_curve();
   ED_operatormacros_mask();
   ED_operatormacros_sequencer();
   ED_operatormacros_paint();
   ED_operatormacros_gpencil();
-  /* `ED_operatormacros_nla()` went with the NLA editor module. */
 
   /* Register dropboxes (can use macros). */
   ED_dropboxes_ui();

@@ -448,20 +448,26 @@ Two things are deliberately *not* covered, and are worth doing by hand:
 
 ### Known cosmetic issue
 
-Starting BLUI prints ten lines of the form
+Starting BLUI used to print ten lines of `OperatorProperties.* not found`.
+**Eight of them are gone** - they came from `ED_operatormacros_node()`, which
+built the node editor's macros out of steps naming node operators that are no
+longer registered, so `RNA_boolean_set(mot->ptr, "socket_select", true)` ran on
+a macro step that was never created. That call is removed and the lines with it.
+
+Two remain, of the form
 
 ```
-RNA_boolean_set: OperatorProperties.extend not found.
 Warning: property 'mode' not found in item 'OperatorProperties'
 ```
 
-They come from `ED_operatormacros_node()`, which builds the node editor's macro
-operators out of steps naming node operators BLUI no longer registers -
-`RNA_boolean_set(mot->ptr, "socket_select", true)` on a macro step that was
-never created. They are harmless: the property is skipped and nothing is
-disabled by it.
+They are the benign half of the same mechanism: `bl_keymap_utils/io.py` walks a
+keymap item's properties and prints this instead of raising when a property is
+absent, so the item is created without it and nothing is disabled. They are not
+in `keymap_data/*.py` as `["mode", ...]`, so the item that carries them is
+somewhere else - `keymap_hierarchy.py`, or a modal map built in C. Worth one more
+look; not worth blocking on.
 
-**They cannot be removed by deleting the macro registration on its own.** That
+**The macro calls cannot be removed by deleting the registration alone.** That
 was tried, and it made BLUI start with *no keymaps at all*: dropping the twelve
 3D `ED_operatormacros_*` calls broke the whole key configuration load.
 `bl_keymap_utils/io.py` walks a macro's nested properties with
@@ -470,6 +476,12 @@ first keymap item naming a missing macro aborts the load -
 `("TRANSFORM_OT_edge_slide", ...)` in the mesh keymap, from `mesh_ops.c:225`.
 The operator registration and the keymap data that names it have to be removed
 in the same step, and that is the shape of the remaining Stage 2 work.
+
+`ED_operatormacros_action()` and `_graph()` came out safely, and `_node()` too -
+the keymap data names no node operator outside a helper nothing calls. Each was
+checked with `check_keymap_config.py` before believing the build. `_mesh()`,
+`_uvedit()`, `_object()`, `_curve()`, `_armature()`, `_metaball()`, `_clip()`
+and `_mask()` are still in, and each needs its keymap data removed with it.
 
 Nothing in the suite noticed at the time, which is why `check_keymap_config.py`
 now exists. It was verified against the failure on purpose: dropping
