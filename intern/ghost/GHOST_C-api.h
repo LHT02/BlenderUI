@@ -94,6 +94,32 @@ extern GHOST_TSuccess GHOST_StartDragFiles(GHOST_WindowHandle windowhandle,
                                            bool *r_started);
 
 /**
+ * Show the operating system's context menu for a set of files.
+ *
+ * On Windows this hosts the real shell menu, so it carries the entries
+ * Explorer shows, including those installed by other programs and, thanks to
+ * `CMF_EXTENDEDVERBS`, the ones Windows 11 hides behind "Show more options".
+ *
+ * All paths must share a parent folder, because one `IContextMenu` serves one
+ * folder. Entries outside the common parent are ignored.
+ *
+ * Blocks while the menu is open.
+ *
+ * \param windowhandle: Window that owns the menu.
+ * \param filepaths: Array of NUL terminated UTF-8 file paths.
+ * \param filepath_count: Number of entries in \a filepaths.
+ * \param screen_x: Screen coordinate to show the menu at.
+ * \param screen_y: Screen coordinate to show the menu at.
+ * \return #GHOST_kSuccess if the user picked an entry and it ran,
+ *         #GHOST_kFailure otherwise (including "the menu was dismissed").
+ */
+extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
+                                                 const char *const *filepaths,
+                                                 int filepath_count,
+                                                 int screen_x,
+                                                 int screen_y);
+
+/**
  * Creates an event consumer object
  * \param eventCallback: The event callback routine.
  * \param userdata: Pointer to user data returned to the callback routine.

@@ -467,6 +467,7 @@ elseif(WIN32)
     intern/GHOST_DisplayManagerWin32.cc
     intern/GHOST_DragSourceWin32.cc
     intern/GHOST_DropTargetWin32.cc
+    intern/GHOST_ShellMenuWin32.cc
     intern/GHOST_SystemWin32.cc
     intern/GHOST_TrackpadWin32.cc
     intern/GHOST_WindowWin32.cc
@@ -476,6 +477,7 @@ elseif(WIN32)
     intern/GHOST_DisplayManagerWin32.hh
     intern/GHOST_DragSourceWin32.hh
     intern/GHOST_DropTargetWin32.hh
+    intern/GHOST_ShellMenuWin32.hh
     intern/GHOST_SystemWin32.hh
     intern/GHOST_TaskbarWin32.hh
     intern/GHOST_TrackpadWin32.hh

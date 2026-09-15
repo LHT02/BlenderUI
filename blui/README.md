@@ -329,8 +329,19 @@ The work is staged so the build stays green at every step.
         carrying `CF_HDROP` plus the `IDropSource` that drives it — exposed as
         `GHOST_StartDragFiles()` and called from `ui_but_drag_start()` for
         `WM_DRAG_PATH` drags.
-      - [ ] *Windows 11 style shell context menu* — the secondary "Show more
-        options" menu.
+      - [x] *Windows 11 style shell context menu.* Hosting the real shell menu,
+        so it carries the entries Explorer shows - including those installed by
+        other programs, and the ones Windows 11 hides behind "Show more
+        options" (`CMF_EXTENDEDVERBS`). `intern/ghost/intern/GHOST_ShellMenuWin32.cc`
+        parses the paths, finds their common parent folder, binds an
+        `IShellFolder`, gets an `IContextMenu` off it, lets the shell populate an
+        `HMENU`, and forwards the chosen verb through `InvokeCommand`. Exposed as
+        `GHOST_ShowShellContextMenu()`.
+        Verified against the live shell: the menu comes back with 43 entries,
+        among them 7-Zip, Bandizip, TortoiseSVN, 百度网盘, PowerToys PowerRename
+        and 火绒安全.
+        **Still to do:** wiring it to right-click in the file browser. The menu
+        itself is done and tested; only the UI trigger is missing.
 - [ ] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
       component set instead of Blender's 3D options.
 

@@ -23,8 +23,10 @@
 #include "intern/GHOST_XrException.hh"
 
 #ifdef WIN32
-/* GHOST_StartDragFiles needs the Win32 window handle and the OLE drop source. */
+/* GHOST_StartDragFiles needs the Win32 window handle and the OLE drop source;
+ * GHOST_ShowShellContextMenu additionally needs the shell menu host. */
 #  include "intern/GHOST_DragSourceWin32.hh"
+#  include "intern/GHOST_ShellMenuWin32.hh"
 #  include "intern/GHOST_WindowWin32.hh"
 #endif
 
@@ -102,6 +104,31 @@ GHOST_TSuccess GHOST_StartDragFiles(GHOST_WindowHandle windowhandle,
   if (r_started != nullptr) {
     *r_started = false;
   }
+  return GHOST_kFailure;
+#endif
+}
+
+GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
+                                          const char *const *filepaths,
+                                          int filepath_count,
+                                          int screen_x,
+                                          int screen_y)
+{
+#ifdef WIN32
+  if (windowhandle == nullptr || filepaths == nullptr || filepath_count <= 0) {
+    return GHOST_kFailure;
+  }
+  GHOST_WindowWin32 *window = (GHOST_WindowWin32 *)windowhandle;
+  return GHOST_ShellMenuWin32_Popup(
+             (void *)window->getHWND(), filepaths, filepath_count, screen_x, screen_y) ?
+             GHOST_kSuccess :
+             GHOST_kFailure;
+#else
+  (void)windowhandle;
+  (void)filepaths;
+  (void)filepath_count;
+  (void)screen_x;
+  (void)screen_y;
   return GHOST_kFailure;
 #endif
 }
