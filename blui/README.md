@@ -961,6 +961,34 @@ The work is staged so the build stays green at every step.
       No keymap data is involved - there is no `constraint.*` entry in either
       keymap file - which is why the usual signals said nothing.
 
+      ### `editors/uvedit/` is the next module, and it is four calls short
+
+      Measured the same way the space types were, and it is closer to deletable
+      than anything else left - 14 files, 591 KB, with 29 functions declared in
+      `ED_uvedit.h` and only 16 calls from outside the module.
+
+      Most of those callers are doomed (`transform` 6, `sculpt_paint` 4,
+      `mesh` 2) and one header include comes from `sculpt_paint/sculpt_uv.cc`,
+      also doomed. What keeps it in place is **four calls from modules that
+      stay**:
+
+      | Call | From |
+      | --- | --- |
+      | `ED_uvedit_buttons_register(art)` | `space_image/space_image.c:1132` |
+      | `ED_uvedit_minmax_multi(...)` | `space_image/image_ops.c:958` |
+      | `ED_uvedit_get_aspect(ob, ...)` | `makesrna/intern/rna_scene_api.c:92` |
+      | `ED_uvedit_selectmode_clean_multi(C)` | `makesrna/intern/rna_scene.c:1968` |
+
+      Two are image-editor UI (a buttons region and a min/max operator), one is
+      an RNA property, one is select-mode cleanup. Each needs a product decision
+      rather than a mechanical edit - the image editor is a viewer, so the UI
+      two are probably dead, but `ED_uvedit_get_aspect` backs something in
+      `rna_scene_api.c` that has to be identified before it can go.
+
+      That is the whole remaining distance: four decisions, then 591 KB and a
+      module. Worth stating because it is the first time the answer has been
+      "four known things" rather than a category.
+
       ### What deleting a module actually involves
 
       | Symbol | Refs | Files |
