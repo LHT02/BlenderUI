@@ -330,6 +330,29 @@ Verified: builds, starts, and the existing checks still pass. **The
 close-every-window-then-use-the-tray path is not covered by an automated test** -
 it needs a real click on the tray icon - so that is worth exercising by hand.
 
+## Verified state
+
+Everything below is checked by a script in `blui/tools/`, not asserted from
+memory. Run them after any change; none of them need a person watching.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| OLE drop source (`CF_HDROP` payload + COM contract) | `build\dragsource_selftest.exe` | PASS, 0 failures |
+| Shell context menu (bind, populate, enumerate) | `build\shellmenu_selftest.exe` | PASS, 0 failures |
+| Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
+| Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
+| Window / editor isolation (two Text windows) | `check_window_isolation.py` | ISOLATED |
+| Opening a component in its own window | `check_component_window.py` | PASS |
+| Click sweep, 144 points, whole window | `click_sweep.py` | no crash, no crash log |
+| Configuration isolation | — | `%APPDATA%\Blender Foundation` untouched |
+
+Two things are deliberately *not* covered, and are worth doing by hand:
+
+* whether the tray icon is visible and its menu works after every window is
+  closed - that needs a real click on the icon;
+* whether a drag from the file browser lands in another application - the OLE
+  loop cannot be driven by injected events.
+
 ## Roadmap
 
 The work is staged so the build stays green at every step.
