@@ -5369,8 +5369,11 @@ def km_image_editor_tool_uv_rip_region(params):
         "Image Editor Tool: Uv, Rip Region",
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("uv.rip_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
-             {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
+            # BLUI removed the nested `TRANSFORM_OT_translate` macro
+            # sub-property here. `uv.rip_move` is a UV macro, and the loader
+            # raises on a macro sub-property whose macro is no longer
+            # registered, which takes the whole key configuration with it.
+            ("uv.rip_move", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 

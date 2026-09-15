@@ -167,7 +167,6 @@ void ED_spacemacros_init(void)
    *
    * An operator and the keymap data that names it have to be removed in the
    * same step. */
-  ED_operatormacros_uvedit();
   /* BLUI registers macros only for the modes it still has keymaps for.
    * `_metaball()`, `_armature()`, `_curve()`, `_clip()` and `_mask()` are gone,
    * each verified by `check_keymap_config.py` to leave the configuration
