@@ -2480,7 +2480,8 @@ classes = (
     USERPREF_PT_animation_keyframes,
     USERPREF_PT_animation_fcurves,
 
-    USERPREF_PT_system_cycles_devices,
+    # BLUI: USERPREF_PT_system_cycles_devices is not registered - BLUI has no
+    # Cycles, so the panel could only ever draw an empty box.
     USERPREF_PT_system_gpu_backend,
     USERPREF_PT_system_os_settings,
     USERPREF_PT_system_memory,

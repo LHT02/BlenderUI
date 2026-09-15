@@ -40,31 +40,31 @@
 
 #include "BLT_lang.h"
 
+/* BLUI: the preferences sections the product actually has settings for.
+ *
+ * Blender's list also carries Viewport, Lights, Animation, Navigation and
+ * Experimental. Those exist to tune a 3D authoring tool - viewport quality,
+ * studio lights, keyframe defaults, orbit and fly/walk navigation, and
+ * prototypes for work in progress. BLUI is a file browser, an image viewer, a
+ * text editor and (later) a video editor, so none of them have anything to
+ * configure, and a panel whose context is not in this list is never drawn.
+ *
+ * Add-ons is kept deliberately: BLUI ships none of its own, but leaving the
+ * section in place keeps the product extensible.
+ */
 const EnumPropertyItem rna_enum_preference_section_items[] = {
     {USER_SECTION_INTERFACE, "INTERFACE", 0, "Interface", ""},
     {USER_SECTION_THEME, "THEMES", 0, "Themes", ""},
-    {USER_SECTION_VIEWPORT, "VIEWPORT", 0, "Viewport", ""},
-    {USER_SECTION_LIGHT, "LIGHTS", 0, "Lights", ""},
+    RNA_ENUM_ITEM_SEPR,
     {USER_SECTION_EDITING, "EDITING", 0, "Editing", ""},
-    {USER_SECTION_ANIMATION, "ANIMATION", 0, "Animation", ""},
-    RNA_ENUM_ITEM_SEPR,
-    {USER_SECTION_ADDONS, "ADDONS", 0, "Add-ons", ""},
-#if 0 /* def WITH_USERDEF_WORKSPACES */
-    RNA_ENUM_ITEM_SEPR,
-    {USER_SECTION_WORKSPACE_CONFIG, "WORKSPACE_CONFIG", 0, "Configuration File", ""},
-    {USER_SECTION_WORKSPACE_ADDONS, "WORKSPACE_ADDONS", 0, "Add-on Overrides", ""},
-    {USER_SECTION_WORKSPACE_KEYMAPS, "WORKSPACE_KEYMAPS", 0, "Keymap Overrides", ""},
-#endif
-    RNA_ENUM_ITEM_SEPR,
     {USER_SECTION_INPUT, "INPUT", 0, "Input", ""},
-    {USER_SECTION_NAVIGATION, "NAVIGATION", 0, "Navigation", ""},
     {USER_SECTION_KEYMAP, "KEYMAP", 0, "Keymap", ""},
     RNA_ENUM_ITEM_SEPR,
     {USER_SECTION_SYSTEM, "SYSTEM", 0, "System", ""},
     {USER_SECTION_SAVE_LOAD, "SAVE_LOAD", 0, "Save & Load", ""},
     {USER_SECTION_FILE_PATHS, "FILE_PATHS", 0, "File Paths", ""},
     RNA_ENUM_ITEM_SEPR,
-    {USER_SECTION_EXPERIMENTAL, "EXPERIMENTAL", 0, "Experimental", ""},
+    {USER_SECTION_ADDONS, "ADDONS", 0, "Add-ons", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -544,21 +544,11 @@ static const EnumPropertyItem *rna_UseDef_active_section_itemf(bContext *UNUSED(
     return rna_enum_preference_section_items;
   }
 
-  EnumPropertyItem *items = NULL;
-  int totitem = 0;
-
-  for (const EnumPropertyItem *it = rna_enum_preference_section_items; it->identifier != NULL;
-       it++) {
-    if (it->value == USER_SECTION_EXPERIMENTAL) {
-      continue;
-    }
-    RNA_enum_item_add(&items, &totitem, it);
-  }
-
-  RNA_enum_item_end(&items, &totitem);
-
-  *r_free = true;
-  return items;
+  /* BLUI: the section list no longer contains the developer-only Experimental
+   * section, so there is nothing left to filter out for regular users. The
+   * function is kept because the property is registered against it. */
+  *r_free = false;
+  return rna_enum_preference_section_items;
 }
 
 static PointerRNA rna_UserDef_view_get(PointerRNA *ptr)

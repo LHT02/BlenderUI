@@ -368,8 +368,25 @@ The work is staged so the build stays green at every step.
         stay where they were. That also mirrors the two-level shape Windows 11
         itself uses, where "Show more options" leads to the full shell menu.
         Operator: `file.shell_context_menu` in `editors/space_file/file_ops.c`.
-- [ ] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
+- [~] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
       component set instead of Blender's 3D options.
+      - [x] Section list trimmed from 14 tabs to 9. Blender's Viewport, Lights,
+        Animation, Navigation and Experimental sections exist to tune a 3D
+        authoring tool - viewport quality, studio lights, keyframe defaults,
+        orbit and fly/walk navigation, and prototypes for work in progress -
+        and none of them have anything to configure for a file browser, an image
+        viewer or a text editor. They are removed from
+        `rna_enum_preference_section_items`, and a panel whose context is not in
+        that list is never drawn, so their panels become unreachable without
+        being deleted. Add-ons is kept on purpose: BLUI ships none of its own,
+        but leaving the section in keeps the product extensible.
+        Verified: the live enum reports `INTERFACE, THEMES, EDITING, INPUT,
+        KEYMAP, SYSTEM, SAVE_LOAD, FILE_PATHS, ADDONS`.
+      - [x] The "Cycles Render Devices" panel is no longer registered - BLUI has
+        no Cycles, so it could only ever draw an empty box.
+      - [ ] Trim the remaining 3D panels inside *Editing* (only its Text Editor
+        panel is meaningful) and *Save & Load* (Blend Files and Auto Save are
+        about a document BLUI does not have).
 
 ### Licensing
 
