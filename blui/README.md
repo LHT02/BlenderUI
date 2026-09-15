@@ -552,6 +552,38 @@ The work is staged so the build stays green at every step.
       coupling has been measured rather than estimated, so it is the one to
       prove the pattern on before repeating it 26 times:
 
+      > **Done.** `space_spreadsheet` is deleted (24 files / 132 KB). What the
+      > attempt taught is below, and the pattern is now known.
+
+      ### Measure function leakage, not just types and headers
+
+      The next target was chosen by counting, for each remaining module, how
+      many *external* references its space-type enum and its DNA struct had, and
+      how many of its headers other modules `#include`. On that basis
+      `space_outliner` looked like the least coupled of the seven candidates -
+      30 enum refs in 15 files, 20 struct refs in 8, and **zero** headers
+      included from outside.
+
+      It is not. Deleting it failed at once, because its **functions** leak far
+      more widely than its types do: `ED_outliner_select_sync_from_{object,edit_bone,pose_bone,sequence,all}_tag()`
+      is called from about fifty places in roughly fifteen files, and several of
+      those files are in modules that *stay* - `space_sequencer`, `undo`,
+      `windowmanager`, `makesrna`. `ED_outliner_give_base_under_cursor()` and
+      `ED_outliner_collections_editor_poll()` are used by the interface
+      eyedropper and by `object_edit.cc` respectively.
+
+      So the three cheap counts are not enough. Before picking a module, also
+      count how many times its **public functions** are called from outside it,
+      and whether those callers survive. A module whose callers are all in other
+      doomed modules is cheap; one whose callers are in `space_sequencer` or
+      `windowmanager` is not, however small its enum surface looks.
+
+      The outliner deletion was started and reverted. Reverting is
+      `git checkout -- .` in `source/`, which restores deleted files as well as
+      edits.
+
+      ### What deleting a module actually involves
+
       | Symbol | Refs | Files |
       | --- | --- | --- |
       | `SPACE_SPREADSHEET` | 25 | 16 |
