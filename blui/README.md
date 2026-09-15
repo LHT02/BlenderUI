@@ -661,10 +661,38 @@ The work is staged so the build stays green at every step.
       nothing outside it calls in, and expensive when it exports **UI template
       callbacks**, **context directories** or **context members** - none of which
       live in a header, so none of which show up when reading. `space_buttons`
-      and `space_clip` both fail that way. The next candidates worth trying are
-      the data editors (`object`, `mesh`, `armature`, ...), which are expected
-      to be expensive for the opposite reason - they have large public headers -
-      and the remaining space types, tried one at a time against the linker.
+      and `space_clip` both fail that way.
+
+      ### The data editors are interlocked - they cannot be done one at a time
+
+      `editors/metaball` is the smallest module in the tree (5 files, 35 KB) and
+      was the obvious next try. It leaks seven symbols, and where they land is
+      the point:
+
+      | Symbol | Lands in |
+      | --- | --- |
+      | `ED_keymap_metaball` | `space_api/spacetypes.c` (stays) - one line |
+      | `ED_mball_undosys_type` | `undo/undo_system_types.cc` (stays) - one line |
+      | `ED_mball_editmball_free/make/load` | `object/object_edit.cc` |
+      | `ED_mball_add_primitive` | `object/object_add.cc` |
+      | `ED_mball_select_pick` | `space_view3d/view3d_select.cc` |
+
+      Every data editor has this shape. `undo/undo_system_types.cc` registers one
+      undosys line per data type - armature, curve, font, lattice, metaball,
+      mesh, curves, image, sculpt, particle, paintcurve, text, memfile - and
+      `object` and `space_view3d` carry the edit-mode and selection glue for all
+      of them.
+
+      So the data editors are **not** a sequence of cheap deletions. Either they
+      go as one group with `object` and `space_view3d`, or `object` and
+      `space_view3d` go first and take most of the glue with them. Both are large
+      changes, and neither is a "try it and see" - which is exactly why the four
+      that *were* cheap are worth having banked first.
+
+      For whoever continues: bank the cheap ones (the remaining space types,
+      tried against the linker one at a time), then treat `object` +
+      `space_view3d` + the data editors as a single planned block rather than
+      discovering the interlock seven times.
 
       ### What deleting a module actually involves
 
