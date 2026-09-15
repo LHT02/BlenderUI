@@ -764,24 +764,33 @@ The work is staged so the build stays green at every step.
       takes no arguments, `ED_keymap_X()` takes `keyconf`. A pattern matching
       `\(\)` silently removes only half the pair.
 
-      #### An unresolved question, recorded as such
+      #### The question from the curve triple, answered
 
-      The curve triple was removed in full - `ED_operatortypes_curve()`,
-      `ED_keymap_curve(keyconf)`, and the whole `km_curve` function with its 21
-      `curve.*` entries and its collector line. Zero unknown operators. But the
-      console went to **42** `OperatorProperties not found` lines, and only eight
-      of them were accounted for by the keymap data that came out.
+      Last round left this open: removing the curve triple gave 42
+      `OperatorProperties not found` lines and only eight were accounted for by
+      `km_curve`. A grep said only `km_curve` names a `curve.*` operator, so the
+      rest looked unaccounted for.
 
-      A grep says only `km_curve` names a `curve.*` operator, so the remaining
-      thirty-odd warnings come from something else that
-      `ED_operatortypes_curve()` supplied - and that something was **not**
-      identified. It is written here as an open question rather than a
-      conclusion, because guessing at it would be worse than leaving it: the
-      next attempt should remove the triple and read the 42 warning names
-      (`mode`, `style`, `action`) against the operators `ED_operatortypes_curve()`
-      registers, rather than trusting the `curve.*` grep.
+      They are `font.*`. **`ED_operatortypes_curve()` registers the whole
+      `FONT_OT_*` set as well as `CURVE_OT_*`** - Blender keeps 3D-text editing
+      in `editors/curve/curve_ops.c`, so one call supplies two families of
+      operators with nothing in its name to say so. `km_font` holds 46 `font.*`
+      entries, and the warning property names were `style`, `mode` and `action`,
+      which are `FONT_OT_style_set`, `_case_set` and friends.
 
-      Reverted, so the console is back to two lines.
+      So the `curve.*` grep was not wrong, it was answering a narrower question
+      than the one that mattered. The unit of removal is not "the module whose
+      name is on the function" but "everything that function registers":
+
+      ```
+      ED_operatortypes_curve()  ->  CURVE_OT_*  and  FONT_OT_*
+      ED_keymap_curve()         ->  the Curve and Font keymaps
+      keymap data               ->  km_curve (21) and km_font (46)
+      ```
+
+      That makes it a quadruple, not a triple, and the extra member is invisible
+      from the function's name. Expect the same elsewhere: `ED_operatortypes_X()`
+      is a bag, not a label.
 
       ### What deleting a module actually involves
 
