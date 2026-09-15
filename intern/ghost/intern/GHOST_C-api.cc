@@ -133,6 +133,27 @@ GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
 #endif
 }
 
+GHOST_TSuccess GHOST_GetCursorScreenPosition(int *r_x, int *r_y)
+{
+#ifdef WIN32
+  POINT point;
+  if (!GetCursorPos(&point)) {
+    return GHOST_kFailure;
+  }
+  if (r_x != nullptr) {
+    *r_x = int(point.x);
+  }
+  if (r_y != nullptr) {
+    *r_y = int(point.y);
+  }
+  return GHOST_kSuccess;
+#else
+  (void)r_x;
+  (void)r_y;
+  return GHOST_kFailure;
+#endif
+}
+
 GHOST_EventConsumerHandle GHOST_CreateEventConsumer(GHOST_EventCallbackProcPtr eventCallback,
                                                     GHOST_TUserDataPtr userdata)
 {

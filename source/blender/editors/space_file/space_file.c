@@ -625,6 +625,10 @@ static void file_operatortypes(void)
   WM_operatortype_append(FILE_OT_edit_directory_path);
   WM_operatortype_append(FILE_OT_view_selected);
   WM_operatortype_append(FILE_OT_external_operation);
+#ifdef WIN32
+  /* BLUI: host the real Windows shell menu (see file_ops.c). */
+  WM_operatortype_append(FILE_OT_shell_context_menu);
+#endif
 }
 
 /* NOTE: do not add .blend file reading on this level */

@@ -71,6 +71,12 @@ void FILE_OT_execute(struct wmOperatorType *ot);
 void FILE_OT_external_operation(struct wmOperatorType *ot);
 void file_external_operations_menu_register(void);
 
+/* BLUI: shows the operating system's context menu for the selected files.
+ * Windows only - it hosts the shell's IContextMenu. */
+#ifdef WIN32
+void FILE_OT_shell_context_menu(struct wmOperatorType *ot);
+#endif
+
 /**
  * Variation of #FILE_OT_execute that accounts for some mouse specific handling.
  * Otherwise calls the same logic.

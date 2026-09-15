@@ -340,8 +340,13 @@ The work is staged so the build stays green at every step.
         Verified against the live shell: the menu comes back with 43 entries,
         among them 7-Zip, Bandizip, TortoiseSVN, 百度网盘, PowerToys PowerRename
         and 火绒安全.
-        **Still to do:** wiring it to right-click in the file browser. The menu
-        itself is done and tested; only the UI trigger is missing.
+
+        It is reached from the file browser's context menu, as a *"Windows Shell
+        Menu..."* entry at the top rather than replacing the menu, so Blender's
+        own navigation and view entries (back, forward, parent, refresh, sort)
+        stay where they were. That also mirrors the two-level shape Windows 11
+        itself uses, where "Show more options" leads to the full shell menu.
+        Operator: `file.shell_context_menu` in `editors/space_file/file_ops.c`.
 - [ ] **Stage 5 — Preferences.** Redesign the preferences panel for BLUI's
       component set instead of Blender's 3D options.
 

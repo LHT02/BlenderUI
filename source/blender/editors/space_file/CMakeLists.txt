@@ -16,6 +16,7 @@ set(INC
   ../../render
   ../../windowmanager
   ../../../../intern/atomic
+  ../../../../intern/ghost
   ../../../../intern/guardedalloc
   ../../../../extern/fmtlib/include
 

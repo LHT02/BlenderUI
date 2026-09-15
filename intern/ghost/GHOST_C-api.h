@@ -120,6 +120,19 @@ extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle
                                                  int screen_y);
 
 /**
+ * Get the cursor position in screen coordinates.
+ *
+ * Distinct from #GHOST_GetCursorPosition(), which is window/client relative.
+ * Screen coordinates are what `TrackPopupMenu()` and friends want, so that a
+ * menu can be placed where the user actually clicked.
+ *
+ * \param r_x: Receives the x coordinate.
+ * \param r_y: Receives the y coordinate, measured from the top of the screen.
+ * \return #GHOST_kSuccess if the platform could report it.
+ */
+extern GHOST_TSuccess GHOST_GetCursorScreenPosition(int *r_x, int *r_y);
+
+/**
  * Creates an event consumer object
  * \param eventCallback: The event callback routine.
  * \param userdata: Pointer to user data returned to the callback routine.

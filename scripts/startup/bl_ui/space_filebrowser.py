@@ -534,6 +534,16 @@ class FILEBROWSER_MT_context_menu(FileBrowserMenu, Menu):
         st = context.space_data
         params = st.params
 
+        # BLUI: the real shell menu. Explorer-like file management (Open with,
+        # archive, version control, cloud upload, Properties) lives in the
+        # operating system, not in Blender's own menu; everything below this
+        # entry is Blender's navigation and view handling.
+        import sys
+        if sys.platform == "win32":
+            layout.operator("file.shell_context_menu",
+                            text="Windows Shell Menu...", icon='FILEBROWSER')
+            layout.separator()
+
         layout.operator("file.previous", text="Back")
         layout.operator("file.next", text="Forward")
         layout.operator("file.parent", text="Go to Parent")

@@ -25,6 +25,10 @@
 #  include "BLI_winstuff.h"
 #endif
 
+/* BLUI: GHOST_ShowShellContextMenu / GHOST_GetCursorScreenPosition, used by the
+ * shell context menu operator. */
+#include "GHOST_C-api.h"
+
 #include "ED_asset.h"
 #include "ED_fileselect.h"
 #include "ED_screen.h"
@@ -2029,6 +2033,106 @@ void file_external_operations_menu_register(void)
   mt->poll = file_os_operations_menu_poll;
   WM_menutype_add(mt);
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Shell Context Menu Operator
+ *
+ * BLUI: show the operating system's own context menu for the selected files,
+ * the way a file manager does.
+ *
+ * Blender's file browser has its own small context menu, which is useful for
+ * navigating (back, forward, parent, refresh, sort) but knows nothing about
+ * what this machine can actually do with a file: no "Open with", no archiver,
+ * no version control client, no cloud upload entries. Those live in the shell,
+ * and on Windows 11 half of them are hidden behind "Show more options". Hosting
+ * the shell menu is the only way to get them - see
+ * intern/ghost/intern/GHOST_ShellMenuWin32.cc.
+ *
+ * The operator is offered as an entry in the file browser's context menu rather
+ * than replacing it, so navigation and view options stay where they were.
+ * \{ */
+
+#ifdef WIN32
+
+static bool file_shell_context_menu_poll(bContext *C)
+{
+  if (!ED_operator_file_browsing_active(C)) {
+    return false;
+  }
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  return sfile != NULL && sfile->files != NULL;
+}
+
+static int file_shell_context_menu_invoke(bContext *C,
+                                          wmOperator *op,
+                                          const wmEvent *UNUSED(event))
+{
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  wmWindow *win = CTX_wm_window(C);
+
+  if (sfile == NULL || sfile->files == NULL || win == NULL || win->ghostwin == NULL) {
+    return OPERATOR_CANCELLED;
+  }
+
+  const int num_files = filelist_files_ensure(sfile->files);
+  if (num_files <= 0) {
+    return OPERATOR_CANCELLED;
+  }
+
+  char **paths = MEM_callocN(sizeof(char *) * (size_t)num_files, __func__);
+  int path_count = 0;
+
+  for (int i = 0; i < num_files; i++) {
+    if (!filelist_entry_select_index_get(sfile->files, i, CHECK_ALL)) {
+      continue;
+    }
+    FileDirEntry *file = filelist_file(sfile->files, i);
+    if (file == NULL) {
+      continue;
+    }
+    char path[FILE_MAX_LIBEXTRA];
+    filelist_file_get_full_path(sfile->files, file, path);
+    paths[path_count++] = BLI_strdup(path);
+  }
+
+  if (path_count == 0) {
+    MEM_freeN(paths);
+    BKE_report(op->reports, RPT_ERROR, "No file selected");
+    return OPERATOR_CANCELLED;
+  }
+
+  int screen_x = 0;
+  int screen_y = 0;
+  GHOST_GetCursorScreenPosition(&screen_x, &screen_y);
+
+  /* Blocks until the user picks an entry or dismisses the menu, which is what
+   * TrackPopupMenu does. */
+  const GHOST_TSuccess result = GHOST_ShowShellContextMenu(
+      win->ghostwin, (const char *const *)paths, path_count, screen_x, screen_y);
+
+  for (int i = 0; i < path_count; i++) {
+    MEM_freeN(paths[i]);
+  }
+  MEM_freeN(paths);
+
+  return (result == GHOST_kSuccess) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+}
+
+void FILE_OT_shell_context_menu(wmOperatorType *ot)
+{
+  ot->name = "Shell Context Menu";
+  ot->description =
+      "Show the operating system's context menu for the selected files, including entries "
+      "installed by other applications";
+  ot->idname = "FILE_OT_shell_context_menu";
+
+  ot->invoke = file_shell_context_menu_invoke;
+  ot->poll = file_shell_context_menu_poll;
+}
+
+#endif /* WIN32 */
 
 /** \} */
 
