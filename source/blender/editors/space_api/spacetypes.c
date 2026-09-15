@@ -156,33 +156,32 @@ void ED_spacemacros_init(void)
   /* Macros must go last since they reference other operators.
    * They need to be registered after python operators too.
    *
-   * BLUI still registers all of them, including the macros for the editors it
-   * does not have. That is not an oversight: the keymap data in
-   * `scripts/presets/keyconfig/keymap_data/` still carries items for those
-   * macros, and `bl_keymap_utils/io.py` walks a macro's nested properties with
-   * `property_unset()`, which raises rather than warning when the macro is
-   * missing. Dropping `ED_operatormacros_mesh()` alone, for instance, breaks
-   * the whole key configuration at `("TRANSFORM_OT_edge_slide", ...)` in the
-   * mesh keymap, and BLUI then starts with no keymaps at all.
+   * BLUI registers macros only for the components it keeps. Eleven have come
+   * out: node, action, graph, nla, metaball, armature, curve, clip, mask, mesh,
+   * uv and object - twelve, counting object, which was the last.
    *
-   * An operator and the keymap data that names it have to be removed in the
-   * same step. */
-  /* BLUI registers macros only for the modes it still has keymaps for.
-   * `_metaball()`, `_armature()`, `_curve()`, `_clip()` and `_mask()` are gone,
-   * each verified by `check_keymap_config.py` to leave the configuration
-   * loading.
+   * Each had to be removed **together with the keymap data that names it**, and
+   * this is the part that cannot be worked out by reading.
+   * `bl_keymap_utils/io.py` walks a macro's nested properties with
+   * `property_unset()`, which *raises* where the flat case only warns, so a
+   * single keymap entry naming a macro whose registration is gone aborts the
+   * whole key configuration load - BLUI then starts with 7 keymaps instead of
+   * 135, and Ctrl+S does nothing. The entries that had to come out of
+   * `keymap_data/blender_default.py` were:
    *
-   * `_mesh()` and `_uvedit()` stay, and they are the reason this cannot be done
-   * by reading: the keymap data still names one of their macro sub-properties -
-   * `TRANSFORM_OT_edge_slide` in the mesh keymap, and a UV one alongside it.
-   * `bl_keymap_utils/io.py` calls `property_unset()` on those, which raises
-   * rather than warns, so the whole configuration fails to load and BLUI starts
-   * with 7 keymaps instead of 135. Their keymap data has to come out first. */
-  ED_operatormacros_object();
-  /* `ED_operatormacros_metaball()`, `_armature()` and `_curve()` went with their
-   * keymaps - no keymap left names one of their macros. `_mesh()`, `_uvedit()`
-   * and `_object()` stay because a surviving keymap still names one of theirs;
-   * their keymap data has to come out first. */
+   *   mesh.loopcut_slide, mesh.offset_edge_loops_slide   TRANSFORM_OT_edge_slide
+   *   mesh.rip_move (V and Alt+V)                        MESH_OT_rip
+   *   uv.rip_move (Image Editor Rip Region tool)         TRANSFORM_OT_translate
+   *
+   * Note the third: `TRANSFORM_OT_translate` *is* registered, and looks
+   * harmless. It only breaks as a nested macro sub-property. Grepping for
+   * nested property lists found three candidates and none of them was that one;
+   * the traceback named it in a line. `check_keymap_config.py` says whether the
+   * configuration survived, the traceback says which entry killed it, and both
+   * are needed.
+   *
+   * The four left - file, sequencer, paint, gpencil - belong to components BLUI
+   * keeps, so they stay. */
   ED_operatormacros_file();
   ED_operatormacros_sequencer();
   ED_operatormacros_paint();
