@@ -4375,34 +4375,13 @@ void ED_screens_navigation_bar_tools_menu_create(bContext *C, uiLayout *layout, 
   uiItemO(layout, but_flip_str, ICON_NONE, "SCREEN_OT_region_flip");
 }
 
-static void ed_screens_statusbar_menu_create(uiLayout *layout, void *UNUSED(arg))
-{
-  PointerRNA ptr;
-
-  RNA_pointer_create(NULL, &RNA_PreferencesView, &U, &ptr);
-  uiItemR(layout, &ptr, "show_statusbar_stats", 0, IFACE_("Scene Statistics"), ICON_NONE);
-  uiItemR(layout, &ptr, "show_statusbar_scene_duration", 0, IFACE_("Scene Duration"), ICON_NONE);
-  uiItemR(layout, &ptr, "show_statusbar_memory", 0, IFACE_("System Memory"), ICON_NONE);
-  if (GPU_mem_stats_supported()) {
-    uiItemR(layout, &ptr, "show_statusbar_vram", 0, IFACE_("Video Memory"), ICON_NONE);
-  }
-  uiItemR(layout, &ptr, "show_statusbar_version", 0, IFACE_("Blender Version"), ICON_NONE);
-}
-
 static int screen_context_menu_invoke(bContext *C,
                                       wmOperator *UNUSED(op),
                                       const wmEvent *UNUSED(event))
 {
-  const ScrArea *area = CTX_wm_area(C);
   const ARegion *region = CTX_wm_region(C);
 
-  if (area && area->spacetype == SPACE_STATUSBAR) {
-    uiPopupMenu *pup = UI_popup_menu_begin(C, IFACE_("Status Bar"), ICON_NONE);
-    uiLayout *layout = UI_popup_menu_layout(pup);
-    ed_screens_statusbar_menu_create(layout, NULL);
-    UI_popup_menu_end(C, pup);
-  }
-  else if (region) {
+  if (region) {
     if (ELEM(region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER)) {
       uiPopupMenu *pup = UI_popup_menu_begin(C, IFACE_("Header"), ICON_NONE);
       uiLayout *layout = UI_popup_menu_layout(pup);
@@ -5514,7 +5493,7 @@ static void SCREEN_OT_region_blend(wmOperatorType *ot)
 static bool space_type_set_or_cycle_poll(bContext *C)
 {
   ScrArea *area = CTX_wm_area(C);
-  return (area && !ELEM(area->spacetype, SPACE_TOPBAR, SPACE_STATUSBAR));
+  return (area && area->spacetype != SPACE_TOPBAR);
 }
 
 static int space_type_set_or_cycle_exec(bContext *C, wmOperator *op)

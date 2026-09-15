@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 8 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons` (1,139 KB) |
+      | Editor modules deleted | 9 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons`, `space_statusbar` (1,144 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -1192,7 +1192,54 @@ The work is staged so the build stays green at every step.
       the directory - which is the same lesson as the include sweeps, arrived at
       from the other direction.
 
-      ### `editors/space_buttons/` is deleted, in four layers
+      ### `editors/space_statusbar/` is deleted, and the Python half is not optional
+
+      The status bar - asked for in the original brief ("remove Blender's top bar
+      and status bar") - and the smallest space left at 5 KB. The C side is a
+      dozen sites across eight files, which the build enumerates exactly once
+      `SPACE_STATUSBAR` is removed from the enum: `rna_space.c`, `rna_screen.c`,
+      `interface_template_search_menu.cc`, `interface/resources.cc`,
+      `screen_ops.c`, `screen_edit.c`, `area.cc`, `wm_event_system.cc`,
+      `wm_draw.c` and `readfile.cc`. Removing the enum first and letting the
+      compiler list the call sites is much cheaper than grepping for them.
+
+      Two cascade rather than being one-liners. `screen_ops.c`'s status-bar
+      context menu was the **only** caller of
+      `ed_screens_statusbar_menu_create()`, so the function is orphaned and has
+      to go with the branch. `wm_event_system.cc` had a whole function whose job
+      was to find the status-bar area; it now returns null.
+
+      **The part worth remembering is Python.** Deleting the C module is not
+      enough. `scripts/startup/bl_ui/space_statusbar.py` registers a `Header`
+      with `bl_space_type = 'STATUSBAR'`, and with the enum gone
+      `register_class` raises
+
+          TypeError: validating class: enum "STATUSBAR" not found in (...)
+
+      That is raised inside `bl_ui/__init__.py`'s registration loop and **aborts
+      the rest of it**, so the userpref panels in `editing`, `save_load` and
+      `file_paths` silently never registered. `check_preferences.py` failed with
+      three empty sets while every other check passed - a failure surfacing
+      nowhere near its cause, since the symptom was missing *preferences* panels
+      caused by a deleted *status bar*.
+
+      So: a space-type deletion has a Python half, and the check that catches it
+      is `check_preferences.py`, not the C build. `bpy_types.py`'s
+      `WorkSpace.status_text_set()` also imported that module to patch its draw
+      function; it now only stores the text, since there is no status bar to draw
+      it into.
+
+      One more thing for next time: the binary loads scripts from
+      `build/bin/1.0/scripts/`, not `source/scripts/`. Deleting a `bl_ui` file
+      changes nothing until the build's install step copies it - the first re-run
+      after the fix failed for exactly that reason.
+
+      The `bTheme.space_statusbar` slot and its `ThemeSpaceStatusBar` RNA are
+      deliberately left as shells, the same decision as for `SpaceProperties`:
+      they are user-preference colour data for a space that can no longer exist,
+      and removing them reaches into the verified preferences panels.
+
+      ### `space_buttons` is deleted, in four layers
 
       CORRECTION, one round later. The heading here used to claim this module was
       "fully scoped" - seven RNA callbacks plus one call in `screen/area.cc`.

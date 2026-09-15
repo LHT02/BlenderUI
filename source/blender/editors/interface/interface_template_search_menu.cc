@@ -641,7 +641,6 @@ static MenuSearch_Data *menu_items_from_ui_create(
                              "CLIP_MT_tracking_editor_menus" :
                              "CLIP_MT_masking_editor_menus");
           SPACE_MENU_NOP(SPACE_EMPTY);
-          SPACE_MENU_NOP(SPACE_STATUSBAR);
           SPACE_MENU_NOP(SPACE_TOPBAR);
           SPACE_MENU_NOP(SPACE_SPREADSHEET);
         }

@@ -1850,22 +1850,6 @@ typedef struct SpaceTopBar {
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Status Bar
- * \{ */
-
-typedef struct SpaceStatusBar {
-  SpaceLink *next, *prev;
-  /** Storage of regions for inactive spaces. */
-  ListBase regionbase;
-  char spacetype;
-  char link_flag;
-  char _pad0[6];
-  /* End 'SpaceLink' header. */
-} SpaceStatusBar;
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Spreadsheet
  * \{ */
 
@@ -2054,7 +2038,9 @@ typedef enum eSpace_Type {
   SPACE_USERPREF = 19,
   SPACE_CLIP = 20,
   SPACE_TOPBAR = 21,
-  SPACE_STATUSBAR = 22,
+  /* 22 was `SPACE_STATUSBAR`. BLUI deleted the space, its module and its DNA
+   * struct; the slot stays unused so the explicit values around it keep their
+   * meaning. */
   SPACE_SPREADSHEET = 23
 
 #define SPACE_TYPE_NUM (SPACE_SPREADSHEET + 1)

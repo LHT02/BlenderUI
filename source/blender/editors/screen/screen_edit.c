@@ -1097,15 +1097,9 @@ void ED_screen_global_areas_sync(wmWindow *win)
    * global areas should just become part of the screen instead. */
   bScreen *screen = BKE_workspace_active_screen_get(win->workspace_hook);
 
+  /* BLUI removed `editors/space_statusbar`, so there is never a status-bar area
+   * to collapse and `SCREEN_COLLAPSE_STATUSBAR` stays clear. */
   screen->flag &= ~SCREEN_COLLAPSE_STATUSBAR;
-
-  LISTBASE_FOREACH (ScrArea *, area, &win->global_areas.areabase) {
-    if (area->global->cur_fixed_height == area->global->size_min) {
-      if (area->spacetype == SPACE_STATUSBAR) {
-        screen->flag |= SCREEN_COLLAPSE_STATUSBAR;
-      }
-    }
-  }
 }
 
 void ED_screen_global_areas_refresh(wmWindow *win)

@@ -817,13 +817,8 @@ void ED_workspace_status_text(bContext *C, const char *str)
     MEM_SAFE_FREE(workspace->status_text);
   }
 
-  /* Redraw status bar. */
-  LISTBASE_FOREACH (ScrArea *, area, &win->global_areas.areabase) {
-    if (area->spacetype == SPACE_STATUSBAR) {
-      ED_area_tag_redraw(area);
-      break;
-    }
-  }
+  /* Redraw status bar. BLUI removed `editors/space_statusbar`, so there is no
+   * status-bar area to redraw. */
 }
 
 /* ************************************************************ */
@@ -3339,7 +3334,7 @@ void ED_region_header_layout(const bContext *C, ARegion *region)
 
   /* XXX workaround for 1 px alignment issue. Not sure what causes it...
    * Would prefer a proper fix - Julian */
-  if (!ELEM(CTX_wm_area(C)->spacetype, SPACE_TOPBAR, SPACE_STATUSBAR)) {
+  if (CTX_wm_area(C)->spacetype != SPACE_TOPBAR) {
     yco -= 1;
   }
 

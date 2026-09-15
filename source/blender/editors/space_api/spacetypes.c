@@ -54,10 +54,10 @@ void ED_spacetypes_init(void)
    * created at all - and an unregistered space type cannot be reached from the
    * editor-type menu, from the operator search menu, or from Python.
    *
-   * Three registrations are kept for machinery rather than for a user: `info`
-   * is the space type the .blend reader falls back to for an area with no
-   * space data at all, and `topbar` / `statusbar` are the global areas. None of
-   * them is offered as an editor. */
+   * Two registrations are kept for machinery rather than for a user: `info` is
+   * the space type the .blend reader falls back to for an area with no space
+   * data at all, and `topbar` is the global menu area. Neither is offered as an
+   * editor. */
   ED_spacetype_image();
   ED_spacetype_info();
   ED_spacetype_file();
@@ -65,7 +65,6 @@ void ED_spacetypes_init(void)
   ED_spacetype_sequencer();
   ED_spacetype_console();
   ED_spacetype_userpref();
-  ED_spacetype_statusbar();
   ED_spacetype_topbar();
 
   /* Register operator types for screen and all spaces. */

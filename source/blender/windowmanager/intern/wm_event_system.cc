@@ -6081,14 +6081,10 @@ ScrArea *WM_window_status_area_find(wmWindow *win, bScreen *screen)
   if (screen->state == SCREENFULL) {
     return nullptr;
   }
-  ScrArea *area_statusbar = nullptr;
-  LISTBASE_FOREACH (ScrArea *, area, &win->global_areas.areabase) {
-    if (area->spacetype == SPACE_STATUSBAR) {
-      area_statusbar = area;
-      break;
-    }
-  }
-  return area_statusbar;
+  /* BLUI removed `editors/space_statusbar`: a status-bar area cannot exist, so
+   * there is never one to find. */
+  (void)win;
+  return nullptr;
 }
 
 void WM_window_status_area_tag_redraw(wmWindow *win)
@@ -6143,7 +6139,7 @@ void WM_window_cursor_keymap_status_refresh(bContext *C, wmWindow *win)
   }
 
   /* Keep as-is. */
-  if (ELEM(area->spacetype, SPACE_STATUSBAR, SPACE_TOPBAR)) {
+  if (area->spacetype == SPACE_TOPBAR) {
     return;
   }
   if (ELEM(region->regiontype,

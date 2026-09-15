@@ -123,7 +123,7 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Preferences",
      "Edit persistent configuration settings"},
 
-    /* The three below are never offered as editors - `rna_Area_ui_type_itemf()`
+    /* The two below are never offered as editors - `rna_Area_ui_type_itemf()`
      * skips them, exactly as Blender skipped the global areas. They stay in
      * this array so that `Area.type` can still name them from Python, which is
      * how the .blend reader and the global-area code identify an area. */
@@ -134,12 +134,6 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Top Bar",
      "Global bar at the top of the screen for "
      "global per-window settings"},
-    {SPACE_STATUSBAR,
-     "STATUSBAR",
-     ICON_NONE,
-     "Status Bar",
-     "Global bar at the bottom of the "
-     "screen for general status information"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -583,7 +577,6 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
       /* Currently no type info. */
     case SPACE_EMPTY:
     case SPACE_TOPBAR:
-    case SPACE_STATUSBAR:
       break;
   }
 

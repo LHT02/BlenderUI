@@ -39,7 +39,6 @@ _modules = [
     "space_image",
     "space_info",
     "space_sequencer",
-    "space_statusbar",
     "space_text",
     "space_topbar",
     "space_userpref",
