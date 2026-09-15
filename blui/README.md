@@ -556,6 +556,48 @@ The work is staged so the build stays green at every step.
       > this category. Deleting one produces `C1083: cannot open include
       > file`. Check for unconditional `#include`s of a library's headers
       > before removing it.
+
+- [~] **Stage 2b — Delete the legacy `.blend` versioning.** Unblocked by
+      *Compatibility: none required*. Every function here brings an **older
+      Blender file** up to the current layout, written as a series of
+      `if (!MAIN_VERSION_ATLEAST(bmain, x, y))` blocks, and BLUI only ever reads
+      files it wrote itself at the current version. `versioning_cycles.c`
+      (61 KB) is done; what is left is mapped out so it does not have to be
+      re-derived:
+
+      | File | Bytes | Call site in `readfile.cc` |
+      | --- | --- | --- |
+      | `versioning_legacy.c` | 73,955 | `blo_do_versions_pre250` @3588 |
+      | `versioning_250.c` | 77,817 | `blo_do_versions_250` @3591 |
+      | `versioning_260.c` | 86,253 | `blo_do_versions_260` @3594 |
+      | `versioning_270.c` | 59,478 | `blo_do_versions_270` @3597 |
+      | `versioning_280.c` | 195,032 | `blo_do_versions_280` @3600 |
+      | `versioning_290.cc` | 73,752 | `blo_do_versions_290` @3603 |
+      | `versioning_300.cc` | 178,568 | `blo_do_versions_300` @3606 |
+      | `versioning_400.cc` | 16,539 | `blo_do_versions_400` @3609 |
+      | `versioning_common.cc` + `.h` | 14,551 | helpers for the above |
+
+      Plus the six `do_versions_after_linking_{250,260,270,280,290,300}` calls
+      at `readfile.cc:3637-3652`, and the matching declarations in `readfile.h`.
+
+      **Keep**, because they are not legacy upgrades: `versioning_defaults.cc`
+      (sets defaults, no version guards at all), `versioning_userdef.c`
+      (`blo_do_versions_userdef` @3556 and `do_versions_userdef` @3984 still run,
+      and it carries defaults for the current version), and `versioning_dna.c`
+      (`blo_do_versions_dna` @1014, a DNA sanity check).
+
+      Two things to check before deleting each: whether any `do_versions_*`
+      body has **unguarded** top-level work that BLUI's own files rely on -
+      `do_versions_after_linking_*` is where that most often hides - and
+      whether `versioning_common.cc` helpers are used by the three files that
+      stay.
+
+      > One file can have more than one entry point. `versioning_cycles.c` had
+      > `blo_do_versions_cycles` **and** `do_versions_after_linking_cycles`,
+      > called from two different functions, and removing only the first left a
+      > `LNK2019`. Let the linker find the second one rather than grepping for
+      > the file name.
+
 - [x] **Stage 3 — Component shell.** BLUI boots into its own workspace set
       (*Files*, *Images*, *Text*, *Video*, *Settings*, *Console*) instead of a
       3D viewport, with its own splash and logo art. See
