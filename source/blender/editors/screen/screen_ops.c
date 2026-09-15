@@ -5206,7 +5206,8 @@ static int drivers_editor_show_exec(bContext *C, wmOperator *op)
                      true,
                      WIN_ALIGN_LOCATION_CENTER) != NULL)
   {
-    ED_drivers_editor_init(C, CTX_wm_area(C));
+    /* `ED_drivers_editor_init()` went with the Graph Editor module. There is no
+     * driver editor in BLUI, so the temporary space below cannot open one. */
 
     /* activate driver F-Curve for the property under the cursor */
     if (but) {

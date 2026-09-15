@@ -55,14 +55,10 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel);
  */
 static ListBase *fmodifier_list_space_specific(const bContext *C)
 {
-  ScrArea *area = CTX_wm_area(C);
-
-  if (area->spacetype == SPACE_GRAPH) {
-    FCurve *fcu = ANIM_graph_context_fcurve(C);
-    return &fcu->modifiers;
-  }
-
-  /* The SPACE_NLA branch went with the NLA editor module. */
+  /* BLUI has neither a Graph Editor nor an NLA editor, which were the only two
+   * spaces with F-Modifier panels. This animation module is on the deletion
+   * list, so it asserts rather than pretending to have an owner. */
+  UNUSED_VARS(C);
 
   /* This should not be called in any other space. */
   BLI_assert(false);
@@ -82,8 +78,8 @@ static PointerRNA *fmodifier_get_pointers(const bContext *C, const Panel *panel,
   }
 
   if (C != NULL && CTX_wm_space_graph(C)) {
-    FCurve *fcu = ANIM_graph_context_fcurve(C);
-    uiLayoutSetActive(panel->layout, !(fcu->flag & FCURVE_MOD_OFF));
+    /* BLUI has no Graph Editor, so there is no F-Curve to grey the panel out
+     * for. This whole animation module is on the deletion list. */
   }
 
   return ptr;

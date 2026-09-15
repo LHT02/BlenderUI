@@ -2350,7 +2350,6 @@ static void rna_SpaceGraphEditor_display_mode_update(bContext *C, PointerRNA *pt
 
   /* for "Drivers" mode, enable all the necessary bits and pieces */
   if (sipo->mode == SIPO_MODE_DRIVERS) {
-    ED_drivers_editor_init(C, area);
     ED_area_tag_redraw(area);
   }
 
