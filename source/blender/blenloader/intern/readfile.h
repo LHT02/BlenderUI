@@ -216,21 +216,10 @@ void blo_do_versions_key_uidgen(struct Key *key);
  */
 void blo_do_versions_userdef(struct UserDef *userdef);
 
-void blo_do_versions_pre250(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_250(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_260(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_270(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_280(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_290(struct FileData *fd, struct Library *lib, struct Main *bmain);
-void blo_do_versions_300(struct FileData *fd, struct Library *lib, struct Main *bmain);
+/* BLUI removed the pre-306 upgrade chain (pre250, 250-300) along with the
+ * versioning_*.c files that implemented it. `blo_do_versions_400()` remains
+ * because its guards are on 400/401 and are live for a 306.14 file. */
 void blo_do_versions_400(struct FileData *fd, struct Library *lib, struct Main *bmain);
-
-void do_versions_after_linking_250(struct Main *bmain);
-void do_versions_after_linking_260(struct Main *bmain);
-void do_versions_after_linking_270(struct Main *bmain);
-void do_versions_after_linking_280(struct FileData *fd, struct Main *bmain);
-void do_versions_after_linking_290(struct FileData *fd, struct Main *bmain);
-void do_versions_after_linking_300(struct FileData *fd, struct Main *bmain);
 
 /**
  * Direct data-blocks with global linking.

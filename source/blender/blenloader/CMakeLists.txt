@@ -39,17 +39,10 @@ set(SRC
   intern/readfile.cc
   intern/readfile_tempload.cc
   intern/undofile.cc
-  intern/versioning_250.c
-  intern/versioning_260.c
-  intern/versioning_270.c
-  intern/versioning_280.c
-  intern/versioning_290.cc
-  intern/versioning_300.cc
   intern/versioning_400.cc
   intern/versioning_common.cc
   intern/versioning_defaults.cc
   intern/versioning_dna.c
-  intern/versioning_legacy.c
   intern/versioning_userdef.c
   intern/writefile.cc
 

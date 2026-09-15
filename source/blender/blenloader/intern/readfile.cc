@@ -3584,33 +3584,18 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
               main->build_hash);
   }
 
-  if (!main->is_read_invalid) {
-    blo_do_versions_pre250(fd, lib, main);
-  }
-  if (!main->is_read_invalid) {
-    blo_do_versions_250(fd, lib, main);
-  }
-  if (!main->is_read_invalid) {
-    blo_do_versions_260(fd, lib, main);
-  }
-  if (!main->is_read_invalid) {
-    blo_do_versions_270(fd, lib, main);
-  }
-  if (!main->is_read_invalid) {
-    blo_do_versions_280(fd, lib, main);
-  }
-  if (!main->is_read_invalid) {
-    blo_do_versions_290(fd, lib, main);
-  }
-  if (!main->is_read_invalid) {
-    blo_do_versions_300(fd, lib, main);
-  }
+  /* BLUI does not read Blender's files, so the versioning chain that brought an
+   * older Blender file up to the current layout is gone: pre250, 250, 260, 270,
+   * 280, 290 and 300, plus `blo_do_versions_cycles()`. Every one of those is a
+   * series of `if (!MAIN_VERSION_ATLEAST(bmain, x, y))` blocks, and BLUI's own
+   * files are written at 306.14 - so every guard evaluates false and no block
+   * could ever have run.
+   *
+   * `blo_do_versions_400()` stays, and it is not an oversight: its guards are
+   * on 400/401, which for a 306.14 file evaluate TRUE. It is live code. */
   if (!main->is_read_invalid) {
     blo_do_versions_400(fd, lib, main);
   }
-  /* BLUI does not read Blender's files, so `blo_do_versions_cycles()` is gone.
-   * It only ever ran for files older than Blender 2.80 (`MAIN_VERSION_ATLEAST`
-   * guards), and BLUI cannot create the Cycles data it migrated in any case. */
 
   /* WATCH IT!!!: pointers from libdata have not been converted yet here! */
   /* WATCH IT 2!: Userdef struct init see do_versions_userdef() above! */
@@ -3633,25 +3618,8 @@ static void do_versions_after_linking(FileData *fd, Main *main)
   /* Don't allow versioning to create new data-blocks. */
   main->is_locked_for_linking = true;
 
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_250(main);
-  }
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_260(main);
-  }
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_270(main);
-  }
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_280(fd, main);
-  }
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_290(fd, main);
-  }
-  if (!main->is_read_invalid) {
-    do_versions_after_linking_300(fd, main);
-  }
-
+  /* The after-linking half of the chain went with the rest of it - same
+   * reasoning, same guards. */
   main->is_locked_for_linking = false;
 }
 

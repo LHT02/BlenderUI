@@ -557,13 +557,20 @@ The work is staged so the build stays green at every step.
       > file`. Check for unconditional `#include`s of a library's headers
       > before removing it.
 
-- [~] **Stage 2b — Delete the legacy `.blend` versioning.** Unblocked by
-      *Compatibility: none required*. Every function here brings an **older
+- [x] **Stage 2b — Delete the legacy `.blend` versioning.** Unblocked by
+      *Compatibility: none required*. Every function here brought an **older
       Blender file** up to the current layout, written as a series of
-      `if (!MAIN_VERSION_ATLEAST(bmain, x, y))` blocks, and BLUI only ever reads
-      files it wrote itself at the current version. `versioning_cycles.c`
-      (61 KB) is done; what is left is mapped out so it does not have to be
-      re-derived:
+      `if (!MAIN_VERSION_ATLEAST(bmain, x, y))` blocks. **Done: 8 files,
+      ~788 KB** — `versioning_cycles.c` first, then `versioning_legacy.c`,
+      `250`, `260`, `270`, `280`, `290` and `300`, with their call sites in
+      `readfile.cc` and their declarations in `readfile.h`.
+
+      The method, for the C-side deletion still to come below: a guard is dead
+      when the file version already satisfies it. BLUI's files are 306.14, so
+      `!ATLEAST(300, y)` is dead and `!ATLEAST(400, y)` is **live**. That test
+      is what caught `versioning_400.cc` before it was deleted by mistake.
+
+      What went, largest first:
 
       | File | Bytes | Call site in `readfile.cc` |
       | --- | --- | --- |
@@ -574,23 +581,34 @@ The work is staged so the build stays green at every step.
       | `versioning_280.c` | 195,032 | `blo_do_versions_280` @3600 |
       | `versioning_290.cc` | 73,752 | `blo_do_versions_290` @3603 |
       | `versioning_300.cc` | 178,568 | `blo_do_versions_300` @3606 |
-      | `versioning_400.cc` | 16,539 | `blo_do_versions_400` @3609 |
       | `versioning_common.cc` + `.h` | 14,551 | helpers for the above |
 
       Plus the six `do_versions_after_linking_{250,260,270,280,290,300}` calls
       at `readfile.cc:3637-3652`, and the matching declarations in `readfile.h`.
 
-      **Keep**, because they are not legacy upgrades: `versioning_defaults.cc`
-      (sets defaults, no version guards at all), `versioning_userdef.c`
-      (`blo_do_versions_userdef` @3556 and `do_versions_userdef` @3984 still run,
-      and it carries defaults for the current version), and `versioning_dna.c`
-      (`blo_do_versions_dna` @1014, a DNA sanity check).
+      **Keep**, and the first two are not legacy upgrades at all:
+      `versioning_defaults.cc` (sets defaults, no version guards),
+      `versioning_userdef.c` (`blo_do_versions_userdef` @3556 and
+      `do_versions_userdef` @3984 still run, and it carries defaults for the
+      current version), `versioning_dna.c` (`blo_do_versions_dna` @1014, a DNA
+      sanity check), and `versioning_common.cc` + `.h`, whose helpers
+      `versioning_defaults.cc` and `versioning_400.cc` both include.
 
-      Two things to check before deleting each: whether any `do_versions_*`
-      body has **unguarded** top-level work that BLUI's own files rely on -
-      `do_versions_after_linking_*` is where that most often hides - and
-      whether `versioning_common.cc` helpers are used by the three files that
-      stay.
+      **`versioning_400.cc` must stay, and getting this wrong is easy.**
+      The test is not "is it guarded" but "**does the guard evaluate true for
+      BLUI's own file version**". BLUI writes 306.14 (`BLENDER_FILE_SUBVERSION`
+      is 14), so a guard on 400 is *live* while a guard on 300 is dead. An
+      earlier version of this table listed `versioning_400.cc` as deletable; it
+      is the one file in the set that actually runs. Check each guard against
+      306.14 before deleting anything here.
+
+      Both of the things worth checking before a deletion like this were
+      checked. No `do_versions_*` body in the deleted set had unguarded
+      top-level work that BLUI's own files rely on - the guards cover the whole
+      body in each case, and both the build and the runtime suite agree. And
+      `versioning_common.cc` really is shared: `versioning_defaults.cc` and
+      `versioning_400.cc` both include its header, so it stayed with them
+      instead of being swept up with the files it was written alongside.
 
       > One file can have more than one entry point. `versioning_cycles.c` had
       > `blo_do_versions_cycles` **and** `do_versions_after_linking_cycles`,
