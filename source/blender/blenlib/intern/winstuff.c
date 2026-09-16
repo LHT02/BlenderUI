@@ -229,7 +229,16 @@ bool BLI_windows_external_operation_execute(const char *filepath, const char *op
 
   SHELLEXECUTEINFOW shellinfo = {0};
   shellinfo.cbSize = sizeof(SHELLEXECUTEINFO);
-  shellinfo.fMask = SEE_MASK_INVOKEIDLIST;
+  /* `SEE_MASK_ASYNCOK` is not optional here.
+   *
+   * `ShellExecuteEx` waits for the operation's DDE conversation to finish
+   * before returning, and on a GUI thread it does that whether or not
+   * `SEE_MASK_NOASYNC` was asked for. BLUI calls this from its main thread, so
+   * "External -> Open Folder" froze the whole application indefinitely -
+   * measured at over 20 seconds on `C:\Windows` with no return at all, which
+   * is what it was reported as. `SEE_MASK_ASYNCOK` is the documented way to
+   * say the caller does not need to wait. */
+  shellinfo.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_ASYNCOK;
   shellinfo.lpVerb = woperation;
   shellinfo.lpFile = wpath;
   shellinfo.nShow = SW_SHOW;

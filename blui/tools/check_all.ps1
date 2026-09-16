@@ -60,6 +60,12 @@ $checks = @(
   @{ Name = "check_save_isolation";    Timeout = 240; Cmd = (Blui @("--factory-startup", "--python", "$tools\check_save_isolation.py", "--", "$env:TEMP\blui_save_isolation_check.blend")) }
   @{ Name = "probe_document_isolation"; Timeout = 240; Cmd = (Blui @("--factory-startup", "--python", "$tools\probe_document_isolation.py")) }
 
+  # MUST run windowed: the freeze it guards against only happens on a GUI
+  # thread, so under --background it would pass while the app still froze.
+  # Side effect: it opens one Explorer window, because that is what the
+  # operation under test does.
+  @{ Name = "check_external_op";       Timeout = 120; Cmd = (Blui @("--factory-startup", "--python", "$tools\probe_external_op.py", "--", "C:\Windows", "FOLDER_OPEN")) }
+
   # --- drives synthetic input ----------------------------------------------
   @{ Name = "click_sweep";             Timeout = 300; Cmd = (Blui @("--debug", "--enable-event-simulate", "--python", "$tools\click_sweep.py")) }
   @{ Name = "check_menu_draw";         Timeout = 300; Cmd = (Blui @("--factory-startup", "--enable-event-simulate", "--python", "$tools\check_menu_draw.py")) }
