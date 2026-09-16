@@ -515,6 +515,14 @@ The work is staged so the build stays green at every step.
       | Keymaps | 135 → 116 |
       | Startup warning lines | 10 → 2 |
 
+      **Target 4 (`object` + `space_view3d`, 2.3 MB) is measured and rejected.**
+      See *`object` + `space_view3d` measured* below: both public headers are
+      100% live (263 symbols, zero unreferenced), with 63 kept files depending on
+      them - 7 of those in `makesrna/intern`, 18 in the kept `gpencil_legacy`
+      annotation stack, and 7 in `windowmanager`. Nothing in targets 1-3 shrank
+      that surface. It needs a product decision and a projection-math refactor,
+      not a cut.
+
       Everything still registered belongs to a component BLUI keeps, or is
       blocked by one - the rejections and the reason for each are in the tables
       below. There is no target left that has not been measured.
@@ -1607,6 +1615,134 @@ The work is staged so the build stays green at every step.
       `SPACE_TOPBAR = 21` is retired rather than reused, matching slot 22
       (`SPACE_STATUSBAR`) and slot 14 (`SPACE_SCRIPT`). Three dead slots now, and
       every enumerator in that enum is explicit, so no renumbering pass is needed.
+
+      ### `object` + `space_view3d` (2.3 MB) measured: they are the apex, and the apex is load-bearing
+
+      Measured on 2026-09-16 with the same script used for `physics` and
+      `curves`, extended to bucket each consumer by whether it is a Stage 2
+      target or a module BLUI keeps. The numbers settle the order recorded
+      above, and the answer is not what "delete the apex last" implies.
+
+      | | `editors/object` | `editors/space_view3d` |
+      | --- | --- | --- |
+      | Files / size | 28 / 1,195,982 B | 41 / 1,147,410 B |
+      | Public header | `ED_object.h`, 748 lines | `ED_view3d.h`, 1,381 lines |
+      | Declared symbols | 136 | 127 |
+      | Symbols with **zero** external users | **0** | **0** |
+      | Files including the header | 106 | 158 |
+      | Consumers that are themselves doomed | 41 | 80 |
+      | Consumers that **stay** | **25** | **38** |
+
+      Both headers are 100% live. There is no dead enumeration to take first,
+      the way there was for the four space types - every one of the 263 exported
+      symbols has at least one caller outside the module, and the big ones have
+      a lot: `ED_view3d_ob_project_mat_get` **26 files**,
+      `ED_view3d_viewcontext_init` 23, `ED_view3d_project_float_v2_m4` 22,
+      `ED_object_base_select` 16, `ED_object_base_activate` 13.
+
+      So the two modules are not apexes in the dependency-cone sense - a node
+      nothing depends on. They are apexes in the *reverse* sense: the two
+      modules with the largest export surface in the editor layer, and 63 kept
+      files sit on top of them. Deleting them is not a cut, it is a
+      re-homing exercise for 263 functions.
+
+      #### Where the kept consumers actually are
+
+      `ED_object.h` - 25 kept files, and **7 of them are `makesrna/intern`**:
+
+      ```
+       7  makesrna/intern        (rna_object.c 16 syms, rna_layer.c,
+                                  rna_pose.c, rna_constraint.c,
+                                  rna_object_api.c, rna_object_force.c, rna_scene.c)
+       6  editors/gpencil_legacy (gpencil_data/edit/armature/convert/trace_ops/utils)
+       2  editors/interface     (interface_ops.cc, interface_templates.cc)
+       2  modifiers/intern      (MOD_nodes.cc, MOD_particlesystem.cc)
+       1  each: makesdna, editors/util, editors/undo, windowmanager/intern,
+                editors/render, editors/space_api, editors/screen, editors/space_image
+      ```
+
+      `ED_view3d.h` - 38 kept files, and the distribution is different:
+
+      ```
+      12  editors/gpencil_legacy  (the whole annotation/gpencil paint stack)
+       6  draw/engines            (overlay grid/fade/gpencil, eevee, compositor)
+       4  windowmanager/intern    (wm_draw, wm_operators, wm_event_system, wm_files)
+       3  draw/intern             (draw_manager, draw_manager_text, draw_view)
+       3  editors/render          (render_opengl, render_update, render_preview)
+       2  makesrna/intern         (rna_space.c, rna_space_api.c)
+       2  windowmanager/gizmo     (wm_gizmo, wm_gizmo_map)
+       2  editors/interface      (the two eyedroppers)
+       1  each: editors/screen, windowmanager/xr, blenkernel/intern,
+                editors/space_sequencer
+      ```
+
+      Three of those buckets are decisive, and none of them is a Stage 2 target:
+
+      - **`makesrna/intern`.** `rna_object.c` needs 16 `ED_object_*` functions -
+        modifier add/remove/clear/move, constraint active set and update, facemap
+        add/remove, parent, shaderfx add/clear/remove. The RNA layer *is* the
+        object model's public API. This is the same shape as `space_buttons`,
+        whose RNA callbacks were the reason it could not be cut mechanically.
+      - **`editors/gpencil_legacy`.** 6 files for `ED_object.h` and **12** for
+        `ED_view3d.h`. Grease-pencil annotation painting is a component BLUI
+        keeps, and it is a 3D-context painter: it needs
+        `ED_view3d_depth_read_cached`, `_depth_override`, `_autodist_simple`,
+        `_calc_camera_border`, `_project_float_global` and friends to map screen
+        input onto the scene. **This is the finding that decides `space_view3d`:**
+        the annotation stack is not using the *viewport* - it is using the
+        *projection math*, which happens to live in `space_view3d`.
+      - **`windowmanager`.** 4 + 2 + 2 + 1 files, including `wm_draw.c`,
+        `wm_operators.c`, `wm_files.cc` and the whole gizmo subsystem. The
+        window manager cannot be deleted and cannot easily be un-taught the
+        viewport.
+
+      #### The verdict
+
+      **`object` and `space_view3d` are measured and rejected as a single
+      mechanical deletion.** They were listed in the brief as the dependency
+      cone's apex and therefore the last thing to do, on the theory that the
+      first three steps would shrink what they carry. Steps 1-3 are done, and
+      they do not shrink it: `physics`, `curves` and `space_topbar` contributed
+      **zero** of the 25 + 38 kept consumers. The measurement that mattered was
+      of an edge none of the three touched.
+
+      What would have to happen instead, in the order the evidence supports:
+
+      1. **`object` cannot be deleted before the object model's RNA is
+         re-decided.** `rna_object.c`'s 16 calls are modifier and constraint
+         operations exposed to Python. Either those RNA properties go (a
+         product statement: BLUI has no modifier stack) or the functions they
+         call move somewhere kept. That is 16 functions in one file, and it is
+         the cheapest of the three buckets.
+      2. **`space_view3d` cannot be deleted before the projection math is
+         separated from the viewport.** `ED_view3d_project_*`,
+         `ED_view3d_win_to_3d_*`, `ED_view3d_depth_*`,
+         `ED_view3d_calc_zfac` and `ED_view3d_ob_project_mat_get` are
+         *arithmetic over a `RegionView3D`*, not viewport UI. They are in
+         `space_view3d` because that is where Blender put them, and the
+         annotation painter, the gizmo subsystem and the draw engines all
+         depend on them. Moving them to a kept module would shrink the kept
+         surface substantially - but it is a refactor, not a deletion, and it
+         would want its own build-and-verify round before anything is removed.
+      3. **`gpencil_legacy` (18 files across the two headers) is the consumer to
+         look at first.** It is the single largest kept bucket and it is the one
+         most entangled with 3D projection. If annotation painting is in scope
+         for BLUI, it pins the projection math in place and the honest answer is
+         that `space_view3d` shrinks but does not disappear.
+
+      That third point is a **product question for LHT, not a technical
+      one** - the same shape as the particle question that unblocked `physics`,
+      and the reason this section is a measurement rather than a deletion.
+      Until it is answered, `object` and `space_view3d` stay, and the honest
+      progress report for this target is "measured, blocked on a product
+      decision, nothing deleted".
+
+      For the record, the same trick that made the four space types cheap does
+      **not** apply here, and this is worth stating plainly because it was the
+      working assumption: those modules had a dead *enum surface* that could be
+      removed first, and the compiler then named every call site. `ED_object.h`
+      and `ED_view3d.h` have no dead surface at all - removing any symbol
+      breaks a link immediately. There is no enum-first move available.
 
       ### `editors/space_statusbar/` is deleted, and the Python half is not optional
 
