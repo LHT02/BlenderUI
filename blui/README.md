@@ -307,7 +307,7 @@ set:
 | `verify_startup.py` | prints the workspace set and each area's active editor |
 | `check_editor_set.py` | asserts only BLUI's editors exist, and that the startup file uses them |
 | `check_preferences.py` | asserts the preferences sections and panels are BLUI's set |
-| `check_keymap_config.py` | asserts the key configuration loads and still has Ctrl+S and Shift+F1..F6 |
+| `check_keymap_config.py` | asserts all three presets load, keymap counts, Ctrl+S, Shift+F1..F6, and that no keymap names an unregistered operator |
 | `dump_screens.py` | dumps every workspace, screen, area and space |
 | `click_sweep.py` | clicks a grid over the whole window |
 | `interaction_test.py` | right-click, double-click and drag |
@@ -431,7 +431,7 @@ memory. Run them after any change; none of them need a person watching.
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
-| Key configuration (loads fully, Ctrl+S, Shift+F1..F6) | `check_keymap_config.py` | PASS, 116 keymaps |
+| Key configuration: all 3 presets load, Ctrl+S, Shift+F1..F6 | `check_keymap_config.py` | PASS on those; **FAILS on 34 dangling bindings** - see below |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
 | Open-document isolation (item 4's target) | `check_window_isolation.py -- --strict` | FAILS today, by design |
@@ -480,14 +480,147 @@ in the same step, and that is the shape of the remaining Stage 2 work.
 `ED_operatormacros_action()` and `_graph()` came out safely, and `_node()` too -
 the keymap data names no node operator outside a helper nothing calls. Each was
 checked with `check_keymap_config.py` before believing the build. `_mesh()`,
-`_uvedit()`, `_object()`, `_curve()`, `_armature()`, `_metaball()`, `_clip()`
-and `_mask()` are still in, and each needs its keymap data removed with it.
+`_uvedit()`, `_curve()`, `_armature()`, `_metaball()`, `_clip()` and `_mask()`
+are still **called**; each needs its keymap data removed with it.
+
+> **Corrected 2026-09-16.** An earlier revision of this paragraph listed
+> `_object()` among the functions "still in". It is not: `spacetypes.c` calls
+> only `_file()`, `_sequencer()` and `_gpencil()` now, so `_object()` was
+> unregistered at some point. The paragraph was written from the comment in
+> `spacetypes.c` rather than from the call list, and the comment is itself
+> wrong - it claims "the four left - file, sequencer, paint, gpencil" while
+> three calls are present. `ED_operatormacros_paint()` is defined, declared in
+> `ED_paint.h`, and called from nowhere. Its absence is inert only because the
+> one macro it registers (`PAINTCURVE_OT_add_point_slide`) appears in no keymap
+> data - a coincidence, not a design. **Read the call list, not the comment.**
+>
+> The corresponding keymap-data entries for the unregistered macros were *not*
+> removed at the same time, and they are dangling right now. See "Verification
+> suite coverage boundaries" below.
 
 Nothing in the suite noticed at the time, which is why `check_keymap_config.py`
 now exists. It was verified against the failure on purpose: dropping
 `ED_operatormacros_mesh()` alone takes the key configuration from 135 keymaps to
 7, and the check reports 11 failures and exits 1. Restoring it returns 135
 keymaps, PASS and exit 0.
+
+## Verification suite coverage boundaries
+
+A check is only worth its blind spot. This section records what each script in
+`source\blui\tools\` actually looks at, so the next person does not read a green
+run as broader coverage than it is. It exists because a real defect got through
+the whole suite once already.
+
+**Read this before trusting a PASS.** Most of these scripts assert one shape of
+one thing. That is deliberate - each was written to catch one specific failure -
+but it means "the suite is green" is a much weaker statement than it sounds.
+
+| Script | Covers | Does **not** cover |
+| --- | --- | --- |
+| `check_editor_set.py` | the `Area.type` / `Panel.bl_space_type` enums, the editor menu, and the areas present in the **startup file** | a workspace created at runtime, or an area type reachable only through an operator |
+| `check_preferences.py` | every registered `Panel` subclass with `bl_space_type == "PREFERENCES"`, grouped by `bl_context` | preferences that are not panels (operators, RNA properties, the `Input`/`Keymap` editors' contents) |
+| `check_keymap_config.py` | all three shipped presets, keymap counts, four required global keymaps, Ctrl+S, Shift+F1..F6, **and that every bound `idname` still resolves** | keymap items whose behaviour is wrong but whose operator exists; `Node Editor`-style editors with no keymap at all |
+| `check_window_isolation.py` | whether two windows share a screen, and whether the open-document list is per-window | editor types other than `TEXT_EDITOR` / `IMAGE_EDITOR`; anything about saving |
+| `check_component_window.py` | that `wm.window_new(workspace=...)` opens the named workspace in a new window | what the new window *contains* beyond its workspace name; `--strict` isolation |
+| `check_save_isolation.py` | Ctrl+S (via `wm.save_active_file`) writes the focused text editor's own file, read back from disk | the image editor's save path; a viewer with nothing to save; failure/cancel paths |
+| `click_sweep.py` | that a grid of clicks over window 0 does not crash or assert | whether anything the clicks did was *correct*; popups beyond one Escape; multiple windows |
+
+### Blind spot 1: only the active key configuration was checked
+
+The original `check_keymap_config.py` read `keyconfigs.active` and stopped. The
+annotation deletion removed `builtin.annotate` from
+`keymap_data/blender_default.py` but left two references in
+`keymap_data/industry_compatible_data.py` (one in `_template_items_basic_tools`,
+shared by Object Mode and Grease Pencil Stroke Edit Mode, and one in the Image
+keymap), producing three dangling `wm.tool_set_by_id` bindings. Every script
+passed. It was inert rather than an abort - activating the preset still returned
+`{'FINISHED'}` - but that was luck, not safety.
+
+**Fixed 2026-09-16:** all three presets are now activated in turn and measured.
+An important correction fell out of doing it:
+
+**A preset being shipped is not the same as a preset being instantiated.** Only
+`Blender.py` is loaded at startup; `Blender_27x` and `Industry_Compatible` are
+created on demand the first time someone selects them in Preferences > Input.
+At startup `keyconfigs` therefore holds exactly three entries - `Blender`,
+`Blender addon`, `Blender user` - and the two on-demand presets are absent.
+Touching `kc.preferences` does **not** materialize them (measured; it was the
+first hypothesis and it is wrong). So the check tests whether the preset **file**
+exists, then activates it **by filepath**, which is the path the UI itself uses.
+
+Measured counts, 2026-09-16, `--factory-startup`:
+
+| Preset | Keymaps |
+| --- | --- |
+| `Blender` | 112 |
+| `Blender_27x` | 103 |
+| `Industry_Compatible` | 103 |
+
+### Blind spot 2: "is what should be there present" without "does what is there still exist"
+
+Counting keymaps cannot see a keymap item that names an operator which is no
+longer registered, and that is exactly the residue a module deletion leaves.
+The scan walks every `kmi.idname` in the configuration and asks the running
+binary whether it resolves (`bpy.ops.<cat>.<name>.get_rna_type()`); reading the
+keymap data files cannot answer it, because operators are registered from C.
+
+**It is not a hypothetical.** Running it for the first time found **34 dangling
+bindings** across the three presets - `Blender` 16, `Blender_27x` 13,
+`Industry_Compatible` 5. This is *not* the annotation residue (that one was
+fixed); it is a second, larger one, and the suite had never looked for it.
+
+Every one was independently confirmed to raise `KeyError` on
+`get_rna_type()`, against negative controls that resolve cleanly
+(`object.gpencil_add`, `image.open`, `image.save`, `text.open`, `text.save`), so
+the scan is not blanket-failing.
+
+| Operator | Presets | Root cause |
+| --- | --- | --- |
+| `view2d.ndof` | all 3 | ndof operator unregistered |
+| `image.view_ndof` | all 3 | ndof operator unregistered |
+| `view3d.select` | `Blender`, `Industry_Compatible` | `space_view3d` deleted |
+| `view3d.select_box` / `select_lasso` / `select_circle` | `Blender`, `Blender_27x` | `space_view3d` deleted |
+| `view3d.object_mode_pie_or_toggle` | `Blender` | `space_view3d` deleted |
+| `object.duplicate_move` / `duplicate_move_linked` | all 3 | `ED_operatormacros_object()` no longer called |
+| `collection.create` / `objects_remove` / `objects_remove_all` / `objects_add_active` / `objects_remove_active` | `Blender`, `Blender_27x` | `ED_operatormacros_collection()` no longer called |
+| `text.uncomment` | `Industry_Compatible` | Text operator unregistered |
+
+The `view3d.*` group is **expected and accepted**: BLUI has no 3D view, so those
+bindings are unreachable by construction. The `object.*` and `collection.*`
+groups are the interesting ones - they are live keymap entries for operators
+whose registration was removed to stop an abort, and the keymap data was never
+removed alongside. That is the same "registration and the data naming it must go
+in one step" rule from the macro section above, applied to the *leftovers* of a
+previous round rather than to a new deletion.
+
+The `DANGLING_ALLOWED` allowlist in the script is intentionally **empty**, so
+the check can fail. It currently fails, which is the honest state: **the
+dangling bindings have not been cleaned up yet.**
+
+The tempting shortcut is to park the `view3d.*` group in that allowlist - BLUI
+has no 3D viewport, so those bindings are unreachable by construction. That is
+the wrong move: the same allowlist would silence the `object.duplicate_move` and
+`collection.*` bindings, which sit in **Object Mode** and are reachable in
+workspaces BLUI ships. Those are real bugs. An allowlist populated to make a
+suite green is how the suite stops being able to fail, which is the whole point
+of this exercise. **The fix is to delete the keymap items, not to excuse
+them.** A red run here is the signal working.
+
+The immediate next step is to decide, per group, whether the binding or the
+operator should go:
+
+- `object.duplicate_move`, `object.duplicate_move_linked` - bound to Shift+D /
+  Alt+D in Object Mode and reachable. Either re-register
+  `ED_operatormacros_object()` or remove the two bindings.
+- `collection.*` (5 items) - bound to Ctrl+G and friends in Object Mode and
+  reachable. Same choice.
+- `view3d.*` (7 items), `view2d.ndof`, `image.view_ndof` - unreachable, since
+  there is no 3D viewport and ndof is not a BLUI input path. Removing the
+  bindings is pure cleanup.
+- `text.uncomment` - bound in the `Industry_Compatible` Text keymap only. The
+  Text editor is a BLUI component, so this one wants looking at rather than
+  assuming.
+
 
 ## Roadmap
 
@@ -2149,6 +2282,89 @@ The work is staged so the build stays green at every step.
       medium" - which is a legitimate reason, but a different one than byte
       count. If that is the reason, it should be its own Stage, not a rider on
       target 4.
+
+      ### The verification suite had a blind spot, and finding it turned up 34 real defects
+
+      **Executed 2026-09-16.** No module was deleted this round. The deliverable
+      is a widened check plus a measurement, and the measurement is the
+      uncomfortable part.
+
+      The starting point was a known miss: the annotation deletion left two
+      `builtin.annotate` references in `industry_compatible_data.py`, producing
+      three dangling `wm.tool_set_by_id` bindings, and all seven check scripts
+      passed. Two causes, both now closed:
+
+      1. `check_keymap_config.py` read `keyconfigs.active` only, so a preset that
+         was not active was never looked at.
+      2. Nothing anywhere asserted that a keymap item's `idname` still resolves.
+         Counting keymaps cannot see an entry naming an operator that was
+         deleted - which is exactly the residue a module deletion leaves.
+
+      #### What the widened check found
+
+      The dangling scan was run for the first time and reports **34 bindings
+      across the three presets** - `Blender` 16, `Blender_27x` 13,
+      `Industry_Compatible` 5. Each was independently confirmed to raise
+      `KeyError` on `get_rna_type()`, against negative controls that resolve
+      (`object.gpencil_add`, `image.open`, `image.save`, `text.open`,
+      `text.save`), so the scan is not blanket-failing. Re-run three times, same
+      numbers.
+
+      | Operator | Presets | Root cause |
+      | --- | --- | --- |
+      | `view2d.ndof`, `image.view_ndof` | all 3 | ndof operators unregistered |
+      | `view3d.select` / `select_box` / `select_lasso` / `select_circle` / `object_mode_pie_or_toggle` | 1-2 | `space_view3d` deleted |
+      | `object.duplicate_move`, `duplicate_move_linked` | all 3 | `ED_operatormacros_object()` not called |
+      | `collection.create`, `objects_remove`, `objects_remove_all`, `objects_add_active`, `objects_remove_active` | 1-2 | `ED_operatormacros_collection()` not called |
+      | `text.uncomment` | `Industry_Compatible` | Text operator unregistered |
+
+      The `object.*` and `collection.*` groups are the ones that matter: they are
+      bound in **Object Mode**, which is reachable in workspaces BLUI ships. They
+      are the leftovers of the earlier abort fix - the macro *registrations* were
+      removed to stop `bl_keymap_utils/io.py` aborting, and the keymap data
+      naming them was never removed alongside. That is the same rule the macro
+      section above states, applied to a previous round's residue.
+
+      **Two corrections to earlier claims, both from reading the call list
+      instead of the comment:**
+
+      * The macro section said `_object()` was "still in". It is not:
+        `spacetypes.c` calls only `_file()`, `_sequencer()` and `_gpencil()`.
+      * The comment at `spacetypes.c:163` says "the four left - file, sequencer,
+        paint, gpencil" while three calls are present.
+        `ED_operatormacros_paint()` is defined, declared in `ED_paint.h`, and
+        called from nowhere. Its absence is inert only because the one macro it
+        registers (`PAINTCURVE_OT_add_point_slide`) appears in no keymap data -
+        coincidence, not design.
+
+      #### Deliberate decisions
+
+      * **`DANGLING_ALLOWED` stays empty and the check therefore FAILS today.**
+        Parking the unreachable `view3d.*` group in it would also silence
+        `object.duplicate_move` and `collection.*`, which are reachable bugs.
+        An allowlist filled in to make a suite green is how a suite stops being
+        able to fail. The fix is to delete the keymap items, not excuse them.
+      * **A shipped preset is not an instantiated preset.** Only `Blender.py`
+        loads at startup; `Blender_27x` and `Industry_Compatible` are created on
+        demand. At startup `keyconfigs` holds `Blender`, `Blender addon`,
+        `Blender user`. Touching `kc.preferences` does *not* materialize them
+        (measured; that was the first hypothesis and it is wrong). The check
+        tests the preset **file** exists, then activates it **by filepath**.
+        `preferences.keyconfig_activate` takes `filepath=`, not `file=` -
+        passing `file=` raises `TypeError` inside the timer and the process then
+        dies of an access violation, which is how that was found.
+
+      Measured keymap counts, `--factory-startup`: **`Blender` 112,
+      `Blender_27x` 103, `Industry_Compatible` 103.**
+
+      Suite result: `check_keymap_config.py` **FAILED (3)**, exit 1 - the three
+      per-preset dangling assertions. Everything else in it passes. See
+      "Verification suite coverage boundaries" for what each script does and
+      does not cover.
+
+      **Nothing else changed this round.** No source was touched, no module was
+      deleted, and the binary is unchanged - the script is run from
+      `source\blui\tools\` via `--python` and does not need installing.
 
       Nothing was deleted and nothing was changed this round. No commit: the
       tree is untouched and the README entry is the deliverable.
