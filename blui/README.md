@@ -454,6 +454,79 @@ The scan is deliberately **not** gated on `note->window == win`: several of
 these are broadcast with a null window via `WM_main_add_notifier()`, so gating
 on it would miss exactly the directory-change case it is there for.
 
+### File browser operations
+
+Four things the browser has to do that Blender's never did, because Blender's is
+a file *dialog* and BLUI's is a file *manager*.
+
+**Double-click opens the file.** Blender opens a file by handing it back to the
+operator that asked for it, so with no such operator a double-click fell through
+and was ignored. It now runs `ShellExecuteEx` `"open"` through
+`BLI_windows_external_operation_execute()`, so file associations apply and
+double-clicking a `.exe` launches it. Directories were already handled.
+
+**Ctrl+C / Ctrl+X / Ctrl+V** work on files through the **system** clipboard, not
+Blender's interface clipboard (`wm.copy`/`wm.paste` are for text and button
+values), so a copy here pastes into Explorer and a copy there pastes here. The
+payload is the same `CF_HDROP` the drag source already builds, which is why
+`GHOST_DragSourceWin32_Clipboard*` lives next to it rather than in a new file.
+Cut publishes the paths with `CFSTR_PREFERREDDROPEFFECT` set to move and touches
+nothing - the files move when something pastes them. Paste never overwrites:
+replacing a file is the user's decision and there is no prompt on this path, so
+a name that already exists is skipped and reported.
+
+Three details that are easy to get wrong and are written down for that reason:
+
+- `SetClipboardData()` takes the handle on **success** and leaves it to the
+  caller on failure, so freeing it afterwards is a double free. The self test in
+  `blui/tools/dragsource_selftest.cc` round-trips the clipboard precisely
+  because a mistake here is invisible in the UI.
+- The operators are registered on **every** platform, not under `#ifdef WIN32`,
+  and the keymap binds them unconditionally. The transport is Windows-only but
+  fails closed, whereas a platform-dependent keymap is a *dangling binding* on
+  the platform that lacks the operator - the exact failure the assertion in
+  `check_keymap_config.py` exists to catch.
+- Paste clears the clipboard after a move. Those paths no longer exist, so
+  leaving them there would offer files that cannot be pasted again.
+
+**The shell context menu** (`Windows Shell Menu...`) hosts `IContextMenu` for the
+selected files. Two things it needed on Windows 10, which is what this fork is
+developed on:
+
+- `QueryContextMenu()` produces the top-level entries, but the messages that let
+  an extension fill a submenu as it opens (`WM_INITMENUPOPUP`, `WM_DRAWITEM`,
+  `WM_MEASUREITEM`, `WM_MENUCHAR`) go to a modal loop that `TrackPopupMenu()`
+  owns. They are forwarded through a `WH_MSGFILTER` hook for the life of the
+  popup; without it 7-Zip's and TortoiseSVN's submenus came up empty while the
+  menu itself looked complete. `GHOST_ShellMenuWin32_SupportsMenuMessages()`
+  exposes whether there is a receiver, and the self test asserts it - nothing
+  else in the suite can see this half.
+- `CMF_EXTENDEDVERBS` is passed only on Windows 11 and later. It exists to reach
+  what Win11 hides behind "Show more options"; on Win10 there is no such split
+  and passing it adds the verbs otherwise reserved for Shift+right-click.
+
+The entry also only ever acted on **selected** files, and right-clicking does not
+select in Blender's browser - selection is on left press. Right-clicking an
+unselected file therefore collected nothing and cancelled, which is
+indistinguishable from a dead menu entry. The invoke now makes the item under the
+cursor the selection first, unless it is already part of it, so right-clicking
+inside a multi-selection still acts on all of it.
+
+### Known gap: shortcut icons are not verified
+
+`BLI_windows_file_icon_load()` asks the shell for the icon of what a `.lnk`
+points at, and `filelist_file_create_entry()` turns it into a preview icon for
+`.lnk` entries. It builds, and it fails closed - a failed load leaves the entry
+with its ordinary icon - but **it has not been observed working**.
+
+The reason is that there is no instrument for it yet. The file list is not
+reachable from Python (`SpaceFile` exposes `params`, not the entries), and
+driving the browser to a folder from a `--python` script did not rebuild the
+list, so a trace added to the load path never fired. The right instrument is the
+one the shell menu already has: move the extraction out of BLI into the GHOST
+SDK-only pattern and give it a self test, which needs no window and no CMake.
+Until then this is code that compiles, not a feature.
+
 ## Verified state
 
 Everything below is checked by a script in `blui/tools/`, not asserted from
