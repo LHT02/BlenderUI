@@ -469,6 +469,38 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
   info.ptInvoke.x = screen_x;
   info.ptInvoke.y = screen_y;
 
+  if (SUCCEEDED(shell_menu.context_menu()->InvokeCommand(
+          reinterpret_cast<LPCMINVOKECOMMANDINFO>(&info))))
+  {
+    return true;
+  }
+
+  /* Some extensions answer only to their canonical verb, not to the menu
+   * offset they were handed - they populate the menu and then fail to
+   * recognise their own command id. Ask for the verb and try once more, rather
+   * than reporting a failure the user can do nothing about.
+   *
+   * `GCS_VERBW` writes a wide string, and the API takes it as `char *` because
+   * the A and W variants share a signature. */
+  wchar_t verb[128] = {0};
+  if (FAILED(shell_menu.context_menu()->GetCommandString(
+          offset, GCS_VERBW, nullptr, reinterpret_cast<char *>(verb), 128)))
+  {
+    return false;
+  }
+  if (verb[0] == L'\0') {
+    return false;
+  }
+
+  memset(&info, 0, sizeof(info));
+  info.cbSize = sizeof(info);
+  info.fMask = CMIC_MASK_UNICODE | CMIC_MASK_PTINVOKE;
+  info.hwnd = window;
+  info.lpVerbW = verb;
+  info.nShow = SW_SHOWNORMAL;
+  info.ptInvoke.x = screen_x;
+  info.ptInvoke.y = screen_y;
+
   return SUCCEEDED(
       shell_menu.context_menu()->InvokeCommand(reinterpret_cast<LPCMINVOKECOMMANDINFO>(&info)));
 }
