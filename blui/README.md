@@ -1192,6 +1192,48 @@ The work is staged so the build stays green at every step.
       the directory - which is the same lesson as the include sweeps, arrived at
       from the other direction.
 
+      ### `space_topbar` is scoped, and it is not the status bar's twin
+
+      The status bar took one round. The top bar will not, and the reason is
+      worth recording before anyone starts it: **the top bar owns two C menu
+      types that BLUI keeps using.**
+
+      - `TOPBAR_MT_undo_history`, defined in `space_topbar.c` (~30 lines) and
+        invoked by `editors/undo/ed_undo.cc:777` through `WM_menu_name_call()`.
+        Undo is core to BLUI, so this menu has to *move* to a kept module before
+        the top bar can go - not be deleted with it.
+      - `TOPBAR_MT_file_open_recent`, also defined there, and named by
+        `keymap_data/industry_compatible_data.py:187` as an `op_menu()` binding.
+
+      Both are additionally listed by name in `interface_template_search_menu.cc`.
+
+      **The Python half is the opposite of the status bar's.** There the whole
+      `bl_ui` module had to go. Here `bl_ui/space_topbar.py` must *stay*: it
+      defines BLUI's entire main menu bar - `TOPBAR_MT_editor_menus`,
+      `TOPBAR_MT_file`, `_edit`, `_window`, `_help`, `_blender`, and the
+      BLUI-specific `TOPBAR_MT_blui_components`. It is drawn from
+      `bl_ui/space_blui.py:20,37`, which imports `TOPBAR_MT_editor_menus` and
+      calls `draw_collapsible()`. Only the `Header` class at
+      `space_topbar.py:5` (`bl_space_type = 'TOPBAR'`) may be removed; the menus
+      stay, because a window header draws them rather than a top-bar area.
+
+      So the module is named after the space, and the *file of the same name* is
+      now mostly menu definitions that have nothing to do with it. Third
+      appearance of that pattern, and the largest instance so far.
+
+      The C-side sites, for whoever picks this up - the enum-first method will
+      re-derive them, but they are: `rna_space.c` (enum array +
+      `rna_Space_refine`), `rna_screen.c` (the `Area.type` setter and the itemf
+      filter), `readfile.cc`, `wm_draw.c`, `wm_event_system.cc` (two), `area.cc`
+      (two), `screen_ops.c` (six), `screen_user_menu.c`,
+      `blenkernel/context.cc` (`CTX_wm_space_topbar`), `interface/resources.cc`,
+      `gpencil_utils.c` (two) and `interface_template_search_menu.cc`.
+
+      The `include_all_areas` sentinel at `interface_template_search_menu.cc:1142`
+      is already dead: it is true only when the *top bar* runs the menu search,
+      and no top-bar area can exist in BLUI. The dummy `ScrArea` at line 515 only
+      needs a different non-`SPACE_EMPTY` spacetype, and `SPACE_INFO` will do.
+
       ### `editors/space_statusbar/` is deleted, and the Python half is not optional
 
       The status bar - asked for in the original brief ("remove Blender's top bar
