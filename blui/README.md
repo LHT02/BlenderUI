@@ -1693,6 +1693,10 @@ The work is staged so the build stays green at every step.
       - **`editors/gpencil_legacy`.** 6 files for `ED_object.h` and **12** for
         `ED_view3d.h`. Grease-pencil annotation painting is a component BLUI
         keeps, and it is a 3D-context painter: it needs
+        *(these figures are the pre-annotation-cut counts. The
+        re-measurement after `feec67c6313` is **5 and 11**, and it shows both
+        buckets are the GP **object**, not annotation - the sentence below is
+        wrong about that. Kept for the record; read the re-measurement.)*
         `ED_view3d_depth_read_cached`, `_depth_override`, `_autodist_simple`,
         `_calc_camera_border`, `_project_float_global` and friends to map screen
         input onto the scene. **This is the finding that decides `space_view3d`:**
@@ -1721,6 +1725,10 @@ The work is staged so the build stays green at every step.
          product statement: BLUI has no modifier stack) or the functions they
          call move somewhere kept. That is 16 functions in one file, and it is
          the cheapest of the three buckets.
+
+         *(Re-measured after the annotation cut - see "`object` +
+         `space_view3d` re-measured" below. This bucket is unchanged at 7
+         files for `ED_object.h`; it is still the cheapest.)*
       2. **`space_view3d` cannot be deleted before the projection math is
          separated from the viewport.** `ED_view3d_project_*`,
          `ED_view3d_win_to_3d_*`, `ED_view3d_depth_*`,
@@ -1736,6 +1744,10 @@ The work is staged so the build stays green at every step.
          most entangled with 3D projection. If annotation painting is in scope
          for BLUI, it pins the projection math in place and the honest answer is
          that `space_view3d` shrinks but does not disappear.
+
+         **CORRECTED.** LHT answered that annotation is *not* in scope, and
+         the projection math is *still* pinned - the bucket turned out to be
+         the GP object, not annotation. See the re-measurement below.
 
       That third point is a **product question for LHT, not a technical
       one** - the same shape as the particle question that unblocked `physics`,
@@ -1868,6 +1880,10 @@ The work is staged so the build stays green at every step.
          for `ED_view3d.h`, and most of the 12 are the annotation painter's
          depth/projection calls. Step 1 should take them out of the table; how
          much of the remaining 25 + 38 it takes has to be measured, not assumed.
+
+         **DONE - see the re-measurement section below.** The answer is 1 and
+         1, not 6 and 12; "most of the 12 are the annotation painter's" was
+         false.
       3. **The `OB_GPENCIL_LEGACY` object is a separate decision**, and a much
          bigger one: 15 switch arms in `object.cc`, the whole
          `gpencil_modifiers_legacy/` tree, `rna_gpencil_legacy.c` +
@@ -1882,6 +1898,108 @@ The work is staged so the build stays green at every step.
       and identifies `gpencil_legacy` as the next 1.6 MB - but the 63-entry
       keymap coupling and the object/annotation split mean it wants its own
       round with its own build and verify, exactly like every other module here.
+
+      ### `object` + `space_view3d` re-measured after the annotation cut: the bucket was mislabelled
+
+      The scoping round above estimated that annotation was worth **6 files** of
+      `ED_object.h`'s kept surface and **12** of `ED_view3d.h`'s. Those figures
+      were the product question's whole justification - "annotation painting is
+      the single largest kept consumer of `space_view3d`, so retiring it
+      unblocks the projection math." The files have now actually been deleted
+      (`feec67c6313`), so the estimate can be re-run against the tree instead of
+      carried forward. **Both numbers are wrong, and they are wrong in the
+      direction that matters.**
+
+      | | `ED_object.h` | `ED_view3d.h` |
+      | --- | --- | --- |
+      | before annotation cut | 25 kept files | 38 kept files |
+      | **after** annotation cut | **24** kept files | **37** kept files |
+      | estimated drop | 6 | 12 |
+      | **actual drop** | **1** | **1** |
+
+      One file each. Both are the same class of diff: `gpencil_legacy` went from
+      6 to 5 files on `ED_object.h` and from 12 to 11 on `ED_view3d.h`, because
+      the two files that actually died (`annotate_draw.c`, `annotate_paint.c`)
+      took their own includes with them. Nothing else moved.
+
+      #### Why the bucket was mislabelled
+
+      The old table described the 12 as *"the whole annotation/gpencil paint
+      stack"* and read the number as annotation debt. Re-run per file, the 11
+      survivors on `ED_view3d.h` are:
+
+      ```
+       7  gpencil_paint.c, gpencil_fill.c, gpencil_utils.c, gpencil_primitive.c,
+          gpencil_sculpt_paint.c, gpencil_convert.c, gpencil_edit.c
+          -> OB_GPENCIL_LEGACY paint/fill/sculpt brushes, not annotation
+          ED_view3d_depth_override, _depth_read_cached, _depth_read_cached_seg,
+          _depths_free, _calc_zfac, _project_float_global, _pixel_size
+       3  gpencil_select.c, gpencil_uv.c, gpencil_intern.h
+       1  gpencil_ops.c
+      ```
+
+      Not one of them is annotation. They are the **grease-pencil object's**
+      3D painters, and they ask `space_view3d` the same question annotation did:
+      "turn this screen coordinate into a scene-space point using the cached
+      depth buffer." That is why deleting the annotation half changed nothing -
+      it was never the load.
+
+      The same mislabel is visible on `ED_object.h`: the surviving
+      `gpencil_legacy` consumer count is 5, and all five are `gpencil_data.c`,
+      `gpencil_edit.c`, `gpencil_armature.c`, `gpencil_convert.c`,
+      `gpencil_trace_ops.c` - object-side files.
+
+      #### What this changes
+
+      The record above reads: *"`gpencil_legacy` (18 files across the two
+      headers) is the consumer to look at first... If annotation painting is in
+      scope for BLUI, it pins the projection math in place; if it is not, the
+      projection math is unblocked."* **LHT answered that annotation is out of
+      scope, and the measurement above says the projection math is still
+      pinned - by the GP object instead.**
+
+      So the dependency did not move; the name on it did. The bucket that holds
+      `space_view3d` in place is `OB_GPENCIL_LEGACY`, which is the *other*,
+      larger decision the scoping round already flagged as needing its own
+      answer (15 switch arms in `object.cc`, all of `gpencil_modifiers_legacy/`,
+      `rna_gpencil_legacy.c` + `rna_gpencil_legacy_modifier.c`, `io/gpencil/`,
+      three file menu items). **The annotation answer does not unblock target
+      4; only the GP-object answer does.**
+
+      #### The same re-measurement, per bucket, unchanged
+
+      Everything else the target-4 table listed is untouched, which is itself
+      the finding - `physics`, `curves`, `space_topbar` and `annotation`
+      contributed zero kept consumers, so the kept surface is stable at 24 + 37:
+
+      | bucket | `ED_object.h` | `ED_view3d.h` |
+      | --- | --- | --- |
+      | `makesrna/intern` | 7 | 2 |
+      | `gpencil_legacy` | 5 ~~6~~ | 11 ~~12~~ |
+      | `editors/interface` | 2 | 2 |
+      | `windowmanager` | 1 | 4 + 2 gizmo + 1 xr |
+      | `draw/` | 0 | 6 engines + 3 intern |
+      | `editors/render` | 1 | 3 |
+      | everything else | 8 | 12 |
+
+      The two decisive non-target buckets are unchanged and still decisive:
+      `rna_object.c`'s **16** `ED_object_*` calls (the object model's public
+      Python API) and the window manager's dependency on the viewport. Neither
+      is a function of annotation or of grease pencil.
+
+      #### Status: measured, no deletion, and the blocking question is now the right one
+
+      Target 4 stays where it was - 27 files / 1,194,257 B (`object`) and 40
+      files / 1,145,315 B (`space_view3d`) still present - but the *reason* it is
+      blocked has been corrected. It is not annotation. The next product
+      question to put to LHT is not "is the projection math worth keeping" but
+      **"does BLUI ship `OB_GPENCIL_LEGACY`"** - and that one is a bigger
+      question than annotation was, because it carries a modifier stack, a
+      brush system and a file format along with it.
+
+      No commit for this round: nothing in the tree changed. The measurement is
+      recorded here so the next round does not re-derive it, and the two numbers
+      it retires - 6 and 12 - are annotated rather than left to look current.
 
       ### Annotation is deleted: `annotate_draw.c` + `annotate_paint.c` (126 KB)
 
