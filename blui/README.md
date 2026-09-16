@@ -62,6 +62,46 @@
 >   success. Redirect to a file and read the file, and check the exit code on
 >   its own line.
 
+### The file manager's operation surface is complete, and a retry does not fix the stall
+
+Two results from taking "improve the file manager" literally.
+
+**Every operation a file browser needs is available.** `probe_file_ops.py` walks
+`bpy.ops.file` and reports each poll with the browser's own area and region in
+context, first with nothing selected and then with a file selected by a
+simulated right-press. The second column is the one that matters, because
+several polls legitimately require a selection:
+
+```
+with nothing selected:  delete  NO   filenum NO
+with a file selected:   delete  ok   filenum NO
+```
+
+`file_delete_poll` walks the file list looking for a selection and returns false
+without one - correct, and it briefly looked like a broken Delete because the
+first run had nothing selected. `file_filenum_poll` requires `FILE_CHECK_EXISTING`,
+which is save-dialog mode, so it is meant to be unavailable while browsing. Cut,
+copy, paste, rename, delete, new folder, navigation, bookmarks, filtering and the
+shell menu are all live.
+
+**An automatic retry was tried and does not work.** The session log shows
+attempts two through thirteen succeeding in about 600 ms each after the first
+one stalled, so retrying looked like the obvious fix. Added, then measured:
+
+```
+build attempt 1 abandoned after 8000 ms
+retrying once - later builds in the same process are measured to succeed
+build attempt 2 abandoned after 8000 ms
+```
+
+Both stall. The later attempts in that log succeeded because the *first* worker
+had eventually finished and loaded the extensions in the meantime; a retry that
+starts while the first worker is still inside the shell hits exactly the same
+wall. Reverted, because eight seconds followed by another eight is worse than
+eight. What would work is waiting for the first build to finish before trying
+again, and that can be minutes - not something to do to a person who just
+right-clicked.
+
 ### The shell menu stall is in the shell, not in an installed extension
 
 `QueryContextMenu` stalls for over 150 seconds on some items. The obvious

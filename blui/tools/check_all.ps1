@@ -59,6 +59,7 @@ $checks = @(
   @{ Name = "check_workspace_geometry"; Timeout = 240; Cmd = (Blui @("--factory-startup", "--python", "$tools\check_workspace_geometry.py")) }
   @{ Name = "check_save_isolation";    Timeout = 240; Cmd = (Blui @("--factory-startup", "--python", "$tools\check_save_isolation.py", "--", "$env:TEMP\blui_save_isolation_check.blend")) }
   @{ Name = "probe_document_isolation"; Timeout = 240; Cmd = (Blui @("--factory-startup", "--python", "$tools\probe_document_isolation.py")) }
+  @{ Name = "check_file_ops";          Timeout = 240; Cmd = (Blui @("--factory-startup", "--enable-event-simulate", "--python", "$tools\probe_file_ops.py")) }
 
   # MUST run windowed: the freeze it guards against only happens on a GUI
   # thread, so under --background it would pass while the app still froze.
