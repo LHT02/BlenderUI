@@ -60,6 +60,13 @@ static bool windows_is_11_or_greater()
   return info.dwMajorVersion > 10 || (info.dwMajorVersion == 10 && info.dwBuildNumber >= 22000);
 }
 
+/* Defined further down, next to the popup that uses it. Declared here so the
+ * build path can be timed: every call in it runs third-party shell extension
+ * code, and a slow extension is indistinguishable from a hang without timings.
+ * A hang in here is exactly what "the menu entry does nothing" turned out to
+ * be - the UI stops responding before the menu is ever created. */
+static void shell_menu_log(const char *fmt, ...);
+
 /* -------------------------------------------------------------------- */
 /** \name UTF conversion
  * \{ */
@@ -180,6 +187,7 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
 
   /* A single shell menu can only act on items that share a parent folder, so
    * that is the set the menu is built for. */
+  const ULONGLONG t_start = GetTickCount64();
   PIDLIST_ABSOLUTE first_parent = ILClone(m_item_pidls[0]);
   if (first_parent == nullptr) {
     return false;
@@ -208,6 +216,7 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
       m_folder == nullptr) {
     return false;
   }
+  shell_menu_log("  bind to parent: %llu ms", GetTickCount64() - t_start);
 
   if (FAILED(m_folder->GetUIObjectOf(nullptr,
                                      UINT(m_children.size()),
@@ -219,6 +228,9 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
   {
     return false;
   }
+  /* This is where the shell loads the extensions registered for the file type,
+   * so it is the expensive one. */
+  shell_menu_log("  GetUIObjectOf: %llu ms", GetTickCount64() - t_start);
 
   m_menu = CreatePopupMenu();
   if (m_menu == nullptr) {
@@ -254,6 +266,10 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
   const UINT flags = CMF_NORMAL | (windows_is_11_or_greater() ? CMF_EXTENDEDVERBS : 0);
 
   const HRESULT result = m_context_menu->QueryContextMenu(m_menu, 0, kFirstId, kLastId, flags);
+  shell_menu_log("  QueryContextMenu: %llu ms (hr=0x%08lX, items=%d)",
+                 GetTickCount64() - t_start,
+                 (unsigned long)result,
+                 (int)GetMenuItemCount(m_menu));
   if (FAILED(result)) {
     return false;
   }

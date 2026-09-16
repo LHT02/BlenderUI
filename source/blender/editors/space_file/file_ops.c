@@ -2078,6 +2078,13 @@ static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmE
   SpaceFile *sfile = CTX_wm_space_file(C);
   wmWindow *win = CTX_wm_window(C);
 
+  fprintf(stderr,
+          "BLUI shell invoke: enter sfile=%p files=%p win=%p ghostwin=%p\n",
+          (void *)sfile,
+          (sfile != NULL) ? (void *)sfile->files : NULL,
+          (void *)win,
+          (win != NULL) ? (void *)win->ghostwin : NULL);
+
   if (sfile == NULL || sfile->files == NULL || win == NULL || win->ghostwin == NULL) {
     return OPERATOR_CANCELLED;
   }
@@ -2095,6 +2102,7 @@ static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmE
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
 
   const int num_files = filelist_files_ensure(sfile->files);
+  fprintf(stderr, "BLUI shell invoke: filelist_files_ensure -> %d\n", num_files);
   if (num_files <= 0) {
     fprintf(stderr, "BLUI shell menu: no files in list\n");
     return OPERATOR_CANCELLED;
