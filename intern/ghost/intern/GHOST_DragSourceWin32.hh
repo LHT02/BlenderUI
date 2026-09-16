@@ -82,4 +82,36 @@ GHOST_TSuccess GHOST_DragSourceWin32_StartDrag(void *hwnd,
                                                const char *const *utf8_paths,
                                                int count);
 
+/* -------------------------------------------------------------------- */
+/** \name Clipboard
+ *
+ * The same `CF_HDROP` payload the drag carries is also what a copy or cut puts
+ * on the clipboard, which is what makes Ctrl+C in BLUI paste into Explorer and
+ * the other way round. Plain clipboard calls rather than `OleSetClipboard()`:
+ * the data is a single global-memory block, so the OLE data object would add
+ * nothing that the shell reads.
+ * \{ */
+
+/**
+ * Put \a count files on the system clipboard.
+ *
+ * \param move: True for a cut, false for a copy. Recorded as
+ *        `CFSTR_PREFERREDDROPEFFECT` so that pasting elsewhere moves rather
+ *        than copies. Nothing is moved here - the files are untouched until
+ *        something pastes them.
+ */
+GHOST_TSuccess GHOST_DragSourceWin32_ClipboardSetFiles(const char *const *utf8_paths,
+                                                       int count,
+                                                       bool move);
+
+/**
+ * Read the file list currently on the system clipboard.
+ *
+ * \param r_paths: Receives a newly allocated array of UTF-8 paths, or NULL.
+ *        Free with #GHOST_DragSourceWin32_FreePaths.
+ * \param r_move: Optional; receives whether the clipboard asked for a move.
+ * \return The number of paths, 0 if the clipboard holds no file list.
+ */
+int GHOST_DragSourceWin32_ClipboardGetFiles(char ***r_paths, bool *r_move);
+
 #endif /* _WIN32 */

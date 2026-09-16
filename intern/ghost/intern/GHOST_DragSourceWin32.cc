@@ -532,4 +532,99 @@ GHOST_TSuccess GHOST_DragSourceWin32_StartDrag(void *hwnd,
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Clipboard
+ * \{ */
+
+GHOST_TSuccess GHOST_DragSourceWin32_ClipboardSetFiles(const char *const *utf8_paths,
+                                                       int count,
+                                                       bool move)
+{
+  if (utf8_paths == nullptr || count <= 0) {
+    return GHOST_kFailure;
+  }
+
+  HGLOBAL hdrop = static_cast<HGLOBAL>(GHOST_DragSourceWin32_CreateHDrop(utf8_paths, count));
+  if (hdrop == nullptr) {
+    return GHOST_kFailure;
+  }
+
+  const UINT effect_format = RegisterClipboardFormat(CFSTR_PREFERREDDROPEFFECT);
+  HGLOBAL heffect = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, sizeof(DWORD));
+  if (heffect != nullptr) {
+    DWORD *effect = static_cast<DWORD *>(GlobalLock(heffect));
+    if (effect != nullptr) {
+      *effect = move ? DROPEFFECT_MOVE : DROPEFFECT_COPY;
+      GlobalUnlock(heffect);
+    }
+  }
+
+  if (!OpenClipboard(nullptr)) {
+    GlobalFree(hdrop);
+    if (heffect != nullptr) {
+      GlobalFree(heffect);
+    }
+    return GHOST_kFailure;
+  }
+
+  EmptyClipboard();
+
+  /* `SetClipboardData` takes ownership on success, so each handle is freed only
+   * when the call fails. Freeing them afterwards would be a double free. */
+  if (SetClipboardData(CF_HDROP, hdrop) == nullptr) {
+    GlobalFree(hdrop);
+  }
+  if (heffect != nullptr && SetClipboardData(effect_format, heffect) == nullptr) {
+    GlobalFree(heffect);
+  }
+
+  CloseClipboard();
+  return GHOST_kSuccess;
+}
+
+int GHOST_DragSourceWin32_ClipboardGetFiles(char ***r_paths, bool *r_move)
+{
+  if (r_paths == nullptr) {
+    return 0;
+  }
+  *r_paths = nullptr;
+  if (r_move != nullptr) {
+    *r_move = false;
+  }
+
+  if (!OpenClipboard(nullptr)) {
+    return 0;
+  }
+
+  int count = 0;
+
+  /* The handle belongs to the clipboard for as long as it stays open, so it is
+   * read here and not freed. */
+  HANDLE hdrop = GetClipboardData(CF_HDROP);
+  if (hdrop != nullptr) {
+    char **paths = nullptr;
+    int path_count = 0;
+    if (GHOST_DragSourceWin32_ReadHDrop(hdrop, &paths, &path_count)) {
+      *r_paths = paths;
+      count = path_count;
+    }
+  }
+
+  if (r_move != nullptr && count > 0) {
+    HANDLE heffect = GetClipboardData(RegisterClipboardFormat(CFSTR_PREFERREDDROPEFFECT));
+    if (heffect != nullptr) {
+      const DWORD *effect = static_cast<const DWORD *>(GlobalLock(heffect));
+      if (effect != nullptr) {
+        *r_move = ((*effect) & DROPEFFECT_MOVE) != 0;
+        GlobalUnlock(heffect);
+      }
+    }
+  }
+
+  CloseClipboard();
+  return count;
+}
+
+/** \} */
+
 #endif /* _WIN32 */

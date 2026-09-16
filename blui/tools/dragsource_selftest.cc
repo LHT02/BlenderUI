@@ -152,6 +152,54 @@ static void test_com_object()
   object->Release();
 }
 
+/**
+ * The clipboard half: a copy or cut puts the same `CF_HDROP` payload on the
+ * system clipboard, and a paste reads it back.
+ *
+ * Worth testing here rather than only in the app, because the interesting part
+ * is the ownership rule - `SetClipboardData()` takes the handle on success and
+ * leaves it to the caller on failure - and a mistake there is a double free or
+ * a leak that nothing in the UI would show.
+ */
+static void test_clipboard()
+{
+  printf("clipboard:\n");
+
+  check(GHOST_DragSourceWin32_ClipboardSetFiles(g_paths, g_path_count, false) == GHOST_kSuccess,
+        "a copy is placed on the clipboard");
+
+  char **paths = nullptr;
+  bool move = true;
+  const int count = GHOST_DragSourceWin32_ClipboardGetFiles(&paths, &move);
+  check(count == g_path_count, "the clipboard reads back the same number of paths");
+  check(!move, "a copy is not marked as a move");
+
+  if (count == g_path_count) {
+    bool all_match = true;
+    for (int i = 0; i < count; i++) {
+      if (paths[i] == nullptr || strcmp(paths[i], g_paths[i]) != 0) {
+        all_match = false;
+        printf("        [%d] got %s\n", i, paths[i] ? paths[i] : "(null)");
+      }
+    }
+    check(all_match, "the paths survive the round trip");
+  }
+  GHOST_DragSourceWin32_FreePaths(paths, count);
+
+  check(GHOST_DragSourceWin32_ClipboardSetFiles(g_paths, g_path_count, true) == GHOST_kSuccess,
+        "a cut is placed on the clipboard");
+
+  paths = nullptr;
+  move = false;
+  const int cut_count = GHOST_DragSourceWin32_ClipboardGetFiles(&paths, &move);
+  check(cut_count == g_path_count, "the cut reads back the same number of paths");
+  check(move, "a cut is marked as a move, so pasting elsewhere moves the files");
+  GHOST_DragSourceWin32_FreePaths(paths, cut_count);
+
+  check(GHOST_DragSourceWin32_ClipboardSetFiles(nullptr, 0, false) == GHOST_kFailure,
+        "an empty file list is rejected");
+}
+
 int main()
 {
   const HRESULT ole = OleInitialize(nullptr);
@@ -159,6 +207,7 @@ int main()
 
   test_payload();
   test_com_object();
+  test_clipboard();
 
   printf("\n%s (%d failure%s)\n",
          g_failures == 0 ? "PASS" : "FAIL",
