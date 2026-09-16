@@ -5,7 +5,7 @@
 > This document is long because it records what did *not* work as carefully as
 > what did. If you are picking BLUI up, this is the short version.
 >
-> **Where it stands at `fe74c517a5e`:** build green, all seven checks in
+> **Where it stands at `5cbd9abf3f5`:** build green, all seven checks in
 > `blui/tools/` pass, and both native self tests pass
 > (`shellmenu_selftest.exe`, `dragsource_selftest.exe`). Run them with
 > `blui/tools/…` as described under *Verified state*; none need a person
@@ -36,6 +36,14 @@
 >    Everything measured is in the module tables below, including the ones
 >    rejected and why.
 >
+>    **Read *The 3D block is one link unit, not a sequence* before starting
+>    this.** The four space modules left (`view3d`, `node`, `outliner`, `clip`)
+>    cannot be taken one at a time: dropping them from the build on their own
+>    leaves 179 unresolved externals over 174 symbols, referred to from 24
+>    libraries. The "must go first" above means *first in one coordinated
+>    pass*, not *first as a smaller step*. Attempting the smaller step is how
+>    this round was spent.
+>
 > **Two habits this codebase rewards**, both learned the hard way and both
 > recorded with their evidence:
 >
@@ -47,6 +55,75 @@
 > - **Never leave the tree red.** Two attempts were reverted mid-round rather
 >   than committed half-done; both are written up. A lost round is cheaper than
 >   a broken fork.
+> - **Do not read a build's exit code through a pipe.** `build.cmd` is correct -
+>   it does `exit /b 1` when ninja fails - but `build.cmd | Select-Object -Last
+>   45` reports the *pipeline's* status, which is 0 because `Select-Object`
+>   succeeded. That is exactly how a failed link was first read here as a
+>   success. Redirect to a file and read the file, and check the exit code on
+>   its own line.
+
+### The 3D block is one link unit, not a sequence
+
+The plan in open-work item 4 used to read as though the 3D modules could be
+retired a few at a time, `object` and `space_view3d` leading. That is wrong, and
+it is worth the space here because it is the kind of wrong that costs a round.
+
+Taking just the four remaining space modules out of the build -
+`editors/space_clip`, `space_node`, `space_outliner`, `space_view3d`, by
+removing their `add_subdirectory()` lines and their four entries from the `LIB`
+list in `editors/space_api/CMakeLists.txt` - does not shrink the problem. It
+produces:
+
+```
+bin\BLUI.exe : fatal error LNK1120: 179 个无法解析的外部命令
+```
+
+179 unresolved externals over **174 distinct symbols**, referred to from **24
+libraries**:
+
+| Referring library | Errors | | Referring library | Errors |
+| --- | ---: | --- | --- | ---: |
+| `bf_editor_sculpt_paint` | 98 | | `bf_editor_armature` | 13 |
+| `bf_editor_gpencil_legacy` | 48 | | `bf_editor_render` | 11 |
+| `bf_editor_transform` | 45 | | `bf_editor_interface` | 10 |
+| `bf_rna` | 42 | | `bf_editor_screen` | 8 |
+| `bf_editor_object` | 25 | | `bf_editor_curves` | 4 |
+| `bf_editor_curve` | 20 | | `bf_editor_space_sequencer` | 4 |
+| `bf_editor_gizmo_library` | 19 | | `bf_python` | 3 |
+| `bf_editor_mesh` | 19 | | `bf_editor_uvedit` | 2 |
+| `bf_editor_mask` | 18 | | `space_api`, `space_image`, `undo`, `nodes_geometry`, `python_gpu` | 1 each |
+| `bf_windowmanager` | 15 | | | |
+| `bf_draw` | 14 | | | |
+
+By symbol family: `ED_view3d_*` 88, `ED_node_*` 23, `ED_space_*` 19,
+`ED_outliner_*` 8, `ED_clip_*` 7, `view3d_opengl_*` 3, `ED_init_*` 2,
+`ED_scene_*` 2, then a tail of one-off `uiTemplate*`, `view3d_context`,
+`node_context`, `clip_context`.
+
+So the dependency runs the other way from the one the plan implied: it is not
+that `space_view3d` must go *first* so that others may follow. It is that
+`space_view3d`, `space_node`, `space_outliner` and `space_clip` are **the
+bottom of the cone** - they are what the other 24 libraries are standing on.
+Nothing in the 3D block can be removed until the block goes as a whole, or
+until its consumers are cut down first.
+
+**The false lead that preceded this**, recorded because it looked convincing.
+Counting strings in `BLUI.exe` suggested the modules were already dead:
+
+```
+VIEW3D_MT_object   0      NODE_MT_add        0      SpaceView3D   2
+view3d.select      0      OUTLINER_MT_object 0      SpaceNode    15
+```
+
+No operator idnames, and `SpaceView3D` present only because the DNA/sdna tables
+carry the struct name. The reading was "the linker already dropped these", and
+it was wrong. What is absent is the *registration* - `ED_spacetype_view3d()` is
+never called from `spacetypes.c`, so no operator or menu string is ever
+referenced - while the modules' **functions** (`ED_view3d_project_*`,
+`ED_view3d_cursor_snap_context_ensure`, ...) are still called by everyone else.
+A string table shows what is *named*; a link shows what is *needed*. Only the
+second one is the authority, which is the same lesson as the grep habit above,
+one level down.
 
 **BLUI** is a standalone file-browsing, image-viewing and text-editing
 environment built on the Blender 3.6 source tree.
