@@ -6,6 +6,13 @@ REM The drop source depends on nothing but the Windows SDK, so it can be
 REM compiled on its own - no CMake, no GHOST build, no window. That makes it
 REM possible to check the CF_HDROP payload and the COM contract quickly.
 REM
+REM The last part is deliberately split across processes. Whether clipboard data
+REM survives the process that published it decides whether the OLE publish path
+REM in GHOST_DragSourceWin32_ClipboardSetFiles is load-bearing, and that is not
+REM a question to settle by recollection of what the API promises. One process
+REM sets and exits; a second, by then the only one alive, reads. Both transports
+REM are measured so the answer is a comparison and not a single data point.
+REM
 REM   build_dragsource_selftest.cmd
 REM ---------------------------------------------------------------------------
 setlocal
@@ -49,4 +56,17 @@ popd
 
 echo.
 "%OUT%\dragsource_selftest.exe"
-exit /b %ERRORLEVEL%
+set "RC=%ERRORLEVEL%"
+
+echo.
+echo clipboard lifetime across processes:
+"%OUT%\dragsource_selftest.exe" --set
+"%OUT%\dragsource_selftest.exe" --check
+if errorlevel 1 set "RC=1"
+
+echo.
+echo for comparison, the transport this replaced:
+"%OUT%\dragsource_selftest.exe" --set-raw
+"%OUT%\dragsource_selftest.exe" --check
+
+exit /b %RC%
