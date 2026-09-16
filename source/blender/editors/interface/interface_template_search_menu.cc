@@ -423,6 +423,18 @@ static void menu_items_from_all_operators(bContext *C, MenuSearch_Data *data)
  *
  * - Look up predefined editor-menus.
  * - Look up key-map items which call menus.
+ *
+ * \param include_all_areas: **Always false, and every branch that reads it is
+ * dead.** It was true when the menu search ran from the top bar, and the top bar
+ * space no longer exists, so the single caller passes a literal `false` (see the
+ * bottom of this file). The five branches that still test it, and this
+ * parameter, are leftovers.
+ *
+ * They are deliberately left in place rather than deleted in passing: the flag
+ * is read at six interleaved points, so removing it is a structural change to
+ * this file, not the deletion of one block. `blui/README.md` records the
+ * estimate under the top-bar section so that whoever takes it on budgets a
+ * round for it instead of finding out half way through.
  */
 static MenuSearch_Data *menu_items_from_ui_create(
     bContext *C, wmWindow *win, ScrArea *area_init, ARegion *region_init, bool include_all_areas)
