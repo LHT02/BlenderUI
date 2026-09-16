@@ -43,11 +43,16 @@ $lists = @(
 
 $handlers = @{}
 foreach ($list in $lists) {
-  if (-not (Test-Path $list)) { continue }
-  Get-ChildItem $list -ErrorAction SilentlyContinue | ForEach-Object {
-    $clsid = (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).'(default)'
+  # `-LiteralPath`, not `-Path`: one of these keys is literally named `*`, and
+  # as a path wildcard it makes PowerShell walk every class under
+  # HKEY_CLASSES_ROOT looking for a matching `shellex\ContextMenuHandlers`.
+  # That is thousands of keys and it does not come back - which is what made
+  # this driver produce no output at all, twice, before anyone noticed.
+  if (-not (Test-Path -LiteralPath $list)) { continue }
+  Get-ChildItem -LiteralPath $list -ErrorAction SilentlyContinue | ForEach-Object {
+    $clsid = (Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue).'(default)'
     if ($clsid -and $clsid -match '^\{') {
-      $dll = (Get-ItemProperty "HKLM:\SOFTWARE\Classes\CLSID\$clsid\InprocServer32" -ErrorAction SilentlyContinue).'(default)'
+      $dll = (Get-ItemProperty -LiteralPath "HKLM:\SOFTWARE\Classes\CLSID\$clsid\InprocServer32" -ErrorAction SilentlyContinue).'(default)'
       if (-not $handlers.ContainsKey($clsid)) {
         $handlers[$clsid] = [pscustomobject]@{
           Name  = $_.PSChildName
