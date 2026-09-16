@@ -128,29 +128,6 @@ static void drw_state_ensure_not_reused(DRWManager *dst)
 }
 #endif
 
-static bool drw_draw_show_annotation(void)
-{
-  if (DST.draw_ctx.space_data == NULL) {
-    View3D *v3d = DST.draw_ctx.v3d;
-    return (v3d && ((v3d->flag2 & V3D_SHOW_ANNOTATION) != 0) &&
-            ((v3d->flag2 & V3D_HIDE_OVERLAYS) == 0));
-  }
-
-  switch (DST.draw_ctx.space_data->spacetype) {
-    case SPACE_IMAGE: {
-      SpaceImage *sima = (SpaceImage *)DST.draw_ctx.space_data;
-      return (sima->flag & SI_SHOW_GPENCIL) != 0;
-    }
-    case SPACE_NODE:
-      /* Don't draw the annotation for the node editor. Annotations are handled by space_image as
-       * the draw manager is only used to draw the background. */
-      return false;
-    default:
-      BLI_assert(0);
-      return false;
-  }
-}
-
 /* -------------------------------------------------------------------- */
 /** \name Threading
  * \{ */
@@ -1463,8 +1440,6 @@ void DRW_draw_callbacks_post_scene(void)
   View3D *v3d = DST.draw_ctx.v3d;
   Depsgraph *depsgraph = DST.draw_ctx.depsgraph;
 
-  const bool do_annotations = drw_draw_show_annotation();
-
   if (DST.draw_ctx.evil_C) {
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 
@@ -1474,15 +1449,6 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_matrix_projection_set(rv3d->winmat);
     GPU_matrix_set(rv3d->viewmat);
-
-    /* annotations - temporary drawing buffer (3d space) */
-    /* XXX: Or should we use a proper draw/overlay engine for this case? */
-    if (do_annotations) {
-      GPU_depth_test(GPU_DEPTH_NONE);
-      /* XXX: as `scene->gpd` is not copied for COW yet. */
-      ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
-      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-    }
 
     drw_debug_draw();
 
@@ -1528,14 +1494,6 @@ void DRW_draw_callbacks_post_scene(void)
 
     DRW_draw_region_info();
 
-    /* Annotations - temporary drawing buffer (screen-space). */
-    /* XXX: Or should we use a proper draw/overlay engine for this case? */
-    if (((v3d->flag2 & V3D_HIDE_OVERLAYS) == 0) && (do_annotations)) {
-      GPU_depth_test(GPU_DEPTH_NONE);
-      /* XXX: as scene->gpd is not copied for COW yet */
-      ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, false);
-    }
-
     if ((v3d->gizmo_flag & V3D_GIZMO_HIDE) == 0) {
       /* Draw 2D after region info so we can draw on top of the camera passepartout overlay.
        * 'DRW_draw_region_info' sets the projection in pixel-space. */
@@ -1553,13 +1511,6 @@ void DRW_draw_callbacks_post_scene(void)
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
   else {
-    if (v3d && ((v3d->flag2 & V3D_SHOW_ANNOTATION) != 0)) {
-      GPU_depth_test(GPU_DEPTH_NONE);
-      /* XXX: as scene->gpd is not copied for COW yet */
-      ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
-      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-    }
-
 #ifdef WITH_XR_OPENXR
     if ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0) {
       DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
@@ -2193,7 +2144,6 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
   /* TODO(jbakker): Only populate when editor needs to draw object.
    * for the image editor this is when showing UVs. */
   const bool do_populate_loop = (DST.draw_ctx.space_data->spacetype == SPACE_IMAGE);
-  const bool do_annotations = drw_draw_show_annotation();
   const bool do_draw_gizmos = (DST.draw_ctx.space_data->spacetype != SPACE_IMAGE);
 
   /* Get list of enabled engines */
@@ -2269,9 +2219,6 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
     GPU_matrix_push_projection();
     wmOrtho2(
         region->v2d.cur.xmin, region->v2d.cur.xmax, region->v2d.cur.ymin, region->v2d.cur.ymax);
-    if (do_annotations) {
-      ED_annotation_draw_view2d(DST.draw_ctx.evil_C, true);
-    }
     GPU_depth_test(GPU_DEPTH_NONE);
     ED_region_draw_cb_draw(DST.draw_ctx.evil_C, DST.draw_ctx.region, REGION_DRAW_POST_VIEW);
     GPU_matrix_pop_projection();
@@ -2282,10 +2229,6 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
     GPU_depth_test(GPU_DEPTH_NONE);
     drw_engines_draw_text();
 
-    if (do_annotations) {
-      GPU_depth_test(GPU_DEPTH_NONE);
-      ED_annotation_draw_view2d(DST.draw_ctx.evil_C, false);
-    }
   }
 
   DRW_draw_cursor_2d();

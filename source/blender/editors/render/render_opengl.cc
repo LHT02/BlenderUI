@@ -286,8 +286,6 @@ static void screen_opengl_render_doit(const bContext *C, OGLRender *oglrender, R
 
   if (oglrender->is_sequencer) {
     SpaceSeq *sseq = oglrender->sseq;
-    struct bGPdata *gpd = (sseq && (sseq->flag & SEQ_PREVIEW_SHOW_GPENCIL)) ? sseq->gpd : nullptr;
-
     /* use pre-calculated ImBuf (avoids deadlock), see: */
     ImBuf *ibuf = oglrender->seq_data.ibufs_arr[oglrender->view_id];
 
@@ -306,42 +304,6 @@ static void screen_opengl_render_doit(const bContext *C, OGLRender *oglrender, R
         imb_freerectfloatImBuf(ibuf_result);
       }
       BLI_assert((sizex == ibuf->x) && (sizey == ibuf->y));
-    }
-    else if (gpd) {
-      /* If there are no strips, Grease Pencil still needs a buffer to draw on */
-      ibuf_result = IMB_allocImBuf(sizex, sizey, 32, IB_rect);
-    }
-
-    if (gpd) {
-      int i;
-      uchar *gp_rect;
-      uchar *render_rect = (uchar *)ibuf_result->rect;
-
-      DRW_opengl_context_enable();
-      GPU_offscreen_bind(oglrender->ofs, true);
-
-      GPU_clear_color(0.0f, 0.0f, 0.0f, 0.0f);
-      GPU_clear_depth(1.0f);
-
-      GPU_matrix_reset();
-      wmOrtho2(0, scene->r.xsch, 0, scene->r.ysch);
-      GPU_matrix_translate_2f(scene->r.xsch / 2, scene->r.ysch / 2);
-
-      G.f |= G_FLAG_RENDER_VIEWPORT;
-      ED_annotation_draw_ex(scene, gpd, sizex, sizey, scene->r.cfra, SPACE_SEQ);
-      G.f &= ~G_FLAG_RENDER_VIEWPORT;
-
-      gp_rect = static_cast<uchar *>(
-          MEM_mallocN(sizeof(uchar[4]) * sizex * sizey, "offscreen rect"));
-      GPU_offscreen_read_color(oglrender->ofs, GPU_DATA_UBYTE, gp_rect);
-
-      for (i = 0; i < sizex * sizey * 4; i += 4) {
-        blend_color_mix_byte(&render_rect[i], &render_rect[i], &gp_rect[i]);
-      }
-      GPU_offscreen_unbind(oglrender->ofs, true);
-      DRW_opengl_context_disable();
-
-      MEM_freeN(gp_rect);
     }
   }
   else {

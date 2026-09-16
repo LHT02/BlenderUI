@@ -134,6 +134,7 @@ struct bGPdata **ED_gpencil_data_get_pointers_direct(struct ScrArea *area,
 /* Get the active Grease Pencil data-block, when context is not available */
 struct bGPdata *ED_gpencil_data_get_active_direct(struct ScrArea *area, struct Object *ob);
 
+
 /**
  * Get the active Grease Pencil data-block
  * \note This is the original (#G.main) copy of the data-block, stored in files.
@@ -209,33 +210,6 @@ void ED_operatormacros_gpencil(void);
  */
 void ED_gpencil_strokes_copybuf_free(void);
 
-/* ------------ Grease-Pencil Drawing API ------------------ */
-/* drawgpencil.c */
-
-/**
- * Draw grease-pencil sketches to specified 2d-view that uses `ibuf` corrections.
- */
-void ED_annotation_draw_2dimage(const struct bContext *C);
-/**
- * Draw grease-pencil sketches to specified 2d-view
- * assuming that matrices are already set correctly.
- *
- * \note This gets called twice - first time with onlyv2d=true to draw 'canvas' strokes,
- * second time with onlyv2d=false for screen-aligned strokes.
- */
-void ED_annotation_draw_view2d(const struct bContext *C, bool onlyv2d);
-/**
- * Draw annotations sketches to specified 3d-view assuming that matrices are already set correctly.
- * NOTE: this gets called twice - first time with only3d=true to draw 3d-strokes,
- * second time with only3d=false for screen-aligned strokes.
- */
-void ED_annotation_draw_view3d(struct Scene *scene,
-                               struct Depsgraph *depsgraph,
-                               struct View3D *v3d,
-                               struct ARegion *region,
-                               bool only3d);
-void ED_annotation_draw_ex(
-    struct Scene *scene, struct bGPdata *gpd, int winx, int winy, int cfra, char spacetype);
 
 /* ----------- Grease-Pencil AnimEdit API ------------------ */
 /**

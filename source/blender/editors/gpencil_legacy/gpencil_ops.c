@@ -536,10 +536,6 @@ void ED_keymap_gpencil(wmKeyConfig *keyconf)
 
 void ED_operatortypes_gpencil(void)
 {
-  /* Annotations -------------------- */
-
-  WM_operatortype_append(GPENCIL_OT_annotate);
-
   /* Drawing ----------------------- */
 
   WM_operatortype_append(GPENCIL_OT_draw);

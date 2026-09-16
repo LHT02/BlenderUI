@@ -9,10 +9,6 @@ from bpy.app.translations import (
     contexts as i18n_contexts,
     pgettext_iface as iface_,
 )
-from bl_ui.properties_grease_pencil_common import (
-    AnnotationDataPanel,
-    AnnotationOnionSkin,
-)
 from bl_ui.space_toolsystem_common import (
     ToolActivePanelHelper,
 )
@@ -2567,50 +2563,6 @@ class SEQUENCER_PT_modifiers(SequencerButtonsPanel, Panel):
                         col.prop(mod, "gamma")
 
 
-class SEQUENCER_PT_annotation(AnnotationDataPanel, SequencerButtonsPanel_Output, Panel):
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "View"
-
-    @staticmethod
-    def has_preview(context):
-        st = context.space_data
-        return st.view_type in {'PREVIEW', 'SEQUENCER_PREVIEW'}
-
-    @classmethod
-    def poll(cls, context):
-        return cls.has_preview(context)
-
-    # NOTE: this is just a wrapper around the generic GP Panel
-    # But, it should only show up when there are images in the preview region
-
-
-class SEQUENCER_PT_annotation_onion(AnnotationOnionSkin, SequencerButtonsPanel_Output, Panel):
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "View"
-
-    @staticmethod
-    def has_preview(context):
-        st = context.space_data
-        return st.view_type in {'PREVIEW', 'SEQUENCER_PREVIEW'}
-
-    @classmethod
-    def poll(cls, context):
-        if context.annotation_data_owner is None:
-            return False
-        elif type(context.annotation_data_owner) is bpy.types.Object:
-            return False
-        else:
-            gpl = context.active_annotation_layer
-            if gpl is None:
-                return False
-
-        return cls.has_preview(context)
-
-    # NOTE: this is just a wrapper around the generic GP Panel
-    # But, it should only show up when there are images in the preview region
-
 
 class SEQUENCER_PT_custom_props(SequencerButtonsPanel, PropertyPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH', 'BLENDER_WORKBENCH_NEXT'}
@@ -2724,8 +2676,6 @@ classes = (
     SEQUENCER_PT_view_safe_areas_center_cut,
     SEQUENCER_PT_preview,
 
-    SEQUENCER_PT_annotation,
-    SEQUENCER_PT_annotation_onion,
 
     SEQUENCER_PT_snapping,
 )

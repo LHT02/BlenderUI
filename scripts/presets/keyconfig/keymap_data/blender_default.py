@@ -1999,33 +1999,6 @@ def km_grease_pencil(params):
         {"items": items},
     )
 
-    if params.use_key_activate_tools:
-        items.extend([
-            op_tool_cycle("builtin.annotate", {"type": 'D', "value": 'PRESS'}),
-        ])
-    else:
-        items.extend([
-            # Draw
-            ("gpencil.annotate",
-             {"type": 'LEFTMOUSE', "value": 'PRESS', "key_modifier": 'D'},
-             {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
-            ("gpencil.annotate",
-             {"type": 'LEFTMOUSE', "value": 'PRESS', "key_modifier": 'D', "shift": True},
-             {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
-            # Draw - straight lines
-            ("gpencil.annotate",
-             {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True, "key_modifier": 'D'},
-             {"properties": [("mode", 'DRAW_STRAIGHT'), ("wait_for_input", False)]}),
-            # Draw - poly lines
-            ("gpencil.annotate",
-             {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "alt": True, "key_modifier": 'D'},
-             {"properties": [("mode", 'DRAW_POLY'), ("wait_for_input", False)]}),
-            # Erase
-            ("gpencil.annotate",
-             {"type": 'RIGHTMOUSE', "value": 'PRESS', "key_modifier": 'D'},
-             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-        ])
-
     return keymap
 
 
@@ -4256,58 +4229,6 @@ def km_popup_toolbar(_params):
 #
 # Named are auto-generated based on the tool name and it's toolbar.
 
-def km_generic_tool_annotate(params):
-    return (
-        "Generic Tool: Annotate",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": [
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS'},
-             {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-        ]},
-    )
-
-
-def km_generic_tool_annotate_line(params):
-    return (
-        "Generic Tool: Annotate Line",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": [
-            ("gpencil.annotate", params.tool_maybe_tweak_event,
-             {"properties": [("mode", 'DRAW_STRAIGHT'), ("wait_for_input", False)]}),
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-        ]},
-    )
-
-
-def km_generic_tool_annotate_polygon(params):
-    return (
-        "Generic Tool: Annotate Polygon",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": [
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS'},
-             {"properties": [("mode", 'DRAW_POLY'), ("wait_for_input", False)]}),
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-        ]},
-    )
-
-
-def km_generic_tool_annotate_eraser(params):
-    return (
-        "Generic Tool: Annotate Eraser",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": [
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS'},
-             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-            ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-        ]},
-    )
-
-
 def km_image_editor_tool_generic_sample(params):
     return (
         "Image Editor Tool: Sample",
@@ -4609,10 +4530,6 @@ def generate_keymaps(params=None):
         km_popup_toolbar(params),
 
         # Tool System.
-        km_generic_tool_annotate(params),
-        km_generic_tool_annotate_line(params),
-        km_generic_tool_annotate_polygon(params),
-        km_generic_tool_annotate_eraser(params),
 
         km_image_editor_tool_generic_sample(params),
         *(km_sequencer_editor_tool_generic_select(params, fallback=fallback) for fallback in (False, True)),

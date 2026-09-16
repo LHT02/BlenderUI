@@ -1620,18 +1620,6 @@ static void sequencer_display_size(Scene *scene, float r_viewrect[2])
   r_viewrect[0] *= scene->r.xasp / scene->r.yasp;
 }
 
-static void sequencer_draw_gpencil_overlay(const bContext *C)
-{
-  /* Draw grease-pencil (image aligned). */
-  ED_annotation_draw_2dimage(C);
-
-  /* Orthographic at pixel level. */
-  UI_view2d_view_restore(C);
-
-  /* Draw grease-pencil (screen aligned). */
-  ED_annotation_draw_view2d(C, 0);
-}
-
 /**
  * Draw content and safety borders.
  */
@@ -2150,7 +2138,6 @@ void sequencer_draw_preview(const bContext *C,
   struct ImBuf *scope = NULL;
   float viewrect[2];
   const bool show_imbuf = ED_space_sequencer_check_show_imbuf(sseq);
-  const bool draw_gpencil = ((sseq->preview_overlay.flag & SEQ_PREVIEW_SHOW_GPENCIL) && sseq->gpd);
   const char *names[2] = {STEREO_LEFT_NAME, STEREO_RIGHT_NAME};
 
   sequencer_stop_running_jobs(C, scene);
@@ -2223,10 +2210,6 @@ void sequencer_draw_preview(const bContext *C,
       seq_draw_image_origin_and_outline(C, seq, seq == active_seq);
     }
     SEQ_collection_free(collection);
-  }
-
-  if (draw_gpencil && show_imbuf && (sseq->flag & SEQ_SHOW_OVERLAY)) {
-    sequencer_draw_gpencil_overlay(C);
   }
 
 #if 0

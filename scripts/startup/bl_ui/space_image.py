@@ -22,9 +22,6 @@ from bl_ui.properties_paint_common import (
     FalloffPanel,
     DisplayPanel,
 )
-from bl_ui.properties_grease_pencil_common import (
-    AnnotationDataPanel,
-)
 from bl_ui.space_toolsystem_common import (
     ToolActivePanelHelper,
 )
@@ -1664,17 +1661,6 @@ class IMAGE_PT_overlay_image(Panel):
         layout.prop(uvedit, "show_metadata")
 
 
-# Grease Pencil properties
-class IMAGE_PT_annotation(AnnotationDataPanel, Panel):
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "View"
-
-    # NOTE: this is just a wrapper around the generic GP Panel.
-
-# Grease Pencil drawing tools.
-
-
 classes = (
     IMAGE_MT_view,
     IMAGE_MT_view_zoom,
@@ -1738,7 +1724,6 @@ classes = (
     IMAGE_PT_sample_line,
     IMAGE_PT_scope_sample,
     IMAGE_PT_uv_cursor,
-    IMAGE_PT_annotation,
     IMAGE_PT_gizmo_display,
     IMAGE_PT_overlay,
     IMAGE_PT_overlay_guides,

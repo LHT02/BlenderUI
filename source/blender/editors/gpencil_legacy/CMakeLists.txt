@@ -22,8 +22,6 @@ set(INC_SYS
 )
 
 set(SRC
-  annotate_draw.c
-  annotate_paint.c
   drawgpencil.c
   editaction_gpencil.c
   gpencil_add_blank.c

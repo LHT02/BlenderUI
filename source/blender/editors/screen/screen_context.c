@@ -89,8 +89,6 @@ const char *screen_context_dir[] = {
     "selected_movieclip_tracks",
     "gpencil_data",
     "gpencil_data_owner", /* grease pencil data */
-    "annotation_data",
-    "annotation_data_owner",
     "visible_gpencil_layers",
     "editable_gpencil_layers",
     "editable_gpencil_strokes",
@@ -782,38 +780,6 @@ static eContextResult screen_ctx_gpencil_data_owner(const bContext *C, bContextD
   }
   return CTX_RESULT_NO_DATA;
 }
-static eContextResult screen_ctx_annotation_data(const bContext *C, bContextDataResult *result)
-{
-  wmWindow *win = CTX_wm_window(C);
-  bScreen *screen = CTX_wm_screen(C);
-  ScrArea *area = CTX_wm_area(C);
-  Scene *scene = WM_window_get_active_scene(win);
-  bGPdata *gpd = ED_annotation_data_get_active_direct((ID *)screen, area, scene);
-
-  if (gpd) {
-    CTX_data_id_pointer_set(result, &gpd->id);
-    return CTX_RESULT_OK;
-  }
-  return CTX_RESULT_NO_DATA;
-}
-static eContextResult screen_ctx_annotation_data_owner(const bContext *C,
-                                                       bContextDataResult *result)
-{
-  wmWindow *win = CTX_wm_window(C);
-  bScreen *screen = CTX_wm_screen(C);
-  ScrArea *area = CTX_wm_area(C);
-  Scene *scene = WM_window_get_active_scene(win);
-
-  /* Pointer to which data/datablock owns the reference to the Grease Pencil data being used. */
-  PointerRNA ptr;
-  bGPdata **gpd_ptr = ED_annotation_data_get_pointers_direct((ID *)screen, area, scene, &ptr);
-
-  if (gpd_ptr) {
-    CTX_data_pointer_set_ptr(result, &ptr);
-    return CTX_RESULT_OK;
-  }
-  return CTX_RESULT_NO_DATA;
-}
 static eContextResult screen_ctx_active_gpencil_layer(const bContext *C,
                                                       bContextDataResult *result)
 {
@@ -824,25 +790,6 @@ static eContextResult screen_ctx_active_gpencil_layer(const bContext *C,
   BKE_view_layer_synced_ensure(scene, view_layer);
   Object *obact = BKE_view_layer_active_object_get(view_layer);
   bGPdata *gpd = ED_gpencil_data_get_active_direct(area, obact);
-
-  if (gpd) {
-    bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
-
-    if (gpl) {
-      CTX_data_pointer_set(result, &gpd->id, &RNA_GPencilLayer, gpl);
-      return CTX_RESULT_OK;
-    }
-  }
-  return CTX_RESULT_NO_DATA;
-}
-static eContextResult screen_ctx_active_annotation_layer(const bContext *C,
-                                                         bContextDataResult *result)
-{
-  wmWindow *win = CTX_wm_window(C);
-  bScreen *screen = CTX_wm_screen(C);
-  ScrArea *area = CTX_wm_area(C);
-  Scene *scene = WM_window_get_active_scene(win);
-  bGPdata *gpd = ED_annotation_data_get_active_direct((ID *)screen, area, scene);
 
   if (gpd) {
     bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
@@ -1292,10 +1239,7 @@ static void ensure_ed_screen_context_functions(void)
   register_context_function("selected_movieclip_tracks", screen_ctx_selected_movieclip_tracks);
   register_context_function("gpencil_data", screen_ctx_gpencil_data);
   register_context_function("gpencil_data_owner", screen_ctx_gpencil_data_owner);
-  register_context_function("annotation_data", screen_ctx_annotation_data);
-  register_context_function("annotation_data_owner", screen_ctx_annotation_data_owner);
   register_context_function("active_gpencil_layer", screen_ctx_active_gpencil_layer);
-  register_context_function("active_annotation_layer", screen_ctx_active_annotation_layer);
   register_context_function("active_gpencil_frame", screen_ctx_active_gpencil_frame);
   register_context_function("visible_gpencil_layers", screen_ctx_visible_gpencil_layers);
   register_context_function("editable_gpencil_layers", screen_ctx_editable_gpencil_layers);

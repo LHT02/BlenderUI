@@ -1883,6 +1883,180 @@ The work is staged so the build stays green at every step.
       keymap coupling and the object/annotation split mean it wants its own
       round with its own build and verify, exactly like every other module here.
 
+      ### Annotation is deleted: `annotate_draw.c` + `annotate_paint.c` (126 KB)
+
+      **Executed.** LHT's answer ("annotation drawing is not kept") is now the
+      code, not a plan. The two files that *are* annotation are gone:
+
+      | file | bytes |
+      |---|---|
+      | `editors/gpencil_legacy/annotate_draw.c` | 30,076 |
+      | `editors/gpencil_legacy/annotate_paint.c` | 96,266 |
+      | **total** | **126,342** |
+
+      `editors/gpencil_legacy/` went from **35 files / 1,597,392 B** to
+      **33 files / 1,470,833 B**. `BLUI.exe` went from 42,964,480 to
+      42,933,760 bytes.
+
+      #### What "annotation" actually was, confirmed by the deletion
+
+      The scoping round above guessed the split; deleting it proved it. Four
+      functions in `annotate_draw.c` were the whole drawing API -
+      `ED_annotation_draw_2dimage`, `_draw_view2d`, `_draw_view3d`,
+      `ED_annotation_draw_ex` - and every one of them died without taking a
+      single object-mode call site with it.
+
+      **But the getters are not annotation-only, and this is the trap.** The
+      obvious reading of `ED_annotation_data_get_active()` is "annotation
+      helper, delete it." That is wrong. Those four getters are *defined in
+      `gpencil_utils.c`*, which survives, and they have **16 call sites in
+      surviving files**: 10 in `gpencil_data.c`, 2 in `gpencil_edit.c`, and the
+      definitions themselves in `gpencil_utils.c`. `ED_annotation_data_get_active()`
+      answers "what is the active GP datablock when the owner is a screen
+      rather than an object" - the GP *object* code asks that question too.
+
+      The first attempt deleted both the declarations and the draw API. The
+      build would have failed with `LNK2001` at the final link, from files
+      nobody would think to look at. Caught by grepping for the symbol after
+      deleting the file, before building: **4 declarations restored, 4 draw
+      API declarations kept deleted.** The rule that generalises:
+
+      > "This symbol has `annotation` in its name" is not evidence that the
+      > symbol is annotation. Check where it is *defined* and who *calls* it.
+      > A declaration is cheap to get wrong in the safe direction and
+      > expensive to get wrong in the other.
+
+      #### The keymap coupling, resolved in one step
+
+      This was the 63-entry problem the scoping round flagged as the reason
+      annotation needed its own round. It did not need a special technique -
+      it needed the *same* technique every other module here needed: **delete
+      the operator registration and the keymap data naming it in the same
+      step.**
+
+      `GPENCIL_OT_annotate` was registered at `gpencil_ops.c:541` and named in:
+
+      - `blender_default.py` — 5 entries inside `km_grease_pencil`, plus 4
+        whole keymaps (`Generic Tool: Annotate`, `Annotate Line`,
+        `Annotate Polygon`, `Annotate Eraser`), plus the `op_tool_cycle("builtin.annotate")`
+        line, plus the 4 calls in the keymap list.
+      - `properties_grease_pencil_common.py` — the tool-palette buttons.
+      - `space_toolsystem_toolbar.py` — `_defs_annotate` (128 lines) and 5
+        `*_tools_annotate` splices across two `ToolSelectPanelHelper`s.
+
+      Done together, the keymap config loads fully: **112 keymaps**. Nothing
+      was silently dropped, which is the failure mode when they are done apart
+      (`bl_keymap_utils/io.py` calls `property_unset()` on macro sub-properties
+      and *raises*, so a dangling macro reference takes the whole config down
+      to a handful of keymaps rather than warning).
+
+      #### The Python half needed a split, not a deletion
+
+      `properties_grease_pencil_common.py` is a shared mixin module. Two of its
+      classes are annotation (`AnnotationDataPanel`, `AnnotationOnionSkin`),
+      one includes annotation in its name but is not (`GPENCIL_UL_annotation_layer`
+      is the layer list for a *GP object*), and the rest are GP-object panels
+      that must stay. Deleting the module was never an option.
+
+      What had to go, and why each one:
+
+      | site | why |
+      |---|---|
+      | `AnnotationDrawingToolsPanel` | 4 `gpencil.annotate` operators |
+      | `AnnotationDataPanel` | the panel body; reads the deleted context members |
+      | `AnnotationOnionSkin` | same |
+      | `GPENCIL_UL_annotation_layer` | only reached through the deleted panels |
+      | `IMAGE_PT_annotation` (`space_image.py`) | subclasses `AnnotationDataPanel` |
+      | `SEQUENCER_PT_annotation`, `SEQUENCER_PT_annotation_onion` | same |
+      | `_defs_annotate` + its splices (`space_toolsystem_toolbar.py`) | the tool definitions |
+
+      #### Two live sites the scoping round had marked as doomed
+
+      The scope above listed `node_draw.cc` and `clip_draw.cc` as "doomed
+      (node editor)" and "doomed (clip editor)". Measured this round: **both
+      modules are still in the build.** `editors/space_node/CMakeLists.txt` and
+      `editors/space_clip/CMakeLists.txt` both exist and both are compiled -
+      only the *registry* entries are gone, which is the same distinction the
+      preferences work hit ("being undrawable is not the same as not existing").
+      Their annotation calls were removed as real edits, not left for a future
+      deletion.
+
+      #### A dangling call site the file deletion did not catch
+
+      `sequencer_draw.c` had already lost its `sequencer_draw_gpencil_overlay()`
+      function, but the *call* to it survived at line 2216, along with the
+      `draw_gpencil` local that gated it. Catching this is the same lesson as
+      the `versioning_cycles.c` double-entry case: **deleting a definition does
+      not find its callers.** Removing the file first and letting the compiler
+      work through the remainder found it once the build got far enough.
+
+      #### Verification - all seven scripts, real window where required
+
+      | script | result |
+      |---|---|
+      | `check_editor_set.py` | **PASS** |
+      | `check_preferences.py` | **PASS** |
+      | `check_keymap_config.py` | **PASS** - 112 keymaps loaded |
+      | `check_window_isolation.py` | **PASS** |
+      | `check_component_window.py` | **PASS** |
+      | `check_save_isolation.py` | **PASS** - round-trip through the text editor |
+      | `click_sweep.py` | **PASS** - 144 clicks, no crash |
+
+      `check_preferences.py` is the one that matters here, and it failed twice
+      before it passed - both times for a reason worth writing down.
+
+      **Failure 1: a dangling import.** Removing `AnnotationDataPanel,` from
+      `space_image.py` left an empty `from bl_ui.properties_grease_pencil_common
+      import ()`, which is a `SyntaxError`. `bl_ui/__init__.py` swallows it and
+      aborts the rest of the registration loop, so the symptom was *missing
+      preferences panels* and the cause was in the *image editor* module. Same
+      shape as the top-bar round; the same script caught it. `space_sequencer.py`
+      had the identical bug. **When deleting a name from a multi-line import,
+      delete the statement - and syntax-check every file in `bl_ui/` before
+      building**, which is cheaper than a build round trip.
+
+      **Failure 2: two registrations left behind.** `screen_context.c` kept
+      `register_context_function("annotation_data", screen_ctx_annotation_data)`
+      and the `_owner` twin at lines 1242-1243, pointing at functions that no
+      longer existed. This one was a real `error C2065` and the only genuine
+      compile error of the round.
+
+      #### Build environment: the toolchain was not broken; the sandbox was
+
+      Four consecutive builds failed with `fatal error C1083: cannot open
+      stdio.h` in files that had nothing to do with this change. **None of it
+      was caused by the deletion**, and the diagnosis is worth keeping because
+      it will recur:
+
+      - `build.cmd` calls `vcvars64.bat`, which finds the Windows SDK include
+        directories by running `reg.exe`.
+      - The sandbox blacklists `reg.exe`. vcvars cannot complete, so `INCLUDE`
+        holds only the three MSVC paths and no UCRT path.
+      - The MSVC `include` directory is also missing its CRT headers
+        (`stdio.h`, `stdlib.h`, `string.h`, `stddef.h`, `time.h`, `math.h` all
+        absent; only `setjmp.h` present). The Windows SDK `ucrt` directory has
+        all of them.
+
+      **The toolchain is fine.** Supplying the SDK paths by hand
+      (`_build_sandbox.cmd` at the repo root) makes the same tree compile. That
+      file is a sandbox workaround, not part of the build: on a normal machine
+      plain `build.cmd` works and it is unnecessary. It also pins `-j1`,
+      because parallel `cl.exe` invocations intermittently get `Permission
+      denied` creating their `.obj` under the sandbox.
+
+      The other false signal to ignore: `Permission denied` / `cannot open
+      compiler-generated file ... .obj` on a handful of unrelated files is a
+      transient sandbox write collision, **not** a code error. Re-running
+      clears it. Do not go looking for a cause in the source.
+
+      #### Status: deleted, built, verified, committed
+
+      Target 4's first half is done. `object` and `space_view3d` remain, and
+      the scoping round's estimate of what annotation was worth to them - 6
+      files for `ED_object.h`, **12** for `ED_view3d.h` - can now be
+      *re-measured* against the tree rather than assumed, because the files are
+      actually gone this time.
+
       ### `editors/space_statusbar/` is deleted, and the Python half is not optional
 
       The status bar - asked for in the original brief ("remove Blender's top bar

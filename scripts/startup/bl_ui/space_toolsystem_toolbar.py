@@ -152,135 +152,6 @@ class _defs_view3d_generic:
         )
 
 
-class _defs_annotate:
-
-    def draw_settings_common(context, layout, tool):
-        gpd = context.annotation_data
-        region_type = context.region.type
-
-        if gpd is not None:
-            if gpd.layers.active_note is not None:
-                text = gpd.layers.active_note
-                maxw = 25
-                if len(text) > maxw:
-                    text = text[:maxw - 5] + '..' + text[-3:]
-            else:
-                text = ""
-
-            gpl = context.active_annotation_layer
-            if gpl is not None:
-                layout.label(text="Annotation:")
-                if context.space_data.type in {'VIEW_3D', 'SEQUENCE_EDITOR'}:
-                    if region_type == 'TOOL_HEADER':
-                        sub = layout.split(align=True, factor=0.5)
-                        sub.ui_units_x = 6.5
-                        sub.prop(gpl, "color", text="")
-                    else:
-                        sub = layout.row(align=True)
-                        sub.prop(gpl, "color", text="")
-                    sub.popover(
-                        panel="TOPBAR_PT_annotation_layers",
-                        text=text,
-                    )
-                else:
-                    layout.prop(gpl, "color", text="")
-
-        space_type = tool.space_type
-        tool_settings = context.tool_settings
-
-        if space_type == 'VIEW_3D':
-            row = layout.row(align=True)
-            row.prop(tool_settings, "annotation_stroke_placement_view3d", text="Placement")
-            if tool_settings.gpencil_stroke_placement_view3d == 'CURSOR':
-                row.prop(tool_settings.gpencil_sculpt, "lockaxis")
-            elif tool_settings.gpencil_stroke_placement_view3d in {'SURFACE', 'STROKE'}:
-                row.prop(tool_settings, "use_gpencil_stroke_endpoints")
-
-        elif space_type in {'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR'}:
-            row = layout.row(align=True)
-            row.prop(tool_settings, "annotation_stroke_placement_view2d", text="Placement")
-
-        if tool.idname == "builtin.annotate_line":
-            props = tool.operator_properties("gpencil.annotate")
-            if region_type == 'TOOL_HEADER':
-                row = layout.row()
-                row.ui_units_x = 15
-                row.prop(props, "arrowstyle_start", text="Start")
-                row.separator()
-                row.prop(props, "arrowstyle_end", text="End")
-            else:
-                col = layout.row().column(align=True)
-                col.prop(props, "arrowstyle_start", text="Style Start")
-                col.prop(props, "arrowstyle_end", text="End")
-        elif tool.idname == "builtin.annotate":
-            props = tool.operator_properties("gpencil.annotate")
-            if region_type == 'TOOL_HEADER':
-                row = layout.row()
-                row.prop(props, "use_stabilizer", text="Stabilize Stroke")
-                subrow = layout.row(align=False)
-                subrow.active = props.use_stabilizer
-                subrow.prop(props, "stabilizer_radius", text="Radius", slider=True)
-                subrow.prop(props, "stabilizer_factor", text="Factor", slider=True)
-            else:
-                layout.prop(props, "use_stabilizer", text="Stabilize Stroke")
-                col = layout.column(align=False)
-                col.active = props.use_stabilizer
-                col.prop(props, "stabilizer_radius", text="Radius", slider=True)
-                col.prop(props, "stabilizer_factor", text="Factor", slider=True)
-
-    @ToolDef.from_fn.with_args(draw_settings=draw_settings_common)
-    def scribble(*, draw_settings):
-        return dict(
-            idname="builtin.annotate",
-            label="Annotate",
-            icon="ops.gpencil.draw",
-            cursor='PAINT_BRUSH',
-            keymap="Generic Tool: Annotate",
-            draw_settings=draw_settings,
-            options={'KEYMAP_FALLBACK'},
-        )
-
-    @ToolDef.from_fn.with_args(draw_settings=draw_settings_common)
-    def line(*, draw_settings):
-        return dict(
-            idname="builtin.annotate_line",
-            label="Annotate Line",
-            icon="ops.gpencil.draw.line",
-            cursor='PAINT_BRUSH',
-            keymap="Generic Tool: Annotate Line",
-            draw_settings=draw_settings,
-            options={'KEYMAP_FALLBACK'},
-        )
-
-    @ToolDef.from_fn.with_args(draw_settings=draw_settings_common)
-    def poly(*, draw_settings):
-        return dict(
-            idname="builtin.annotate_polygon",
-            label="Annotate Polygon",
-            icon="ops.gpencil.draw.poly",
-            cursor='PAINT_BRUSH',
-            keymap="Generic Tool: Annotate Polygon",
-            draw_settings=draw_settings,
-            options={'KEYMAP_FALLBACK'},
-        )
-
-    @ToolDef.from_fn
-    def eraser():
-        def draw_settings(context, layout, _tool):
-            # TODO: Move this setting to tool_settings
-            prefs = context.preferences
-            layout.prop(prefs.edit, "grease_pencil_eraser_radius", text="Radius")
-        return dict(
-            idname="builtin.annotate_eraser",
-            label="Annotate Eraser",
-            icon="ops.gpencil.draw.eraser",
-            cursor='ERASER',
-            keymap="Generic Tool: Annotate Eraser",
-            draw_settings=draw_settings,
-            options={'KEYMAP_FALLBACK'},
-        )
-
-
 class _defs_transform:
 
     def draw_transform_sculpt_tool_settings(context, layout):
@@ -2664,15 +2535,6 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
         ),
     )
 
-    _tools_annotate = (
-        (
-            _defs_annotate.scribble,
-            _defs_annotate.line,
-            _defs_annotate.poly,
-            _defs_annotate.eraser,
-        ),
-    )
-
     # Private tools dictionary, store data to implement `tools_all` & `tools_from_context`.
     # The keys match image spaces modes: `context.space_data.mode`.
     # The values represent the tools, see `ToolSelectPanelHelper` for details.
@@ -2682,7 +2544,6 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
         ],
         'VIEW': [
             _defs_image_generic.sample,
-            *_tools_annotate,
         ],
         'UV': [
             *_tools_select,
@@ -2690,7 +2551,6 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
             None,
             *_tools_transform,
             None,
-            *_tools_annotate,
             None,
             _defs_image_uv_edit.rip_region,
             None,
@@ -2706,7 +2566,6 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
         'PAINT': [
             _defs_texture_paint.generate_from_brushes,
             None,
-            *_tools_annotate,
         ],
     }
 
@@ -2747,15 +2606,6 @@ class SEQUENCER_PT_tools_active(ToolSelectPanelHelper, Panel):
             _defs_sequencer_select.box,
         ),
     )
-    _tools_annotate = (
-        (
-            _defs_annotate.scribble,
-            _defs_annotate.line,
-            _defs_annotate.poly,
-            _defs_annotate.eraser,
-        ),
-    )
-
     # Private tools dictionary, store data to implement `tools_all` & `tools_from_context`.
     # The keys match sequence editors view type: `context.space_data.view_type`.
     # The values represent the tools, see `ToolSelectPanelHelper` for details.
@@ -2772,7 +2622,6 @@ class SEQUENCER_PT_tools_active(ToolSelectPanelHelper, Panel):
             _defs_sequencer_generic.transform,
             None,
             _defs_sequencer_generic.sample,
-            *_tools_annotate,
         ],
         'SEQUENCER': [
             *_tools_select,
@@ -2781,7 +2630,6 @@ class SEQUENCER_PT_tools_active(ToolSelectPanelHelper, Panel):
         'SEQUENCER_PREVIEW': [
             *_tools_select,
             None,
-            *_tools_annotate,
             None,
             _defs_sequencer_generic.blade,
         ],

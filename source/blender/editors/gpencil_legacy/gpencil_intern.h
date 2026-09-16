@@ -429,10 +429,6 @@ const struct EnumPropertyItem *ED_gpencil_material_enum_itemf(struct bContext *C
 /* ***************************************************** */
 /* Operator Defines */
 
-/* annotations ------ */
-
-void GPENCIL_OT_annotate(struct wmOperatorType *ot);
-
 /* drawing ---------- */
 
 void GPENCIL_OT_draw(struct wmOperatorType *ot);
