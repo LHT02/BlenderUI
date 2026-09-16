@@ -1,5 +1,53 @@
 # BLUI
 
+> ## Start here
+>
+> This document is long because it records what did *not* work as carefully as
+> what did. If you are picking BLUI up, this is the short version.
+>
+> **Where it stands at `fe74c517a5e`:** build green, all seven checks in
+> `blui/tools/` pass, and both native self tests pass
+> (`shellmenu_selftest.exe`, `dragsource_selftest.exe`). Run them with
+> `blui/tools/…` as described under *Verified state*; none need a person
+> watching.
+>
+> **Open work, in the order it should be tackled:**
+>
+> 1. **Confirm the context menu by hand** - the one thing a script cannot do.
+>    Right-click a file: "Windows Shell Menu..." should open the real shell
+>    menu, 7-Zip's and TortoiseSVN's submenus should have entries, and the
+>    "External" submenu should show either its entries or a disabled line
+>    saying what to select. If the first two still do nothing, the fix in
+>    `890db3b` (right-click selects the item under the cursor) is wrong and
+>    that is what to chase - not the work below.
+> 2. **Isolate the shell menu.** Opening it instantiates every installed shell
+>    extension on the main thread, so a slow one freezes the UI and a hung one
+>    freezes it for good. See *The shell menu is not isolated, and cannot be
+>    moved as one piece* for the constraint that catches people out
+>    (`TrackPopupMenu` must run on the window's own thread), the two halves that
+>    can be split, and the three decisions to make first.
+> 3. **Open-document isolation (objective item 4)** - give each window its own
+>    document list. `check_window_isolation.py -- --strict` is the test to flip,
+>    and `blui/tools/probe_document_isolation.py` measures what is and is not
+>    per-window today.
+> 4. **The remaining 3D editor modules (objective item 2).** Nine are gone
+>    (1,144 KB). `object` and `space_view3d` are the top of the dependency cone
+>    and must go first; roughly 2.5 MB of data editors follow them for free.
+>    Everything measured is in the module tables below, including the ones
+>    rejected and why.
+>
+> **Two habits this codebase rewards**, both learned the hard way and both
+> recorded with their evidence:
+>
+> - **Do not trust a grep for symbols.** The compiler is the authority. Three
+>   times a naming convention hid live code: `ED_uvedit_` missed unprefixed
+>   internals (17 of 33 call sites), `ED_mball_` missed macros, `ED_gizmo_`
+>   missed the compounded prefix. Delete the include or the call, build, and
+>   read what the compiler names.
+> - **Never leave the tree red.** Two attempts were reverted mid-round rather
+>   than committed half-done; both are written up. A lost round is cheaper than
+>   a broken fork.
+
 **BLUI** is a standalone file-browsing, image-viewing and text-editing
 environment built on the Blender 3.6 source tree.
 
