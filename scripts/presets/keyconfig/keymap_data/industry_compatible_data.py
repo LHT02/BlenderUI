@@ -75,15 +75,6 @@ def _template_items_context_panel(menu, key_args_primary):
     ]
 
 
-def _template_items_object_subdivision_set():
-    return [
-        ("object.subdivision_set",
-         {"type": NUMBERS_0[i], "value": 'PRESS', "ctrl": True},
-         {"properties": [("level", i), ("relative", False)]})
-        for i in range(6)
-    ]
-
-
 def _template_items_animation():
     return [
         ("screen.frame_offset", {"type": 'LEFT_ARROW', "value": 'PRESS'},
@@ -115,55 +106,6 @@ def _template_items_basic_tools(*, connected=False):
         op_tool_cycle("builtin.transform", {"type": 'T', "value": 'PRESS'}),
         op_tool_cycle("builtin.measure", {"type": 'M', "value": 'PRESS'}),
         op_tool_cycle("builtin.cursor", {"type": 'C', "value": 'PRESS'}),
-    ]
-
-
-def _template_items_tool_select(params, operator, *, extend):
-    return [
-        (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
-         {"properties": [("deselect_all", True)]}),
-        (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-         {"properties": [(extend, True)]}),
-    ]
-
-
-def _template_items_tool_select_actions(operator, *, type, value):
-    kmi_args = {"type": type, "value": value}
-    return [
-        (operator, kmi_args, None),
-        (operator, {**kmi_args, "shift": True},
-         {"properties": [("mode", 'ADD')]}),
-        (operator, {**kmi_args, "ctrl": True},
-         {"properties": [("mode", 'SUB')]}),
-        (operator, {**kmi_args, "shift": True, "ctrl": True},
-         {"properties": [("mode", 'AND')]}),
-    ]
-
-
-# This could have a more generic name, for now use for circle select.
-def _template_items_tool_select_actions_simple(operator, *, type, value, properties=()):
-    kmi_args = {"type": type, "value": value}
-    return [
-        # Don't define 'SET' here, take from the tool options.
-        (operator, kmi_args,
-         {"properties": [*properties]}),
-        (operator, {**kmi_args, "shift": True},
-         {"properties": [*properties, ("mode", 'ADD')]}),
-        (operator, {**kmi_args, "ctrl": True},
-         {"properties": [*properties, ("mode", 'SUB')]}),
-    ]
-
-
-def _template_items_editmode_mesh_select_mode(params):
-    return [
-        (
-            "mesh.select_mode",
-            {"type": k, "value": 'PRESS', **key_expand, **key_extend},
-            {"properties": [*prop_extend, *prop_expand, ("type", e)]}
-        )
-        for key_expand, prop_expand in (({}, ()), ({"ctrl": True}, (("use_expand", True),)))
-        for key_extend, prop_extend in (({}, ()), ({"shift": True}, (("use_extend", True),)))
-        for k, e in (('ONE', 'VERT'), ('TWO', 'EDGE'), ('THREE', 'FACE'))
     ]
 
 
@@ -2471,38 +2413,6 @@ def km_transform_modal_map(_params):
 # Tool System Keymaps
 #
 # Named are auto-generated based on the tool name and it's toolbar.
-
-
-
-
-# NOTE: duplicated from `blender_default.py`.
-def _template_node_select(*, type, value, select_passthrough):
-    items = [
-        ("node.select", {"type": type, "value": value},
-         {"properties": [("deselect_all", True), ("select_passthrough", True)]}),
-        ("node.select", {"type": type, "value": value, "ctrl": True}, None),
-        ("node.select", {"type": type, "value": value, "alt": True}, None),
-        ("node.select", {"type": type, "value": value, "ctrl": True, "alt": True}, None),
-        ("node.select", {"type": type, "value": value, "shift": True},
-         {"properties": [("toggle", True)]}),
-        ("node.select", {"type": type, "value": value, "shift": True, "ctrl": True},
-         {"properties": [("toggle", True)]}),
-        ("node.select", {"type": type, "value": value, "shift": True, "alt": True},
-         {"properties": [("toggle", True)]}),
-        ("node.select", {"type": type, "value": value, "shift": True, "ctrl": True, "alt": True},
-         {"properties": [("toggle", True)]}),
-    ]
-
-    if select_passthrough and (value == 'PRESS'):
-        # Add an additional click item to de-select all other items,
-        # needed so pass-through is able to de-select other items.
-        items.append((
-            "node.select",
-            {"type": type, "value": 'CLICK'},
-            {"properties": [("deselect_all", True)]},
-        ))
-
-    return items
 
 
 # Fallback for gizmos that don't have custom a custom key-map.

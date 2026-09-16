@@ -398,45 +398,6 @@ def _template_items_gizmo_tweak_value_drag():
     ]
 
 
-def _template_items_editmode_mesh_select_mode(params):
-    if params.legacy:
-        return [
-            op_menu("VIEW3D_MT_edit_mesh_select_mode", {"type": 'TAB', "value": 'PRESS', "ctrl": True}),
-        ]
-    else:
-        return [
-            (
-                "mesh.select_mode",
-                {"type": NUMBERS_1[i], "value": 'PRESS', **key_expand, **key_extend},
-                {"properties": [*prop_extend, *prop_expand, ("type", e)]}
-            )
-            for key_expand, prop_expand in (({}, ()), ({"ctrl": True}, (("use_expand", True),)))
-            for key_extend, prop_extend in (({}, ()), ({"shift": True}, (("use_extend", True),)))
-            for i, e in enumerate(('VERT', 'EDGE', 'FACE'))
-        ]
-
-
-def _template_items_uv_select_mode(params):
-    if params.legacy:
-        return [
-            op_menu("IMAGE_MT_uvs_select_mode", {"type": 'TAB', "value": 'PRESS', "ctrl": True}),
-        ]
-    else:
-        return [
-            # TODO(@campbellbarton): should this be kept?
-            # Seems it was included in the new key-map by accident, check on removing
-            # although it's not currently used for anything else.
-            op_menu("IMAGE_MT_uvs_select_mode", {"type": 'TAB', "value": 'PRESS', "ctrl": True}),
-
-            *_template_items_editmode_mesh_select_mode(params),
-            # Hack to prevent fall-through, when sync select isn't enabled (and the island button isn't visible).
-            ("mesh.select_mode", {"type": 'FOUR', "value": 'PRESS'}, None),
-            *(("uv.select_mode", {"type": NUMBERS_1[i], "value": 'PRESS'},
-               {"properties": [("type", e)]})
-              for i, e in enumerate(('VERTEX', 'EDGE', 'FACE', 'ISLAND')))
-        ]
-
-
 def _template_items_proportional_editing(params, *, connected, toggle_data_path):
     return [
         (
@@ -522,19 +483,6 @@ def _template_items_tool_select(
             ("transform.translate", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'},
              {"properties": [("release_confirm", True), ("cursor_transform", True)]}),
         ]
-
-
-def _template_items_tool_select_actions(operator, *, type, value):
-    kmi_args = {"type": type, "value": value}
-    return [
-        (operator, kmi_args, None),
-        (operator, {**kmi_args, "shift": True},
-         {"properties": [("mode", 'ADD')]}),
-        (operator, {**kmi_args, "ctrl": True},
-         {"properties": [("mode", 'SUB')]}),
-        (operator, {**kmi_args, "shift": True, "ctrl": True},
-         {"properties": [("mode", 'AND')]}),
-    ]
 
 
 # This could have a more generic name, for now use for circle select.
@@ -3074,49 +3022,6 @@ def _template_paint_radial_control(paint, rotation=False, secondary_rotation=Fal
     return items
 
 
-def _template_view3d_select(*, type, value, legacy, select_passthrough, exclude_mod=None):
-    # NOTE: `exclude_mod` is needed since we don't want this tool to exclude Control-RMB actions when this is used
-    # as a tool key-map with RMB-select and `use_fallback_tool` is enabled with RMB select. See #92467.
-
-    props_vert_without_handles = ()
-    if select_passthrough:
-        props_vert_without_handles = ("vert_without_handles",)
-
-    # See: `use_tweak_select_passthrough` doc-string.
-    if select_passthrough and (value in {'CLICK', 'RELEASE'}):
-        select_passthrough = False
-
-    items = [(
-        "view3d.select",
-        {"type": type, "value": value, **{m: True for m in mods}},
-        {"properties": [(c, True) for c in props]},
-    ) for props, mods in (
-        ((("deselect_all", "select_passthrough", *props_vert_without_handles) if select_passthrough else
-          ("deselect_all", *props_vert_without_handles)) if not legacy else (), ()),
-        (("toggle", *props_vert_without_handles), ("shift",)),
-        (("center", "object"), ("ctrl",)),
-        (("enumerate",), ("alt",)),
-        (("toggle", "center"), ("shift", "ctrl")),
-        (("center", "enumerate"), ("ctrl", "alt")),
-        (("toggle", "enumerate"), ("shift", "alt")),
-        (("toggle", "center", "enumerate"), ("shift", "ctrl", "alt")),
-    ) if exclude_mod is None or exclude_mod not in mods]
-
-    if select_passthrough:
-        # Add an additional click item to de-select all other items,
-        # needed so pass-through is able to de-select other items.
-        items.append((
-            "view3d.select",
-            {"type": type, "value": 'CLICK'},
-            {"properties": [
-                (c, True)
-                for c in ("deselect_all", *props_vert_without_handles)
-            ]},
-        ))
-
-    return items
-
-
 def _template_view3d_gpencil_select(*, type, value, legacy, use_select_mouse=True):
     return [
         *([] if not use_select_mouse else [
@@ -3130,63 +3035,6 @@ def _template_view3d_gpencil_select(*, type, value, legacy, use_select_mouse=Tru
         ("gpencil.select", {"type": type, "value": value, "shift": True, "alt": True},
          {"properties": [("extend", True), ("entire_strokes", True)]}),
     ]
-
-
-def _template_node_select(*, type, value, select_passthrough):
-    items = [
-        ("node.select", {"type": type, "value": value},
-         {"properties": [("deselect_all", True), ("select_passthrough", select_passthrough)]}),
-        ("node.select", {"type": type, "value": value, "ctrl": True}, None),
-        ("node.select", {"type": type, "value": value, "alt": True}, None),
-        ("node.select", {"type": type, "value": value, "ctrl": True, "alt": True}, None),
-        ("node.select", {"type": type, "value": value, "shift": True},
-         {"properties": [("toggle", True)]}),
-        ("node.select", {"type": type, "value": value, "shift": True, "ctrl": True},
-         {"properties": [("toggle", True)]}),
-        ("node.select", {"type": type, "value": value, "shift": True, "alt": True},
-         {"properties": [("toggle", True)]}),
-        ("node.select", {"type": type, "value": value, "shift": True, "ctrl": True, "alt": True},
-         {"properties": [("toggle", True)]}),
-    ]
-
-    if select_passthrough and (value == 'PRESS'):
-        # Add an additional click item to de-select all other items,
-        # needed so pass-through is able to de-select other items.
-        items.append((
-            "node.select",
-            {"type": type, "value": 'CLICK'},
-            {"properties": [("deselect_all", True)]},
-        ))
-
-    return items
-
-
-def _template_uv_select(*, type, value, select_passthrough, legacy):
-
-    # See: `use_tweak_select_passthrough` doc-string.
-    if select_passthrough and (value in {'CLICK', 'RELEASE'}):
-        select_passthrough = False
-
-    items = [
-        ("uv.select", {"type": type, "value": value},
-         {"properties": [
-             *((("deselect_all", True),) if not legacy else ()),
-             *((("select_passthrough", True),) if select_passthrough else ()),
-         ]}),
-        ("uv.select", {"type": type, "value": value, "shift": True},
-         {"properties": [("toggle", True)]}),
-    ]
-
-    if select_passthrough:
-        # Add an additional click item to de-select all other items,
-        # needed so pass-through is able to de-select other items.
-        items.append((
-            "uv.select",
-            {"type": type, "value": 'CLICK'},
-            {"properties": [("deselect_all", True)]},
-        ))
-
-    return items
 
 
 def _template_sequencer_generic_select(*, type, value, legacy):

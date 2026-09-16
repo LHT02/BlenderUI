@@ -432,6 +432,7 @@ memory. Run them after any change; none of them need a person watching.
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
 | Key configuration: all 3 presets load, Ctrl+S, Shift+F1..F6 | `check_keymap_config.py` | PASS on those; **FAILS on 15 dangling bindings** - see below |
+| Unreachable `_template_*` helpers in the keymap data | `scan_dead_keymap_helpers.py --check` | PASS, 0 unreachable helpers (plain Python, no BLUI needed) |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
 | Open-document isolation (item 4's target) | `check_window_isolation.py -- --strict` | FAILS today, by design |
@@ -878,6 +879,54 @@ the harness actually prints, so a regression in any cleaned-up group fails the
 
 When groups 3 and 4 are decided, tighten it to zero and the allowlist can stay
 empty - the check then goes green on its own.
+
+### Dead `_template_*` helpers in the keymap data
+
+Looking for group 5 turned up a second kind of residue in the same two files.
+Twelve `_template_*` helpers are **defined but called from nowhere** - 242 lines,
+none of them reachable. Nine distinct names and twelve definitions, because
+three names exist in both files and are live in one of them:
+
+| File | Dead helpers (all deleted) | Lines |
+| --- | --- | --- |
+| `keymap_data/blender_default.py` | `_template_items_editmode_mesh_select_mode`, `_template_items_tool_select_actions`, `_template_items_uv_select_mode`, `_template_node_select`, `_template_uv_select`, `_template_view3d_select` | 152 |
+| `keymap_data/industry_compatible_data.py` | `_template_items_editmode_mesh_select_mode`, `_template_items_object_subdivision_set`, `_template_items_tool_select`, `_template_items_tool_select_actions`, `_template_items_tool_select_actions_simple`, `_template_node_select` | 90 |
+
+**Counting occurrences does not find them, in two different ways.**
+`_template_items_object_subdivision_set`, `_template_items_tool_select` and
+`_template_items_tool_select_actions_simple` appear twice in
+`blender_default.py` - a definition and a call - so they are live there and dead
+only in `industry_compatible_data.py`; a per-file "is this name referenced"
+test reports the file, not the definition. And some dead helpers call each other
+(`_template_items_tool_select_actions_simple` is reached only from its dead
+siblings), so a single pass under-reports. The set only settles as a
+**transitive closure** over the module's real entry points: 6 helpers in
+`blender_default.py`, 6 in `industry_compatible_data.py` - 26 helpers defined and
+20 live in the first file, 12 and 6 in the second. The scanner is now checked in
+as `blui/tools/scan_dead_keymap_helpers.py` so the number is reproducible
+(`--check` exits 1 if any dead helper reappears).
+
+**They are deleted call sites, not unused code.** `git log -S` on each name shows
+the callers went with BLUI's own module removals - the dangling-binding pattern,
+one level up (the helper left behind while the keymap data naming it was
+deleted):
+
+| Helper | Call sites removed by |
+| --- | --- |
+| `_template_items_uv_select_mode`, `_template_uv_select`, `_template_items_tool_select*` | `05aa139e2a6` (remove the UV keymap data) |
+| `_template_view3d_select`, `_template_node_select` | `88840345dec` (BLUI's editor set is the only one that exists) |
+| `_template_items_editmode_mesh_select_mode` | `cd40af2c993` (remove the mesh bag) |
+| `_template_items_object_subdivision_set` | `be71f35bd98` (remove the uvedit and sculpt bags) |
+
+**Zero observable effect, and that is the point.** All seven scripts were re-run
+after the deletion and report results **identical to the run before it**: dangling
+7 / 7 / 1, keymap counts 112 / 103 / 103, `check_keymap_config` still
+`FAILED (3)` and only on the three intentional assertions, `click_sweep` still 144
+clicks with no crash log. A dead helper cannot move a count, so a green suite
+proves the deletion was *safe* and proves nothing about whether it was *worth*
+doing. It was worth doing because it is 242 lines a future reader would otherwise
+have to reason about - `_template_view3d_select` in particular reads like a live
+keymap builder and is what made this round start looking.
 
 
 ## Roadmap
