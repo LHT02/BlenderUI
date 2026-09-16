@@ -629,6 +629,11 @@ static void file_operatortypes(void)
   /* BLUI: host the real Windows shell menu (see file_ops.c). */
   WM_operatortype_append(FILE_OT_shell_context_menu);
 #endif
+  /* BLUI: Ctrl+C / Ctrl+X / Ctrl+V over files. Registered everywhere so the
+   * keymap data can bind them without a platform test. */
+  WM_operatortype_append(FILE_OT_clipboard_copy);
+  WM_operatortype_append(FILE_OT_clipboard_cut);
+  WM_operatortype_append(FILE_OT_clipboard_paste);
 }
 
 /* NOTE: do not add .blend file reading on this level */

@@ -113,6 +113,45 @@ GHOST_TSuccess GHOST_StartDragFiles(GHOST_WindowHandle windowhandle,
 #endif
 }
 
+GHOST_TSuccess GHOST_SetClipboardFiles(const char *const *filepaths,
+                                       int filepath_count,
+                                       bool move)
+{
+#ifdef WIN32
+  return GHOST_DragSourceWin32_ClipboardSetFiles(filepaths, filepath_count, move);
+#else
+  (void)filepaths;
+  (void)filepath_count;
+  (void)move;
+  return GHOST_kFailure;
+#endif
+}
+
+int GHOST_GetClipboardFiles(char ***r_filepaths, bool *r_move)
+{
+#ifdef WIN32
+  return GHOST_DragSourceWin32_ClipboardGetFiles(r_filepaths, r_move);
+#else
+  if (r_filepaths != nullptr) {
+    *r_filepaths = nullptr;
+  }
+  if (r_move != nullptr) {
+    *r_move = false;
+  }
+  return 0;
+#endif
+}
+
+void GHOST_FreeClipboardFiles(char **filepaths, int filepath_count)
+{
+#ifdef WIN32
+  GHOST_DragSourceWin32_FreePaths(filepaths, filepath_count);
+#else
+  (void)filepaths;
+  (void)filepath_count;
+#endif
+}
+
 GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
                                           const char *const *filepaths,
                                           int filepath_count,

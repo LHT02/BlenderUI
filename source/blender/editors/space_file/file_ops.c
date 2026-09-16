@@ -2152,6 +2152,184 @@ void FILE_OT_shell_context_menu(wmOperatorType *ot)
 
 #endif /* WIN32 */
 
+/* -------------------------------------------------------------------- */
+/** \name File Clipboard Operators
+ *
+ * BLUI: Ctrl+C / Ctrl+X / Ctrl+V over files, the way a file manager does it.
+ *
+ * Blender has no file clipboard at all - `wm.copy` and `wm.paste` are the
+ * *interface* clipboard, for text and button values - so these use the system
+ * clipboard. That is the whole point: a copy made here can be pasted into
+ * Explorer, and a copy made there can be pasted here.
+ * \{ */
+
+static bool file_clipboard_poll(bContext *C)
+{
+  return ED_operator_file_browsing_active(C) && CTX_wm_space_file(C) != NULL;
+}
+
+/**
+ * Full paths of the selected entries.
+ *
+ * Always returns a freeable array; `*r_count` may be 0, which is how "nothing
+ * selected" is reported.
+ */
+static char **file_clipboard_selected_paths(SpaceFile *sfile, int *r_count)
+{
+  const int num_files = filelist_files_ensure(sfile->files);
+  if (num_files <= 0) {
+    *r_count = 0;
+    return NULL;
+  }
+
+  char **paths = MEM_callocN(sizeof(char *) * (size_t)num_files, __func__);
+  int count = 0;
+  for (int i = 0; i < num_files; i++) {
+    if (!filelist_entry_select_index_get(sfile->files, i, CHECK_ALL)) {
+      continue;
+    }
+    FileDirEntry *file = filelist_file(sfile->files, i);
+    if (file == NULL) {
+      continue;
+    }
+    char path[FILE_MAX_LIBEXTRA];
+    filelist_file_get_full_path(sfile->files, file, path);
+    paths[count++] = BLI_strdup(path);
+  }
+
+  *r_count = count;
+  return paths;
+}
+
+static void file_clipboard_free_paths(char **paths, const int count)
+{
+  for (int i = 0; i < count; i++) {
+    MEM_freeN(paths[i]);
+  }
+  MEM_freeN(paths);
+}
+
+/** Shared by copy and cut; they differ only in the recorded drop effect. */
+static int file_clipboard_put_exec(bContext *C, wmOperator *op, const bool move)
+{
+  SpaceFile *sfile = CTX_wm_space_file(C);
+
+  int count = 0;
+  char **paths = file_clipboard_selected_paths(sfile, &count);
+  if (count == 0) {
+    file_clipboard_free_paths(paths, count);
+    BKE_report(op->reports, RPT_ERROR, "No file selected");
+    return OPERATOR_CANCELLED;
+  }
+
+  const GHOST_TSuccess ok = GHOST_SetClipboardFiles((const char *const *)paths, count, move);
+  file_clipboard_free_paths(paths, count);
+
+  if (ok != GHOST_kSuccess) {
+    BKE_report(op->reports, RPT_ERROR, "Could not put the files on the clipboard");
+    return OPERATOR_CANCELLED;
+  }
+
+  BKE_reportf(op->reports, RPT_INFO, "%d file(s) %s", count, move ? "cut" : "copied");
+  return OPERATOR_FINISHED;
+}
+
+static int file_clipboard_copy_exec(bContext *C, wmOperator *op)
+{
+  return file_clipboard_put_exec(C, op, false);
+}
+
+static int file_clipboard_cut_exec(bContext *C, wmOperator *op)
+{
+  return file_clipboard_put_exec(C, op, true);
+}
+
+static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
+{
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  if (params == NULL) {
+    return OPERATOR_CANCELLED;
+  }
+
+  char **paths = NULL;
+  bool move = false;
+  const int count = GHOST_GetClipboardFiles(&paths, &move);
+  if (count <= 0) {
+    BKE_report(op->reports, RPT_ERROR, "The clipboard holds no files");
+    return OPERATOR_CANCELLED;
+  }
+
+  int done = 0;
+  int skipped = 0;
+  for (int i = 0; i < count; i++) {
+    char dest[FILE_MAX_LIBEXTRA];
+    BLI_path_join(dest, sizeof(dest), params->dir, BLI_path_basename(paths[i]));
+
+    /* Never overwrite. A file manager asks before replacing a file, and there
+     * is no prompt in this path, so skipping is the safe half of that. */
+    if (BLI_exists(dest)) {
+      skipped++;
+      continue;
+    }
+
+    if ((move ? BLI_rename(paths[i], dest) : BLI_copy(paths[i], dest)) == 0) {
+      done++;
+    }
+  }
+
+  GHOST_FreeClipboardFiles(paths, count);
+
+  BKE_reportf(op->reports,
+              RPT_INFO,
+              "%d file(s) %s%s",
+              done,
+              move ? "moved" : "copied",
+              skipped > 0 ? ", the rest skipped - the name already exists" : "");
+
+  if (move) {
+    /* Those paths no longer exist, so the clipboard must not keep offering
+     * them. Clearing it is what a file manager does after a cut and paste. */
+    GHOST_SetClipboardFiles(NULL, 0, false);
+  }
+
+  ED_file_change_dir(C);
+
+  return done > 0 ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+}
+
+void FILE_OT_clipboard_copy(wmOperatorType *ot)
+{
+  ot->name = "Copy Files";
+  ot->description = "Put the selected files on the system clipboard";
+  ot->idname = "FILE_OT_clipboard_copy";
+
+  ot->exec = file_clipboard_copy_exec;
+  ot->poll = file_clipboard_poll;
+}
+
+void FILE_OT_clipboard_cut(wmOperatorType *ot)
+{
+  ot->name = "Cut Files";
+  ot->description = "Put the selected files on the system clipboard as a cut";
+  ot->idname = "FILE_OT_clipboard_cut";
+
+  ot->exec = file_clipboard_cut_exec;
+  ot->poll = file_clipboard_poll;
+}
+
+void FILE_OT_clipboard_paste(wmOperatorType *ot)
+{
+  ot->name = "Paste Files";
+  ot->description = "Copy or move the files on the system clipboard into this folder";
+  ot->idname = "FILE_OT_clipboard_paste";
+
+  ot->exec = file_clipboard_paste_exec;
+  ot->poll = file_clipboard_poll;
+}
+
+/** \} */
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

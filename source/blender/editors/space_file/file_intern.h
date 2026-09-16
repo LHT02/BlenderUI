@@ -76,6 +76,12 @@ void file_external_operations_menu_register(void);
 #ifdef WIN32
 void FILE_OT_shell_context_menu(struct wmOperatorType *ot);
 #endif
+/* BLUI: file clipboard. Registered on every platform so the keymap data can
+ * bind it unconditionally - the GHOST transport fails closed off Windows, the
+ * same way the shell menu's does. */
+void FILE_OT_clipboard_copy(struct wmOperatorType *ot);
+void FILE_OT_clipboard_cut(struct wmOperatorType *ot);
+void FILE_OT_clipboard_paste(struct wmOperatorType *ot);
 
 /**
  * Variation of #FILE_OT_execute that accounts for some mouse specific handling.

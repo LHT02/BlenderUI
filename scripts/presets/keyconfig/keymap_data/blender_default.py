@@ -1139,6 +1139,11 @@ def km_file_browser(params):
         ("file.directory_new", {"type": 'I', "value": 'PRESS'},
          {"properties": [("confirm", False)]}),
         ("file.rename", {"type": 'F2', "value": 'PRESS'}, None),
+        # BLUI: file clipboard, on the system clipboard rather than Blender's
+        # interface one, so these interoperate with Explorer.
+        ("file.clipboard_copy", {"type": 'C', "value": 'PRESS', "ctrl": True}, None),
+        ("file.clipboard_cut", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
+        ("file.clipboard_paste", {"type": 'V', "value": 'PRESS', "ctrl": True}, None),
         ("file.delete", {"type": 'X', "value": 'PRESS'}, None),
         ("file.delete", {"type": 'DEL', "value": 'PRESS'}, None),
         ("file.smoothscroll", {"type": 'TIMER1', "value": 'ANY', "any": True}, None),

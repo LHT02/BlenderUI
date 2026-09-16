@@ -120,6 +120,37 @@ extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle
                                                  int screen_y);
 
 /**
+ * Put files on the system clipboard, so they can be pasted into another
+ * application and so another application's copy can be pasted into BLUI.
+ *
+ * Nothing is moved or copied here: the paths are only published. That is what
+ * makes a cut behave like a cut in a file manager - the files stay where they
+ * are until something pastes them.
+ *
+ * \param filepaths: Array of NUL terminated UTF-8 file paths.
+ * \param filepath_count: Number of entries in \a filepaths.
+ * \param move: True to record a cut, false to record a copy.
+ * \return #GHOST_kSuccess if the clipboard was set.
+ */
+extern GHOST_TSuccess GHOST_SetClipboardFiles(const char *const *filepaths,
+                                              int filepath_count,
+                                              bool move);
+
+/**
+ * Read the file paths currently on the system clipboard.
+ *
+ * \param r_filepaths: Receives a newly allocated array of UTF-8 paths, or NULL
+ *        when the clipboard holds no file list. Free with
+ *        #GHOST_FreeClipboardFiles.
+ * \param r_move: Receives whether the clipboard asked for a move; may be NULL.
+ * \return The number of paths, or 0 if the clipboard holds no file list.
+ */
+extern int GHOST_GetClipboardFiles(char ***r_filepaths, bool *r_move);
+
+/** Free an array produced by #GHOST_GetClipboardFiles. */
+extern void GHOST_FreeClipboardFiles(char **filepaths, int filepath_count);
+
+/**
  * Get the cursor position in screen coordinates.
  *
  * Distinct from #GHOST_GetCursorPosition(), which is window/client relative.
