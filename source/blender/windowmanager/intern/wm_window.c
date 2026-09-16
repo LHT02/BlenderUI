@@ -14,6 +14,8 @@
 
 #include "DNA_listBase.h"
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
+#include "DNA_text_types.h"
 #include "DNA_windowmanager_types.h"
 #include "DNA_workspace_types.h"
 
@@ -24,6 +26,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_listbase.h"
+#include "BLI_path_util.h"
 #include "BLI_system.h"
 #include "BLI_utildefines.h"
 
@@ -470,6 +473,82 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
   }
 }
 
+/**
+ * BLUI: describe what a window is showing, for its title bar.
+ *
+ * Blender titles a window after the .blend file it has open. BLUI never has one
+ * - its windows are components rather than views onto a document - so every
+ * window read "BLUI" no matter what it held. What is worth putting in a title
+ * is the thing the component has open: the directory in a file browser, the
+ * file in a text editor or image viewer.
+ *
+ * A BLUI window holds one component, so the first area describes the window.
+ * Writes \a r_str and returns true when there is something specific to say;
+ * false means "no content", and the caller falls back to the product name.
+ */
+static bool wm_window_title_content(const wmWindow *win, char *r_str, const size_t str_len)
+{
+  const bScreen *screen = WM_window_get_active_screen(win);
+  if (screen == NULL) {
+    return false;
+  }
+
+  const ScrArea *area = screen->areabase.first;
+  if (area == NULL) {
+    return false;
+  }
+
+  switch (area->spacetype) {
+    case SPACE_FILE: {
+      const SpaceFile *sfile = area->spacedata.first;
+      if (sfile == NULL || sfile->params == NULL || sfile->params->dir[0] == '\0') {
+        return false;
+      }
+      BLI_strncpy(r_str, sfile->params->dir, str_len);
+      return true;
+    }
+    case SPACE_TEXT: {
+      const SpaceText *st = area->spacedata.first;
+      const Text *text = (st != NULL) ? st->text : NULL;
+      if (text == NULL) {
+        return false;
+      }
+      if (text->filepath != NULL && text->filepath[0] != '\0') {
+        BLI_strncpy(r_str, text->filepath, str_len);
+      }
+      else {
+        BLI_snprintf(r_str, str_len, "%s (unsaved)", text->id.name + 2);
+      }
+      return true;
+    }
+    case SPACE_IMAGE: {
+      const SpaceImage *sima = area->spacedata.first;
+      const Image *image = (sima != NULL) ? sima->image : NULL;
+      if (image == NULL) {
+        return false;
+      }
+      if (image->filepath[0] != '\0') {
+        BLI_strncpy(r_str, image->filepath, str_len);
+      }
+      else {
+        BLI_strncpy(r_str, image->id.name + 2, str_len);
+      }
+      return true;
+    }
+    case SPACE_SEQ:
+      BLI_strncpy(r_str, "Video Sequence", str_len);
+      return true;
+    case SPACE_CONSOLE:
+      BLI_strncpy(r_str, "Console", str_len);
+      return true;
+    case SPACE_USERPREF:
+      BLI_strncpy(r_str, "Preferences", str_len);
+      return true;
+    default:
+      return false;
+  }
+}
+
 void wm_window_title(wmWindowManager *wm, wmWindow *win)
 {
   if (WM_window_is_temp_screen(win)) {
@@ -477,19 +556,23 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
      * because #WM_window_open always sets window title. */
   }
   else if (win->ghostwin) {
-    /* this is set to 1 if you don't have startup.blend open */
-    const char *blendfile_path = BKE_main_blendfile_path_from_global();
-    if (blendfile_path[0] != '\0') {
-      char str[sizeof(((Main *)NULL)->filepath) + 24];
-      SNPRINTF(str,
-               BLUI_PRODUCT_NAME "%s [%s%s]",
-               wm->file_saved ? "" : "*",
-               blendfile_path,
-               G_MAIN->recovered ? " (Recovered)" : "");
-      GHOST_SetTitle(win->ghostwin, str);
+    /* BLUI: the title names the content, and nothing else.
+     *
+     * Blender's version of this showed `blendfile_path`, which is always empty
+     * here - BLUI never has one - so every window read "BLUI". The product name
+     * is deliberately not added back as a suffix: the title bar belongs to the
+     * window, and repeating the application's name in every one of them tells
+     * the user nothing about which window they are looking at. */
+    char content[FILE_MAX];
+    if (wm_window_title_content(win, content, sizeof(content))) {
+      GHOST_SetTitle(win->ghostwin, content);
     }
     else {
-      GHOST_SetTitle(win->ghostwin, BLUI_PRODUCT_NAME);
+      /* Nothing specific to show - an area type BLUI does not describe, or a
+       * file browser that has not resolved a directory yet. Name the component
+       * rather than the application. */
+      WorkSpace *workspace = WM_window_get_active_workspace(win);
+      GHOST_SetTitle(win->ghostwin, (workspace != NULL) ? workspace->id.name + 2 : "");
     }
 
     /* Informs GHOST of unsaved changes, to set window modified visual indicator (macOS)
@@ -1034,16 +1117,74 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   wmWindowManager *wm = CTX_wm_manager(C);
 
+  /* Which component the new window should show. Blender treats workspaces as
+   * tabs within one document; BLUI has no such document, so naming one is how
+   * "open Settings" becomes a window rather than a tab.
+   *
+   * Resolved up front because the no-window path below has to put a workspace
+   * on the new window *before* `WM_check()` runs. */
+  char workspace_name[MAX_NAME];
+  RNA_string_get(op->ptr, "workspace", workspace_name);
+
+  WorkSpace *workspace = NULL;
+  if (workspace_name[0] != '\0') {
+    /* Workspace names carry the two character ID prefix, hence the `+ 2`. */
+    workspace = BLI_findstring(&bmain->workspaces, workspace_name, offsetof(ID, name) + 2);
+    if (workspace == NULL) {
+      BKE_reportf(op->reports, RPT_WARNING, "No component named \"%s\"", workspace_name);
+      return OPERATOR_FINISHED;
+    }
+  }
+
   wmWindow *win_new = NULL;
   if (win_src != NULL) {
     win_new = wm_window_copy_test(C, win_src, true, false);
   }
   else {
     /* BLUI: the tray can ask for a component when every window has been closed,
-     * so there is nothing to copy. Build a plain window and let the code below
-     * put the requested component in it. */
+     * so there is nothing to copy.
+     *
+     * `wm_window_new()` only allocates. A window that has not been through
+     * `wm_window_copy()` or `wm_add_default()` has no scene, no view layer and
+     * no workspace, and those are not optional: `WM_check()` creates the GHOST
+     * window, and the first draw reads the active scene and screen through
+     * them. Leaving them unset is what crashed BLUI when a component was opened
+     * from the tray with no window open. There is no sibling window to inherit
+     * from here, so take the state from the document.
+     *
+     * `wm_add_default()` is the reference for what a bare `wm_window_new()`
+     * needs; this is the same four assignments. */
+    if (workspace == NULL) {
+      workspace = bmain->workspaces.first;
+    }
+    Scene *scene = CTX_data_scene(C);
+    if (scene == NULL) {
+      scene = bmain->scenes.first;
+    }
+
     wmWindow *win_fresh = wm_window_new(bmain, wm, NULL, false);
     if (win_fresh != NULL) {
+      win_fresh->scene = scene;
+      if (scene != NULL) {
+        ViewLayer *view_layer = BKE_view_layer_default_view(scene);
+        if (view_layer != NULL) {
+          STRNCPY(win_fresh->view_layer_name, view_layer->name);
+        }
+      }
+      if (workspace != NULL) {
+        BKE_workspace_active_set(win_fresh->workspace_hook, workspace);
+
+        /* Its own layout, so this window does not share a screen with whichever
+         * window owned the workspace's first layout. */
+        WorkSpaceLayout *layout_src = workspace->layouts.first;
+        if (layout_src != NULL) {
+          WorkSpaceLayout *layout_new = ED_workspace_layout_duplicate(
+              bmain, workspace, layout_src, win_fresh);
+          BKE_workspace_active_layout_set(
+              win_fresh->workspace_hook, win_fresh->winid, workspace, layout_new);
+        }
+      }
+
       WM_check(C);
       if (win_fresh->ghostwin != NULL) {
         win_new = win_fresh;
@@ -1059,20 +1200,7 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* Which component the new window should show. Blender treats workspaces as
-   * tabs within one document; BLUI has no such document, so naming one is how
-   * "open Settings" becomes a window rather than a tab. */
-  char workspace_name[MAX_NAME];
-  RNA_string_get(op->ptr, "workspace", workspace_name);
-  if (workspace_name[0] != '\0') {
-    /* Workspace names carry the two character ID prefix, hence the `+ 2`. */
-    WorkSpace *workspace = BLI_findstring(
-        &bmain->workspaces, workspace_name, offsetof(ID, name) + 2);
-    if (workspace == NULL) {
-      BKE_reportf(op->reports, RPT_WARNING, "No component named \"%s\"", workspace_name);
-      return OPERATOR_FINISHED;
-    }
-
+  if (win_src != NULL && workspace != NULL) {
     BKE_workspace_active_set(win_new->workspace_hook, workspace);
 
     /* The layout the copy brought over belongs to the source workspace, so this

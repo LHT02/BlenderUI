@@ -419,6 +419,41 @@ Verified: builds, starts, and the existing checks still pass. **The
 close-every-window-then-use-the-tray path is not covered by an automated test** -
 it needs a real click on the tray icon - so that is worth exercising by hand.
 
+> **It was broken, and this paragraph is why nobody knew.** The tray path did
+> exist and did create a window, but it created an *invalid* one and BLUI died
+> on the click. `wm_window_new()` only allocates; `wm_window_copy()` and
+> `wm_add_default()` are what give a window its scene, view layer, workspace and
+> layout. The tray path called `wm_window_new()` and then `WM_check()`, which
+> brings up the GHOST window and runs the first draw - and set none of the four.
+> With a sibling window present the other branch is taken and everything looks
+> fine, which is exactly why the hand-test above was the only thing that could
+> have caught it, and why it was worth writing down that it had not been run.
+>
+> `wm_window_new_exec()` now resolves the target workspace *first* and gives the
+> fresh window all four, duplicating the workspace's layout so it does not share
+> a screen. `wm_add_default()` is the reference for what a bare `wm_window_new()`
+> needs: scene, view layer name, active workspace, active layout.
+
+**Window titles name the content.** Blender titles a window after its `.blend`
+file, which BLUI never has, so every window read "BLUI" regardless of what it
+held and the `(Recovered)` marker could never appear. `wm_window_title()` now
+describes the component: the directory in a file browser, the file path in the
+text editor or image viewer, and a label for the sequencer, console and
+preferences. The product name is deliberately **not** appended - the title bar
+belongs to the window, and repeating the application name in all of them says
+nothing about which window this is. With nothing specific to show it falls back
+to the component's workspace name.
+
+That is only half the job: a title has to be rewritten when the content changes,
+or it goes stale the moment the user navigates. `wm_event_do_notifiers()` scans
+the queue once per pass for the notifiers the components send when what they
+display changes (`ND_SPACE_FILE_PARAMS`, `ND_SPACE_FILE_LIST`, `ND_SPACE_IMAGE`,
+`ND_SPACE_TEXT`, `ND_SPACE_SEQUENCER`, `ND_SPACE_CONSOLE`, and
+`ND_WORKSPACE_SET`) and rewrites every window's title if any of them is present.
+The scan is deliberately **not** gated on `note->window == win`: several of
+these are broadcast with a null window via `WM_main_add_notifier()`, so gating
+on it would miss exactly the directory-change case it is there for.
+
 ## Verified state
 
 Everything below is checked by a script in `blui/tools/`, not asserted from

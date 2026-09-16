@@ -526,6 +526,32 @@ void wm_event_do_notifiers(bContext *C)
 
   /* Disable? - Keep for now since its used for window level notifiers. */
 #if 1
+  /* BLUI: a window's title names what it is showing, so it has to be rewritten
+   * when a component's content changes - a directory entered in the file
+   * browser, a file loaded in the text editor, an image opened in the viewer.
+   *
+   * Scanned once, before the window loop, and deliberately not gated on
+   * `note->window == win`: several of these notifiers are broadcast with a null
+   * window (`WM_main_add_notifier`), so gating on it would miss them. */
+  bool title_stale = false;
+  if (!G.background) {
+    LISTBASE_FOREACH (const wmNotifier *, note, &wm->notifier_queue) {
+      if ((note->category == NC_SPACE &&
+           ELEM(note->data,
+                ND_SPACE_FILE_PARAMS,
+                ND_SPACE_FILE_LIST,
+                ND_SPACE_IMAGE,
+                ND_SPACE_TEXT,
+                ND_SPACE_SEQUENCER,
+                ND_SPACE_CONSOLE)) ||
+          (note->category == NC_SCREEN && note->data == ND_WORKSPACE_SET))
+      {
+        title_stale = true;
+        break;
+      }
+    }
+  }
+
   /* Cache & catch WM level notifiers, such as frame change, scene/screen set. */
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     Scene *scene = WM_window_get_active_scene(win);
@@ -533,6 +559,10 @@ void wm_event_do_notifiers(bContext *C)
     bool clear_info_stats = false;
 
     CTX_wm_window_set(C, win);
+
+    if (title_stale) {
+      wm_window_title(wm, win);
+    }
 
     LISTBASE_FOREACH_MUTABLE (const wmNotifier *, note, &wm->notifier_queue) {
       if (note->category == NC_WM) {
