@@ -62,6 +62,7 @@ $checks = @(
 
   # --- drives synthetic input ----------------------------------------------
   @{ Name = "click_sweep";             Timeout = 300; Cmd = (Blui @("--debug", "--enable-event-simulate", "--python", "$tools\click_sweep.py")) }
+  @{ Name = "check_menu_draw";         Timeout = 300; Cmd = (Blui @("--factory-startup", "--enable-event-simulate", "--python", "$tools\check_menu_draw.py")) }
 
   # --- self-contained ------------------------------------------------------
   @{ Name = "check_clipboard_paste";   Timeout = 300; Cmd = @{ Exe = "cmd.exe"; Args = @("/c", "$tools\check_clipboard_paste.cmd") } }
@@ -121,6 +122,13 @@ foreach ($check in $checks) {
     }
     elseif ($text -match "SKIP") {
       $verdict = "SKIP"
+    }
+    elseif ($text -match "Traceback \(most recent call last\)") {
+      # A Python exception does not always fail the process. Inside a menu's
+      # draw() it aborts the rest of the menu and the check still exits 0, so
+      # a truncated menu reads as a pass - which is how a missing `CUT` icon
+      # silently deleted every entry after it.
+      $verdict = "TRACEBACK"
     }
   }
 

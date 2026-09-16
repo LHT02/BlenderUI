@@ -548,8 +548,13 @@ class FILEBROWSER_MT_context_menu(FileBrowserMenu, Menu):
         # shortcuts are only reachable while the pointer is over the file list,
         # so the menu has to offer them too - a shortcut nobody can find is not
         # a feature.
+        #
+        # No icon on Cut: there is no `CUT` in this icon enum, and asking for a
+        # missing one raises here rather than drawing nothing. A raise inside a
+        # menu's draw() aborts the rest of the menu, so the symptom was not one
+        # missing icon - it was every entry after this line disappearing.
         col = layout.column(align=True)
-        col.operator("file.clipboard_cut", text="Cut", icon='CUT')
+        col.operator("file.clipboard_cut", text="Cut")
         col.operator("file.clipboard_copy", text="Copy", icon='COPYDOWN')
         col.operator("file.clipboard_paste", text="Paste", icon='PASTEDOWN')
 
