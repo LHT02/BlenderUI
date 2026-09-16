@@ -2011,20 +2011,16 @@ static bool file_os_operations_menu_poll(const bContext *C_const, MenuType *UNUS
       return false;
     }
 
-    int numfiles = filelist_files_ensure(sfile->files);
-    int num_selected = 0;
-    for (int i = 0; i < numfiles; i++) {
-      if (filelist_entry_select_index_get(sfile->files, i, CHECK_ALL)) {
-        num_selected++;
-      }
-    }
-
     /* BLUI: always offered while browsing.
      *
      * This used to fail its poll unless exactly one item was selected, which
      * greys the entry out - and a submenu that refuses to open is
      * indistinguishable from a broken one. The draw function now says what is
-     * missing instead. */
+     * missing instead.
+     *
+     * The selection count that used to decide this is gone with it: it walked
+     * the whole file list on every poll to reach a conclusion the draw function
+     * now reaches anyway. */
     return true;
   }
 
