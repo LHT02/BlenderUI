@@ -143,10 +143,22 @@ SAVE_OPERATOR = "wm.save_active_file"
 # clearing it moves `Industry_Compatible` alone. Do not "correct" the first two
 # numbers to 6: 7 is what the harness prints, and the two remaining groups
 # (`object.duplicate_move*`, `collection.*`) are still unrepaired by design.
+#
+# Now 0 / 0 / 0. Groups 3 and 4 were the ones "still unrepaired by design": the
+# Object Mode bindings for `object.duplicate_move*` (a macro whose registration
+# went with the object bag) and for `collection.*` (regular operators whose
+# registration went the same way). Both were cut from the keymap data in the
+# same step as everything else, which is the discipline the README states and
+# which these two had escaped only because the object bag was removed before
+# the scan existed.
+#
+# The baseline is what arms the strict assertion: while it is non-zero the
+# scan prints a WARN, and at zero `check_preset()` asserts. It is 0 now, so
+# from here a dangling binding is a hard failure rather than a note.
 MEASURED_DANGLING_BINDINGS = {
-    "Blender": 7,
-    "Blender_27x": 7,
-    "Industry_Compatible": 1,
+    "Blender": 0,
+    "Blender_27x": 0,
+    "Industry_Compatible": 0,
 }
 
 failures = []

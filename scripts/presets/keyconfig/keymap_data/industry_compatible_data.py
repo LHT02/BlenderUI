@@ -1974,7 +1974,6 @@ def km_object_mode(params):
          {"properties": [("use_global", False), ("confirm", False)]}),
         ("object.delete", {"type": 'DEL', "value": 'PRESS', "shift": True},
          {"properties": [("use_global", True), ("confirm", False)]}),
-        ("object.duplicate_move", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
         # Keyframing
         ("anim.keyframe_insert_menu", {"type": 'S', "value": 'PRESS', "shift": True}, None),
         ("anim.keyframe_insert_by_name", {"type": 'S', "value": 'PRESS'},

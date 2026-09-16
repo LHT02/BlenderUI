@@ -51,6 +51,21 @@ bool GHOST_ShellMenuWin32_EnumerateLabels(const char *const *utf8_paths,
 void GHOST_ShellMenuWin32_FreeLabels(char **labels, int count);
 
 /**
+ * Whether the shell's menu object for \a utf8_paths implements
+ * `IContextMenu2` or `IContextMenu3`, and so expects its menu messages to be
+ * forwarded while the menu is up.
+ *
+ * This is the difference between a menu whose top-level entries merely appear
+ * and one whose extension submenus actually fill in: `QueryContextMenu`
+ * produces the former, `WM_INITMENUPOPUP` forwarded to `HandleMenuMsg2()` the
+ * latter. Exposed so a test can assert the forwarding path has a receiver
+ * without opening a menu.
+ *
+ * \return True if the menu wants its messages forwarded.
+ */
+bool GHOST_ShellMenuWin32_SupportsMenuMessages(const char *const *utf8_paths, int count);
+
+/**
  * Show the shell context menu for \a utf8_paths and invoke the chosen entry.
  *
  * Blocks while the menu is open, which is what `TrackPopupMenu` does.

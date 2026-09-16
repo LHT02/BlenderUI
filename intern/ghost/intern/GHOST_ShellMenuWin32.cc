@@ -21,6 +21,37 @@
 #  include <windows.h>
 #  include <shlobj.h>
 #  include <shlwapi.h>
+#  include <winternl.h>
+
+/**
+ * True on Windows 11 (build 22000) and later.
+ *
+ * `GetVersionEx` reports whatever the executable's manifest declares rather
+ * than the version actually running, so this asks ntdll for the real one - the
+ * same route the shell itself takes.
+ */
+static bool windows_is_11_or_greater()
+{
+  using RtlGetVersionFn = LONG(WINAPI *)(PRTL_OSVERSIONINFOW);
+
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  if (ntdll == nullptr) {
+    return false;
+  }
+  auto rtl_get_version = reinterpret_cast<RtlGetVersionFn>(
+      reinterpret_cast<void *>(GetProcAddress(ntdll, "RtlGetVersion")));
+  if (rtl_get_version == nullptr) {
+    return false;
+  }
+
+  RTL_OSVERSIONINFOW info = {};
+  info.dwOSVersionInfoSize = sizeof(info);
+  if (rtl_get_version(&info) != 0) {
+    return false;
+  }
+
+  return info.dwMajorVersion > 10 || (info.dwMajorVersion == 10 && info.dwBuildNumber >= 22000);
+}
 
 /* -------------------------------------------------------------------- */
 /** \name UTF conversion
@@ -90,11 +121,32 @@ class ShellMenu {
   HMENU menu() const { return m_menu; }
   IContextMenu *context_menu() const { return m_context_menu; }
 
+  /**
+   * Forward a menu message to the shell's own handler.
+   *
+   * Shell extensions that draw their own items, or that fill a submenu only
+   * when it opens, implement `IContextMenu2` or `IContextMenu3` and receive
+   * their messages here. Without this the top-level entries still appear - they
+   * come from `QueryContextMenu` - but every submenu an extension owns stays
+   * empty, which is what 7-Zip's and TortoiseSVN's do.
+   *
+   * \return True if a handler took the message.
+   */
+  bool handle_menu_msg(UINT msg, WPARAM wparam, LPARAM lparam, LRESULT *r_result);
+
+  /** True if the shell's menu implements `IContextMenu2` or `IContextMenu3`. */
+  bool has_menu_messages() const { return m_context_menu2 != nullptr; }
+
  private:
   void destroy();
 
   IShellFolder *m_folder = nullptr;
   IContextMenu *m_context_menu = nullptr;
+  /* Aliases of `m_context_menu`, obtained by QueryInterface - releasing
+   * `m_context_menu` covers all three. Only one of these is ever non-null:
+   * `IContextMenu3` derives from `IContextMenu2`, so it is preferred. */
+  IContextMenu2 *m_context_menu2 = nullptr;
+  IContextMenu3 *m_context_menu3 = nullptr;
   HMENU m_menu = nullptr;
   /* Absolute item pidls; the child entries point into them. */
   std::vector<PIDLIST_ABSOLUTE> m_item_pidls;
@@ -166,10 +218,35 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
     return false;
   }
 
+  /* Ask the shell's menu object whether it wants its messages forwarded.
+   *
+   * This is what makes extension submenus work. `QueryContextMenu` produces the
+   * top-level entries, so a menu that does not do this looks complete until the
+   * user opens one - 7-Zip's and TortoiseSVN's then come up empty.
+   * `IContextMenu3` derives from `IContextMenu2`, so it is tried first and used
+   * for both. */
+  if (FAILED(m_context_menu->QueryInterface(
+          IID_IContextMenu3, reinterpret_cast<void **>(&m_context_menu3))))
+  {
+    m_context_menu3 = nullptr;
+    if (FAILED(m_context_menu->QueryInterface(
+            IID_IContextMenu2, reinterpret_cast<void **>(&m_context_menu2))))
+    {
+      m_context_menu2 = nullptr;
+    }
+  }
+  else {
+    /* Same object; `m_context_menu2` is an alias and must not be released. */
+    m_context_menu2 = m_context_menu3;
+  }
+
   /* CMF_EXTENDEDVERBS is what puts the entries Windows 11 keeps behind
-   * "Show more options" into the menu. */
-  const HRESULT result = m_context_menu->QueryContextMenu(
-      m_menu, 0, kFirstId, kLastId, CMF_NORMAL | CMF_EXTENDEDVERBS);
+   * "Show more options" into the menu. On Windows 10 there is no such split -
+   * the normal right-click menu already is the extended one - and passing it
+   * there adds the verbs that are otherwise reserved for Shift+right-click. */
+  const UINT flags = CMF_NORMAL | (windows_is_11_or_greater() ? CMF_EXTENDEDVERBS : 0);
+
+  const HRESULT result = m_context_menu->QueryContextMenu(m_menu, 0, kFirstId, kLastId, flags);
   if (FAILED(result)) {
     return false;
   }
@@ -177,11 +254,34 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
   return GetMenuItemCount(m_menu) > 0;
 }
 
+bool ShellMenu::handle_menu_msg(UINT msg, WPARAM wparam, LPARAM lparam, LRESULT *r_result)
+{
+  if (m_context_menu3 != nullptr) {
+    *r_result = 0;
+    return SUCCEEDED(m_context_menu3->HandleMenuMsg2(msg, wparam, lparam, r_result));
+  }
+  if (m_context_menu2 != nullptr) {
+    return SUCCEEDED(m_context_menu2->HandleMenuMsg(msg, wparam, lparam));
+  }
+  return false;
+}
+
 void ShellMenu::destroy()
 {
   if (m_menu != nullptr) {
     DestroyMenu(m_menu);
     m_menu = nullptr;
+  }
+  /* `m_context_menu2` aliases `m_context_menu3` when the latter exists, so only
+   * one of them is released and it is released first. */
+  if (m_context_menu3 != nullptr) {
+    m_context_menu3->Release();
+    m_context_menu3 = nullptr;
+    m_context_menu2 = nullptr;
+  }
+  else if (m_context_menu2 != nullptr) {
+    m_context_menu2->Release();
+    m_context_menu2 = nullptr;
   }
   if (m_context_menu != nullptr) {
     m_context_menu->Release();
@@ -258,6 +358,56 @@ void GHOST_ShellMenuWin32_FreeLabels(char **labels, int count)
   free(labels);
 }
 
+bool GHOST_ShellMenuWin32_SupportsMenuMessages(const char *const *utf8_paths, int count)
+{
+  ShellMenu shell_menu;
+  if (!shell_menu.build(utf8_paths, count)) {
+    return false;
+  }
+  return shell_menu.has_menu_messages();
+}
+
+/* -------------------------------------------------------------------- */
+/** \name Menu message forwarding
+ *
+ * `TrackPopupMenu` runs its own modal loop, so the messages a shell menu
+ * extension needs never reach a window procedure of ours: `WM_INITMENUPOPUP` to
+ * fill a submenu as it opens, `WM_DRAWITEM` and `WM_MEASUREITEM` to draw and
+ * size its own items, and `WM_MENUCHAR` for keyboard accelerators. A
+ * `WH_MSGFILTER` hook is the documented way to see them.
+ *
+ * The popup is synchronous and runs on the calling thread, so a single
+ * file-scope pointer is enough - but it must be cleared before returning, or a
+ * later menu would be handed another menu's messages.
+ * \{ */
+
+static ShellMenu *g_msgfilter_menu = nullptr;
+
+static LRESULT CALLBACK shell_menu_msg_filter(int code, WPARAM wparam, LPARAM lparam)
+{
+  if (code == MSGF_MENU && g_msgfilter_menu != nullptr) {
+    const MSG *msg = reinterpret_cast<const MSG *>(lparam);
+    LRESULT result = 0;
+
+    switch (msg->message) {
+      case WM_INITMENUPOPUP:
+      case WM_DRAWITEM:
+      case WM_MEASUREITEM:
+      case WM_MENUCHAR:
+        if (g_msgfilter_menu->handle_menu_msg(msg->message, msg->wParam, msg->lParam, &result)) {
+          return result;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  return CallNextHookEx(nullptr, code, wparam, lparam);
+}
+
+/** \} */
+
 bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                 const char *const *utf8_paths,
                                 int count,
@@ -276,6 +426,11 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
    * around afterwards. */
   SetForegroundWindow(window);
 
+  /* Active only while the menu is up. */
+  g_msgfilter_menu = &shell_menu;
+  HHOOK hook = SetWindowsHookExW(
+      WH_MSGFILTER, shell_menu_msg_filter, nullptr, GetCurrentThreadId());
+
   const int command = TrackPopupMenu(shell_menu.menu(),
                                      TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                      screen_x,
@@ -283,6 +438,11 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                      0,
                                      window,
                                      nullptr);
+
+  if (hook != nullptr) {
+    UnhookWindowsHookEx(hook);
+  }
+  g_msgfilter_menu = nullptr;
 
   PostMessage(window, WM_NULL, 0, 0);
 

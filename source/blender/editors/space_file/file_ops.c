@@ -2203,6 +2203,28 @@ static bool file_execute(bContext *C, SpaceFile *sfile)
 
     WM_event_fileselect_event(CTX_wm_manager(C), op, EVT_FILESELECT_EXEC);
   }
+#ifdef WIN32
+  else if (file != NULL) {
+    /* BLUI: nothing is waiting for this file.
+     *
+     * Blender's file browser is a dialog - it "opens" a file by handing it back
+     * to the operator that asked for it - so with no such operator a
+     * double-click does nothing at all. BLUI's is a file manager, where a
+     * double-click means what it means on the desktop: open the file with
+     * whatever this machine has registered for it. That is also how a program
+     * is launched, so double-clicking a .exe runs it.
+     *
+     * Directories were handled above, so anything reaching here is a file.
+     * `BLI_windows_external_operation_execute()` uses ShellExecuteEx with
+     * `SEE_MASK_INVOKEIDLIST`, so file associations, "Open with", elevation
+     * prompts and the rest of the shell's behaviour all apply. */
+    char filepath[FILE_MAX_LIBEXTRA];
+    filelist_file_get_full_path(sfile->files, file, filepath);
+    BLI_windows_external_operation_execute(filepath, "open");
+  }
+  /* TODO: no equivalent for other platforms yet. They would need the same thing
+   * through xdg-open / `open`, which does not exist in this tree. */
+#endif
 
   return true;
 }

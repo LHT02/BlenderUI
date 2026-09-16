@@ -113,9 +113,29 @@ static void test_multi_selection()
   }
 }
 
+/**
+ * Whether the shell's menu object wants its messages forwarded.
+ *
+ * This is the half of the popup path that no other check here can see.
+ * `QueryContextMenu` produces the top-level entries whether or not anything
+ * forwards `WM_INITMENUPOPUP` to `HandleMenuMsg2()`, so a menu that enumerates
+ * perfectly can still come up with every extension submenu empty - which is
+ * what 7-Zip's and TortoiseSVN's did. Behaving correctly needs a menu that
+ * implements `IContextMenu2` or `IContextMenu3`, and this asserts one is there.
+ */
+static void test_menu_messages()
+{
+  printf("menu message forwarding:\n");
+
+  const char *paths[1] = {g_exe};
+  check(GHOST_ShellMenuWin32_SupportsMenuMessages(paths, 1),
+        "the shell's menu object implements IContextMenu2 or IContextMenu3");
+}
+
 static void test_missing_path()
 {
   printf("bad input:\n");
+
 
   const char *paths[1] = {"D:\\BlenderUI\\this\\does\\not\\exist.txt"};
   char **labels = nullptr;
@@ -143,6 +163,7 @@ int main()
   test_menu_for_file();
   test_menu_for_directory();
   test_multi_selection();
+  test_menu_messages();
   test_missing_path();
 
   printf("\n%s (%d failure%s)\n",
