@@ -537,6 +537,28 @@ Three details that are easy to get wrong and are written down for that reason:
 - Paste clears the clipboard after a move. Those paths no longer exist, so
   leaving them there would offer files that cannot be pasted again.
 
+> **Known defect, not yet fixed: a copy does not outlive BLUI.**
+> `GHOST_DragSourceWin32_ClipboardSetFiles()` publishes the payload with plain
+> `SetClipboardData()`, and Win32 clipboard data set that way is **owned by the
+> process that set it**. When BLUI exits, the clipboard goes empty - so
+> "Ctrl+C in BLUI, close BLUI, Ctrl+V in Explorer" pastes nothing.
+>
+> Not yet reproduced by hand, so treat it as a strongly-held expectation from
+> how the API works rather than a measurement. The test is two steps: copy a
+> file in BLUI, close every BLUI window, then paste in Explorer.
+>
+> The fix is to publish through OLE instead - `OleSetClipboard()` with the data
+> object the drag source already builds, then `OleFlushClipboard()`, which
+> renders the data into a shared block that outlives the process. That is what
+> this file originally considered and rejected as unnecessary, and the rejection
+> was wrong for exactly this case. Two things have to change with it: the data
+> object hardcodes `DROPEFFECT_COPY` in `DropSource::GetData()`, so a cut needs
+> that parameterised, and `OleFlushClipboard()` requires the OLE clipboard to
+> have been set on the same thread.
+>
+> A copy made and pasted *within* one BLUI session is unaffected and is covered
+> by `check_clipboard_paste.cmd`.
+
 **The shell context menu** (`Windows Shell Menu...`) hosts `IContextMenu` for the
 selected files. Two things it needed on Windows 10, which is what this fork is
 developed on:
