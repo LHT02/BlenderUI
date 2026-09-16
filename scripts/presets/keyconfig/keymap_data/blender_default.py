@@ -833,7 +833,6 @@ def km_view2d(_params):
         ("view2d.scroll_left", {"type": 'WHEELUPMOUSE', "value": 'PRESS', "ctrl": True}, None),
         ("view2d.scroll_down", {"type": 'WHEELDOWNMOUSE', "value": 'PRESS', "shift": True}, None),
         ("view2d.scroll_up", {"type": 'WHEELUPMOUSE', "value": 'PRESS', "shift": True}, None),
-        ("view2d.ndof", {"type": 'NDOF_MOTION', "value": 'ANY'}, None),
         # Zoom with single step
         ("view2d.zoom_out", {"type": 'WHEELOUTMOUSE', "value": 'PRESS'}, None),
         ("view2d.zoom_in", {"type": 'WHEELINMOUSE', "value": 'PRESS'}, None),
@@ -1057,7 +1056,6 @@ def km_image(params):
         ("image.view_pan", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "shift": True}, None),
         ("image.view_pan", {"type": 'TRACKPADPAN', "value": 'ANY'}, None),
         ("image.view_all", {"type": 'NDOF_BUTTON_FIT', "value": 'PRESS'}, None),
-        ("image.view_ndof", {"type": 'NDOF_MOTION', "value": 'ANY'}, None),
         ("image.view_zoom_in", {"type": 'WHEELINMOUSE', "value": 'PRESS'}, None),
         ("image.view_zoom_out", {"type": 'WHEELOUTMOUSE', "value": 'PRESS'}, None),
         ("image.view_zoom_in", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "repeat": True}, None),
@@ -2645,12 +2643,6 @@ def km_grease_pencil_stroke_weight_mode(params):
         ("gpencil.weight_sample", {"type": params.action_mouse, "value": 'PRESS', "ctrl": True}, None),
     ])
 
-    if params.select_mouse == 'LEFTMOUSE':
-        # Bone selection for combined weight paint + pose mode.
-        items.extend([
-            ("view3d.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-        ])
-
     return keymap
 
 
@@ -2925,12 +2917,6 @@ def km_weight_paint_vertex_selection(params):
     items.extend([
         *_template_items_select_actions(params, "paint.vert_select_all"),
         *_template_items_hide_reveal_actions("paint.vert_select_hide", "paint.face_vert_reveal"),
-        ("view3d.select_box", {"type": 'B', "value": 'PRESS'}, None),
-        ("view3d.select_lasso", {"type": params.action_mouse, "value": 'CLICK_DRAG', "ctrl": True},
-         {"properties": [("mode", 'ADD')]}),
-        ("view3d.select_lasso", {"type": params.action_mouse, "value": 'CLICK_DRAG', "shift": True, "ctrl": True},
-         {"properties": [("mode", 'SUB')]}),
-        ("view3d.select_circle", {"type": 'C', "value": 'PRESS'}, None),
         ("paint.vert_select_linked", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("paint.vert_select_linked_pick", {"type": 'L', "value": 'PRESS'},
          {"properties": [("select", True)]}),
@@ -3387,12 +3373,6 @@ def km_weight_paint(params):
         *_template_items_context_panel("VIEW3D_PT_paint_weight_context_menu", params.context_menu_event),
     ])
 
-    if params.select_mouse == 'LEFTMOUSE':
-        # Bone selection for combined weight paint + pose mode.
-        items.extend([
-            ("view3d.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-        ])
-
     if params.legacy:
         items.extend(_template_items_legacy_tools_from_numbers())
 
@@ -3452,11 +3432,12 @@ def km_object_non_modal(params):
         ])
 
         if params.use_pie_click_drag:
+            # Tab opens the mode pie directly, so drag-to-pie is the only
+            # gesture left here (ctrl-tab went with `space_view3d`).
             items.extend([
                 ("object.mode_set", {"type": 'TAB', "value": 'CLICK'},
                  {"properties": [("mode", 'EDIT'), ("toggle", True)]}),
                 op_menu_pie("VIEW3D_MT_object_mode_pie", {"type": 'TAB', "value": 'CLICK_DRAG'}),
-                ("view3d.object_mode_pie_or_toggle", {"type": 'TAB', "value": 'PRESS', "ctrl": True}, None),
             ])
         elif params.use_v3d_tab_menu:
             # Swap Tab/Ctrl-Tab
@@ -3469,7 +3450,12 @@ def km_object_non_modal(params):
             items.extend([
                 ("object.mode_set", {"type": 'TAB', "value": 'PRESS'},
                  {"properties": [("mode", 'EDIT'), ("toggle", True)]}),
-                ("view3d.object_mode_pie_or_toggle", {"type": 'TAB', "value": 'PRESS', "ctrl": True}, None),
+                # Was `view3d.object_mode_pie_or_toggle` (ctrl-tab), which went
+                # with `space_view3d`.  Keep the slot: re-pointed at the operator
+                # upstream already uses for ctrl-tab in the keyboard-driven UI
+                # (`space_topbar.py` and `space_sequencer.py` register it under
+                # the same keys), so the key name and action both stay correct.
+                ("object.transfer_mode", {"type": 'TAB', "value": 'PRESS', "ctrl": True}, None),
             ])
 
     return keymap
