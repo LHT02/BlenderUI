@@ -511,9 +511,6 @@ static MenuSearch_Data *menu_items_from_ui_create(
   int space_type_ui_items_len = 0;
   bool space_type_ui_items_free = false;
 
-  /* Text used as prefix for top-bar menu items. */
-  const char *global_menu_prefix = nullptr;
-
   if (include_all_areas) {
     bScreen *screen = WM_window_get_active_screen(win);
 
@@ -568,8 +565,6 @@ static MenuSearch_Data *menu_items_from_ui_create(
         wm_contexts[space_type_ui_index].region = region;
       }
     }
-
-    global_menu_prefix = CTX_IFACE_(RNA_property_translation_context(prop_ui_type), "Top Bar");
   }
 
   GHashIterator iter;
@@ -659,7 +654,6 @@ static MenuSearch_Data *menu_items_from_ui_create(
       for (int i = 0; i < idname_array_len; i++) {
         MenuType *mt = WM_menutype_find(idname_array[i], false);
         if (mt != nullptr) {
-          /* Check if this exists because of 'include_all_areas'. */
           if (BLI_gset_add(menu_tagged, mt)) {
             BLI_linklist_prepend(&menu_stack, mt);
           }
@@ -825,14 +819,6 @@ static MenuSearch_Data *menu_items_from_ui_create(
   /* Set names as full paths. */
   LISTBASE_FOREACH (MenuSearch_Item *, item, &data->items) {
     BLI_assert(BLI_dynstr_get_len(dyn_str) == 0);
-
-    if (include_all_areas) {
-      BLI_dynstr_appendf(dyn_str,
-                         "%s: ",
-                         (item->wm_context != nullptr) ?
-                             space_type_ui_items[item->wm_context->space_type_ui_index].name :
-                             global_menu_prefix);
-    }
 
     if (item->menu_parent != nullptr) {
       MenuSearch_Parent *menu_parent = item->menu_parent;
