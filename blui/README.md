@@ -1777,9 +1777,11 @@ The work is staged so the build stays green at every step.
       Grease Pencil is two unrelated things that share one module:
 
       - **`OB_GPENCIL_LEGACY`** - a real object type, a 3D drawing medium, with
-        its own modifier stack (`gpencil_modifiers_legacy/`, 30 files), its own
+        its own modifier stack (`gpencil_modifiers_legacy/`, 39 files), its own
         node/mask/palette system, its own paint and sculpt and weight brushes,
         and its own file format. `object.cc` has it in **fifteen** switch arms.
+        *(Measured in full later: 124 files / 3.15 MB across `editors/`,
+        `blenkernel/` and `draw/`.)*
       - **Annotation** - the screen-level scratch layer you scribble on in any
         editor. It is `bGPdata` hanging off a `Screen`, not off an `Object`, and
         it is drawn by `ED_annotation_draw_view2d()` /
@@ -1893,6 +1895,10 @@ The work is staged so the build stays green at every step.
          scope, but it is LHT's call and it is not implied by the annotation
          answer.
 
+         **UNDER-SCOPED. Measured in full below: 124 files / 3.15 MB**, and the
+         core is in `blenkernel` + `draw`, not `editors/`. Read the
+         `OB_GPENCIL_LEGACY` section before acting on this list.
+
       **Status: scoped, nothing deleted.** The honest summary is that
       "annotation is not kept" converts target 4 from *blocked* to *unblocked*,
       and identifies `gpencil_legacy` as the next 1.6 MB - but the 63-entry
@@ -2000,6 +2006,152 @@ The work is staged so the build stays green at every step.
       No commit for this round: nothing in the tree changed. The measurement is
       recorded here so the next round does not re-derive it, and the two numbers
       it retires - 6 and 12 - are annotated rather than left to look current.
+
+      ### `OB_GPENCIL_LEGACY` measured: 124 files / 3.15 MB, and it is not where the last round said it was
+
+      The re-measurement above ends with the question this section answers:
+      *does BLUI ship `OB_GPENCIL_LEGACY`?* That is now the only thing standing
+      between the tree and target 4 (`object` + `space_view3d`, 2.34 MB). The
+      earlier scoping round described the object as "a real object type, a 3D
+      drawing medium, with its own modifier stack" and listed the work as *15
+      switch arms in `object.cc`, `gpencil_modifiers_legacy/`, two RNA files,
+      `io/gpencil/`, three file menu items*. **That description is too small by
+      roughly a factor of two, and it points at the wrong directory.**
+
+      #### The full extent
+
+      | what | files | bytes |
+      | --- | --- | --- |
+      | `editors/gpencil_legacy/` | 32 | 1,469,321 |
+      | `gpencil_modifiers_legacy/` | 39 | 714,040 |
+      | `io/gpencil/` | 13 | 60,902 |
+      | `draw/engines/gpencil/` (incl. 11 `.glsl` + 2 `.hh`) | 22 | 167,650 |
+      | `blenkernel/gpencil*` (10 scattered files) | 10 | 399,683 |
+      | `draw/intern/gpencil*` (2 scattered files) | 2 | 48,536 |
+      | `makesrna/intern/rna_gpencil_legacy.c` | 1 | 113,594 |
+      | `makesrna/intern/rna_gpencil_legacy_modifier.c` | 1 | 230,017 |
+      | `makesdna/DNA_gpencil_legacy_types.h` | 1 | 27,697 |
+      | `makesdna/DNA_gpencil_modifier_defaults.h` | 1 | 9,941 |
+      | `makesdna/DNA_gpencil_modifier_types.h` | 1 | 37,734 |
+      | `editors/include/ED_gpencil_legacy.h` | 1 | 23,637 |
+      | **total** | **124** | **3,302,752 (3.15 MB)** |
+
+      For scale: that is larger than `object` (1.19 MB) and `space_view3d`
+      (1.15 MB) **combined**, and larger than every other module deleted in
+      Stage 2 so far put together.
+
+      #### The correction that matters: the core is in `blenkernel`, not `editors`
+
+      The previous round looked only at the editor layer. The GP object's actual
+      implementation is 399,683 bytes across **ten `blenkernel` files**:
+
+      ```
+      142,435  blenkernel/intern/gpencil_geom_legacy.cc
+       92,297  blenkernel/intern/gpencil_legacy.c
+       46,421  blenkernel/intern/gpencil_curve_legacy.c
+       35,485  blenkernel/intern/gpencil_modifier_legacy.c
+       28,211  blenkernel/BKE_gpencil_legacy.h
+       21,508  blenkernel/BKE_gpencil_geom_legacy.h
+       16,615  blenkernel/BKE_gpencil_modifier_legacy.h
+        8,323  blenkernel/intern/gpencil_update_cache_legacy.c
+        5,308  blenkernel/BKE_gpencil_update_cache_legacy.h
+        3,080  blenkernel/BKE_gpencil_curve_legacy.h
+      ```
+
+      plus a full draw engine (`draw/engines/gpencil/`, 22 files including its
+      own shader set) and a cache implementation (`draw/intern/draw_cache_impl_gpencil.cc`,
+      34,499 B). This is the same shape as the `ED_annotation_data_get_*` lesson
+      one level up: **the module name points at the editor, the implementation
+      lives in the kernel.** A plan built from `editors/` alone would have
+      under-scoped this by ~45%.
+
+      #### How far the dependency actually reaches
+
+      Scanned every non-GP file for GP identifiers (`bGPdata`, `bGPD*`,
+      `GPENCIL_`, `BKE_gpencil*`, `ED_gpencil_*`, `OB_GPENCIL_LEGACY`,
+      `GpencilModifier`, …). **171 non-GP files** reference them, across every
+      layer BLUI keeps:
+
+      | directory | files with GP references |
+      | --- | --- |
+      | `editors/` | 187 symbol hits |
+      | `blenkernel/` | 116 |
+      | `draw/` | 80 |
+      | `makesrna/` | 38 |
+      | `depsgraph/` | 17 |
+      | `makesdna/` | 16 |
+      | `blenloader/` | 4 |
+      | `modifiers/`, `windowmanager/`, `gpu/`, `shader_fx/`, `blentranslation/` | 8 total |
+
+      The heaviest single consumers outside the GP tree are the ones that make
+      this a cross-cutting concern rather than a leaf: `blenkernel/intern/object.cc`
+      (8), `editors/object/object_add.cc` (8), `editors/object/object_transform.cc`
+      (8), `editors/object/object_vgroup.cc` (5), `depsgraph/intern/builder/deg_builder_relations.cc`
+      (5), `deg_builder_nodes.cc` (4), `editors/animation/*` (keyframe filtering,
+      channel drawing), `blenkernel/intern/material.cc` (5), `rna_material.c` (5),
+      and `blenkernel/intern/tracking.cc` (4).
+
+      #### What is genuinely reachable in BLUI - measured, not assumed
+
+      | check | result |
+      | --- | --- |
+      | `bl_ui/space_blui.py` GP/annotation references | **0** |
+      | 3D viewport in BLUI's workspace set | **none** |
+      | `bl_ui/space_topbar.py` references | **5**, all file-format menu items |
+      | `OBJECT_OT_gpencil_add` registration | `editors/object/object_ops.c:86` |
+      | `OBJECT_OT_gpencil_add` UI entry points | **one**: `keymap_data/blender_default.py:2156` (`Shift+A`) |
+      | GP drawing tools / brushes / sculpt | no reachable entry point |
+      | GP preferences panels | removed in the Stage 5 preferences work |
+
+      The five `space_topbar.py` hits are exactly:
+
+      ```
+      337  if bpy.app.build_options.io_gpencil:
+      338    self.layout.operator("wm.gpencil_import_svg", text="SVG as Grease Pencil")
+      362  if bpy.app.build_options.io_gpencil:
+      365    self.layout.operator("wm.gpencil_export_svg", text="Grease Pencil as SVG")
+      368    self.layout.operator("wm.gpencil_export_pdf", text="Grease Pencil as PDF")
+      ```
+
+      Those three menu items are pure **file-format conversion** on an existing
+      GP object. They are only meaningful if a GP object can exist in the first
+      place - and the only way to create one is `Shift+A` in a 3D viewport, which
+      BLUI does not have. **Measured conclusion: in BLUI today, no user can create,
+      open, draw on, or export a Grease Pencil object.** The type is reachable
+      only from Python (`bpy.data.objects.new(..., type='GPENCIL')`) - the same
+      "reachable from RNA" shape that blocked `space_buttons`.
+
+      #### The honest verdict
+
+      This is a **product question with a measured answer at one end and a real
+      cost at the other**, and it is LHT's call:
+
+      - **Shipping it costs nothing today.** It compiles, it is unreachable, and
+        it is not in BLUI's UI. Leaving it is a defensible choice.
+      - **Deleting it is ~3.15 MB and 124 files**, plus edits across **171
+        non-GP files** in `blenkernel`, `draw`, `depsgraph`, `makesdna`,
+        `blenloader` and all of `editors/object/`. It is materially larger than
+        `object` + `space_view3d`, which are themselves measured-and-rejected as
+        a single mechanical deletion.
+      - **It is not a prerequisite for anything else** *except* the way it pins
+        `space_view3d`: 11 of that module's kept consumers are the GP object's
+        paint/fill/sculpt brushes, which need `ED_view3d_depth_override` and
+        friends. So deleting GP would genuinely unblock `space_view3d` - but it
+        would cost more than `space_view3d` was ever going to return.
+
+      **Recommendation, stated as a recommendation and not a decision:** if the
+      goal is to shrink the product, `OB_GPENCIL_LEGACY` is a poor next target -
+      it is the largest single remaining block, it is entirely unreachable, and
+      it buys back less than it costs (it unblocks 1.15 MB of `space_view3d` at
+      a price of 3.15 MB plus 171 files of edits). The better argument for doing
+      it is **product purity** - "BLUI is a file browser, an image viewer, a text
+      editor, a video previewer and a console, and it ships no 3D drawing
+      medium" - which is a legitimate reason, but a different one than byte
+      count. If that is the reason, it should be its own Stage, not a rider on
+      target 4.
+
+      Nothing was deleted and nothing was changed this round. No commit: the
+      tree is untouched and the README entry is the deliverable.
 
       ### Annotation is deleted: `annotate_draw.c` + `annotate_paint.c` (126 KB)
 
