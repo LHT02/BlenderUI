@@ -2994,6 +2994,38 @@ static int filepath_drop_exec(bContext *C, wmOperator *op)
       return OPERATOR_CANCELLED;
     }
 
+    /* BLUI: browsing, so a dropped file is copied into the folder on screen.
+     *
+     * Blender only ever set the filepath here, which is right in a save dialog
+     * and useless in a file manager: dragging a file in from Explorer did
+     * nothing at all. Copying is what the gesture means, and it is the other
+     * half of the drag support the file browser is supposed to have - dragging
+     * out already worked. A name that is already taken is left alone rather
+     * than replaced, matching paste. */
+    if (sfile->browse_mode == FILE_BROWSE_MODE_FILES) {
+      FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+      if (params != NULL && params->dir[0] != '\0') {
+        char dest[FILE_MAX_LIBEXTRA];
+        BLI_path_join(dest, sizeof(dest), params->dir, BLI_path_basename(filepath));
+        if (BLI_exists(dest)) {
+          BKE_reportf(op->reports, RPT_WARNING, "'%s' is already here", BLI_path_basename(dest));
+        }
+        else if (file_ops_copy_recursive(filepath, dest) == 0) {
+          ED_fileselect_clear(CTX_wm_manager(C), sfile);
+          WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
+        }
+        else {
+          char message[512];
+          BLI_snprintf(message,
+                       sizeof(message),
+                       "Could not copy the dropped item into this folder: %s",
+                       BLI_path_basename(filepath));
+          BKE_report(op->reports, RPT_ERROR, message);
+          file_ops_message("BLUI - Drop", message);
+        }
+      }
+    }
+
     file_sfile_filepath_set(sfile, filepath);
 
     if (sfile->op) {
