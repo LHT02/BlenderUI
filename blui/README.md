@@ -3104,3 +3104,114 @@ The work is staged so the build stays green at every step.
 BLUI is derived from Blender and is distributed under the GNU GPL v2 or later.
 The Blender Foundation copyright notice is preserved in source headers and in
 the Windows resource block.
+
+
+## Packaging (portable ZIP)
+
+BLUI ships as a **portable ZIP**, not an installer. The build tree at
+`build/bin` is already a complete, runnable distribution; packaging is a
+*selection* step, not a compilation step.
+
+    python D:\BlenderUI\_package.py scan    # show what ships and what does not
+    python D:\BlenderUI\_package.py stage   # copy into dist\BLUI-1.0.0-windows-x64
+    python D:\BlenderUI\_package.py zip     # stage + zip + read the archive back
+
+Output: `dist\BLUI-1.0.0-windows-x64.zip`.
+
+### Do not run `cmake --install`
+
+`source/creator/CMakeLists.txt` contains
+
+    install(CODE "file(REMOVE_RECURSE ${TARGETDIR_VER})")
+
+`${TARGETDIR_VER}` is `1.0`, so `cmake --install` **deletes `build/bin/1.0/`
+first** - the directory holding every runtime script, datafile and the embedded
+Python - and repopulates it from the install rules. Those rules are not the same
+set (`WITH_PYTHON_INSTALL`, the `blui/tools` tree and the debug `.cmd` wrappers
+are all install-rule casualties), so a naive install silently produces a tree
+that differs from the one that was tested. Copy from `build/bin` instead.
+
+### The allowlist, and why not a blacklist
+
+`_package.py` names the top-level entries that ship (`INCLUDE_TOP`) and drops
+individual files inside them by rule (`DROP_FILES`). A blacklist would silently
+carry anything a future build adds; an allowlist *omits* it - which is also
+silent, just in the other direction. So `report_scan()` prints three numbers
+rather than two:
+
+  - **KEEP** - files copied.
+  - **DROP** - files inside a shipped tree that a rule excluded, with the reason.
+  - **NOT COVERED** - top-level entries the allowlist never mentions. Neither
+    shipped nor dropped. This dimension is the failure mode of an allowlist and
+    is why it is printed explicitly rather than left implied.
+
+Measured, 2026-09-16:
+
+| | |
+| --- | --- |
+| `build/bin` source | 3,931 files, 409.2 MB |
+| shipped | 3,744 files, 338.8 MB |
+| dropped inside shipped trees | 168 files, 9.3 MB |
+| not covered (top level) | 19 files, 61.0 MB |
+| ZIP on disk | 3,745 entries, 119.2 MB |
+
+Of the 409 MB source, **155 MB is build residue**: `BLUI.pdb` alone is 44.8 MB,
+`makesrna.pdb` 8.0 MB, and the code generators (`makesdna`, `makesrna`,
+`datatoc`, `datatoc_icon`, `msgfmt`, `smaa_areatex`) are needed to *compile* BLUI
+and never to run it. Shipping them would have made the download 2.5x larger for
+nothing.
+
+Two files that look like junk are kept deliberately:
+`numpy/core/lib/npymath.lib` and `numpy/random/lib/npyrandom.lib` are numpy's own
+static import libraries, shipped by upstream numpy. The `.lib` drop rule names
+`BLUI.lib` exactly, not the extension, to avoid taking them.
+
+`oculus.json` is an OpenXR runtime manifest pointing at a hardcoded
+`C:\Program Files\Oculus\...` path. It is not referenced anywhere in the source
+tree. Excluded.
+
+`blui/tools/` **is not in `build/bin`** and therefore not in the ZIP - the
+verification suite is not product code. It lives in `source/blui/tools/` and is
+run from there against a packaged `BLUI.exe`.
+
+### Acceptance test
+
+Packing is not proven by matching file counts. `_extract_test.py` unzips the
+archive to a clean directory unrelated to the build tree, then runs the two
+suite checks that support `--background` against the *extracted* executable:
+
+    BLUI.exe --factory-startup --background --python check_editor_set.py
+    BLUI.exe --factory-startup --background --python check_preferences.py
+
+Both must report PASS from inside the extracted tree. That exercises the
+archive itself, so a path broken by packaging, a file missed by the allowlist,
+or an archive Windows cannot open fails here instead of on the user's machine.
+
+The five checks that need a real window (`check_keymap_config`,
+`check_window_isolation`, `check_component_window`, `check_save_isolation`,
+`click_sweep`) cannot run headless and are therefore **not** part of packaging
+acceptance. The package's job is to load the same runtime; the window checks
+test behaviour, not contents.
+
+### Portable mode
+
+Configuration defaults to `%APPDATA%\BLUI\`. It is redirected by **environment
+variable**, not by placing a `config` folder next to the executable - there is no
+"detect a local config and switch" branch in the code:
+
+    BLUI_USER_CONFIG, BLUI_USER_DATAFILES, BLUI_USER_SCRIPTS, BLUI_USER_AUTOSAVE
+
+Verified, not assumed: with `BLUI_USER_CONFIG` set,
+`bpy.utils.user_resource('CONFIG')` returns that path
+(`blenkernel/intern/appdir.c:639`).
+
+### Known packaging gap (not yet fixed)
+
+`build_files/cmake/packaging.cmake:109-110` still names `blender-launcher` for
+`CPACK_PACKAGE_EXECUTABLES` / `CPACK_CREATE_DESKTOP_LINKS`, and lines 85-86 still
+build the install directory as `Blender Foundation/Blender 3.6`. The target now
+outputs `BLUI-launcher.exe`. This affects only the CPack/NSIS installers, which
+BLUI does not currently ship - the portable ZIP path above does not read these
+variables. Left alone rather than half-fixed; if an installer is ever wanted,
+these four lines are the first thing to change.
+
