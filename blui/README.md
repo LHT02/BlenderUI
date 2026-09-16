@@ -2190,6 +2190,27 @@ The work is staged so the build stays green at every step.
       > established first. The other two are trivial by comparison - 662 is a
       > stale comment, 829 appends a prefix to item names in a branch that never
       > runs.
+      >
+      > **Now measured, and the advice is to stop short of the last one.** Four of
+      > the five branches are gone (`a1c1dcf`, `31b1c61`, `17ca3c7`). The
+      > remaining block at 514 should probably **not** be removed, which reverses
+      > what the paragraphs above imply:
+      >
+      > - The loop at 572 has a `continue` in its body (line 656), so it cannot be
+      >   replaced by a straight-line pass. With the `Area.ui_type` array gone it
+      >   would have to become `for (int i = -1; i < 0; i += 1)` - a loop that
+      >   runs once, where the dead block at least reads as a coherent feature
+      >   that is merely unreachable.
+      > - It orphans four locals (`space_type_ui_items`, `_len`, `_free` and
+      >   `wm_contexts`), each of which then has to be hunted down and deleted,
+      >   including the one that is assigned but never read and so produces no
+      >   warning.
+      >
+      > Deleting it would make the code *less* readable and no more correct. The
+      > honest options are to leave it as documented history, or to remove the
+      > whole feature in one pass - the `MenuSearch_Context` plumbing and the
+      > `-1` global-context special case go with it - which is a different and
+      > larger job than a cleanup.
 
       ### `editors/space_topbar/` is deleted, and the scope above held exactly
 
