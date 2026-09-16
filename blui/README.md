@@ -431,7 +431,7 @@ memory. Run them after any change; none of them need a person watching.
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
-| Key configuration: all 3 presets load, Ctrl+S, Shift+F1..F6 | `check_keymap_config.py` | PASS on those; **FAILS on 34 dangling bindings** - see below |
+| Key configuration: all 3 presets load, Ctrl+S, Shift+F1..F6 | `check_keymap_config.py` | PASS on those; **FAILS on 15 dangling bindings** - see below |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
 | Open-document isolation (item 4's target) | `check_window_isolation.py -- --strict` | FAILS today, by design |
@@ -727,6 +727,30 @@ Keymap counts are unchanged at **112 / 103 / 103**, which is the check that the
 deletions removed bindings and not keymaps. All seven scripts were re-run; see
 `## Verification suite coverage boundaries` for the per-script results.
 
+**Update 2026-09-16 (later round): 16 → 15, and only `Industry_Compatible`
+moves.**
+
+One group-5 binding had been missed. `Industry_Compatible -> Weight Paint ->
+view3d.select` is in the original 34, but it was not on any of the three group
+lists, so the group-5 sweep did not carry it. Its unreachability has the same
+cause as the rest of group 5 - there is no 3D view to enter weight-paint mode
+from - so it is pure cleanup and needed no product decision. It sat in the
+`weights` list of `km_weight_paint` in `industry_compatible_data.py`, not inside
+an `if` branch, so nothing was left empty behind it.
+
+It only ever existed in `Industry_Compatible`: the same binding in `Blender`
+(Weight Paint **and** GP Stroke Weight Mode) went with the group-5 sweep, and
+`Blender_27x` never had one. A prediction of 6 / 6 / 1 made before the edit is
+therefore wrong; the measured result is **7 / 7 / 1**. The first two numbers are
+7 and should stay 7.
+
+| Preset | Before | After |
+| --- | --- | --- |
+| `Blender` | 7 | **7** (unchanged - no such entry left) |
+| `Blender_27x` | 7 | **7** (unchanged - never had one) |
+| `Industry_Compatible` | 2 | **1** |
+| **Total** | **16** | **15** |
+
 What was changed, all in `keymap_data/*.py`:
 
 - **Group 1** - deleted `view2d.ndof` and `image.view_ndof` from both preset
@@ -813,7 +837,7 @@ operator should go. Ordered by how live the code path is:
    3D viewport to enter paint or object mode from. Pure cleanup, no decision
    needed. **Done 2026-09-16.**
 
-**Remaining after this round: 16, all of them groups 3 and 4.** They are the
+**Remaining after this round: 15, all of them groups 3 and 4.** They are the
 same seven bindings in `Blender` and `Blender_27x`, plus one in
 `Industry_Compatible`: `object.duplicate_move`, `object.duplicate_move_linked`
 (not bound in `Industry_Compatible`), and the five `collection.*` entries. Every
@@ -821,16 +845,39 @@ one of them sits in the **`Object Mode`** keymap, which is a live keymap in
 verifying BLUI workspaces - so unlike the group-5 entries these are real bugs,
 and they are waiting on a decision rather than on effort.
 
-Also worth doing while in these files: **the assertion is not yet exact.**
-`MEASURED_KEYMAP_COUNTS` and `MEASURED_DANGLING_BINDINGS` in the script record the
-counts but only assert "not worse than", so that the check fails for the right
-reason (`has no dangling operator bindings`) without also failing on a
-known-and-accepted number. Groups 1, 2 and 5 are now cleaned up, so
-`MEASURED_DANGLING_BINDINGS` is still 16/13/5 and is now loose by 9/6/3. Tighten
-it to **7 / 7 / 2** so the check catches a regression in the cleaned groups too -
-otherwise a future edit that reintroduces `view2d.ndof` would still pass. When
-groups 3 and 4 are decided, tighten it again and the allowlist can stay empty and
-the check goes green on its own.
+**Full suite, re-run after this change** (real windows where they are required,
+`--factory-startup` throughout):
+
+| Script | Result |
+| --- | --- |
+| `check_editor_set.py` | PASS, 0 failures |
+| `check_preferences.py` | PASS, 0 failures |
+| `check_keymap_config.py` | `FAILED (3)` - the three intentional dangling assertions, nothing else |
+| `check_window_isolation.py` | `RESULT_PASS` - EDITORS-ISOLATED, DOCUMENTS SHARED |
+| `check_window_isolation.py -- --strict` | `RESULT_FAIL` - the Stage 6 assertion, red by design |
+| `check_component_window.py` | PASS |
+| `check_save_isolation.py` | PASS |
+| `click_sweep.py` | 144 clicks, no crash, no crash log |
+
+**The thresholds are exact for keymaps and as tight as they can be for bindings.**
+`MEASURED_KEYMAP_COUNTS` asserts equality, so a preset that silently loses or
+gains keymaps fails. `MEASURED_DANGLING_BINDINGS` asserts only "not worse than",
+because the check has to stay red for the right reason (`has no dangling operator
+bindings`) while groups 3 and 4 are open - but the recorded value is the number
+the harness actually prints, so a regression in any cleaned-up group fails the
+"not gained" assertion immediately. It has been tightened twice, 16/13/5 →
+7/7/2 → **7 / 7 / 1**. Two things to keep straight when reading it:
+
+- **7 / 7 / 1 is not 6 / 6 / 1.** The last group-5 leftover existed only in
+  `Industry_Compatible`; `Blender` and `Blender_27x` had none left after the
+  group-5 sweep. The first two numbers are 7 and should stay 7.
+- An earlier revision of this paragraph read "`MEASURED_DANGLING_BINDINGS` is
+  still 16/13/5 and is now loose by 9/6/3. Tighten it to **7 / 7 / 2**". That was
+  the correct instruction for exactly one round; it has been carried out and is
+  recorded here instead of being left to mislead the next reader.
+
+When groups 3 and 4 are decided, tighten it to zero and the allowlist can stay
+empty - the check then goes green on its own.
 
 
 ## Roadmap

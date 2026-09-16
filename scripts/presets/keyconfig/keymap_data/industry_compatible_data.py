@@ -2239,8 +2239,6 @@ def km_weight_paint(params):
          {"properties": [("data_path", 'tool_settings.weight_paint.brush.use_smooth_stroke')]}),
         ("paint.face_vert_reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
         *_template_items_context_panel("VIEW3D_PT_paint_weight_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
-        # Bone selection for combined weight paint + pose mode.
-        ("view3d.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
         # Tools
         ("paint.brush_select", {"type": 'D', "value": 'PRESS'},
          {"properties": [("weight_tool", 'DRAW')]}),

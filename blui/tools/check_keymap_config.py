@@ -136,10 +136,17 @@ SAVE_OPERATOR = "wm.save_active_file"
 # 4 (collection.*). Tightened to match, so that a regression in any of the
 # cleaned-up groups is caught: the assertion is "not worse than", and a stale
 # value of 16 would let nine deleted-with-difficulty bindings come back unseen.
+#
+# Was 7 / 7 / 2 for one round. The last group-5 leftover,
+# `Industry_Compatible -> Weight Paint -> view3d.select`, existed only in that
+# preset - the same binding in `Blender` went with the group-5 sweep - so
+# clearing it moves `Industry_Compatible` alone. Do not "correct" the first two
+# numbers to 6: 7 is what the harness prints, and the two remaining groups
+# (`object.duplicate_move*`, `collection.*`) are still unrepaired by design.
 MEASURED_DANGLING_BINDINGS = {
     "Blender": 7,
     "Blender_27x": 7,
-    "Industry_Compatible": 2,
+    "Industry_Compatible": 1,
 }
 
 failures = []
