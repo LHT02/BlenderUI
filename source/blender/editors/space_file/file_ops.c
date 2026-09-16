@@ -2275,6 +2275,41 @@ static int file_clipboard_cut_exec(bContext *C, wmOperator *op)
   return file_clipboard_put_exec(C, op, true);
 }
 
+/* Copy a file, or a whole directory.
+ *
+ * `BLI_copy` is `CopyFileW` on Windows and `copy_file` elsewhere - it copies a
+ * FILE. Handing it a directory fails, and the file browser pastes directories
+ * like any other item, so every folder paste did nothing at all. Nothing in
+ * blenlib walks a tree for this, so this does.
+ *
+ * Returns 0 on success, matching `BLI_copy`. */
+static int file_ops_copy_recursive(const char *src, const char *dst)
+{
+  if (!BLI_is_dir(src)) {
+    return BLI_copy(src, dst);
+  }
+
+  BLI_dir_create_recursive(dst);
+
+  struct direntry *entries = NULL;
+  const int count = BLI_filelist_dir_contents(src, &entries);
+  int result = 0;
+  for (int i = 0; i < count; i++) {
+    const char *name = entries[i].relname;
+    if (STREQ(name, ".") || STREQ(name, "..")) {
+      continue;
+    }
+    char child_src[FILE_MAX_LIBEXTRA];
+    char child_dst[FILE_MAX_LIBEXTRA];
+    BLI_path_join(child_src, sizeof(child_src), src, name);
+    BLI_path_join(child_dst, sizeof(child_dst), dst, name);
+    if (file_ops_copy_recursive(child_src, child_dst) != 0) {
+      result = 1;
+    }
+  }
+  BLI_filelist_free(entries, (unsigned int)count);
+  return result;
+}
 /* BLUI has no info bar and no top bar, so `BKE_report()` on its own goes into a
  * list nothing draws: a paste that skipped every file, or a delete that failed,
  * looks exactly like one that worked. Anything that did not fully succeed is
@@ -2330,7 +2365,7 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
     if (move) {
       result = BLI_rename(paths[i], dest);
       if (result != 0) {
-        result = BLI_copy(paths[i], dest);
+        result = file_ops_copy_recursive(paths[i], dest);
         if (result == 0) {
           const bool dest_is_dir = BLI_is_dir(dest);
           if (BLI_delete(paths[i], dest_is_dir, dest_is_dir) != 0) {
@@ -2342,7 +2377,7 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
       }
     }
     else {
-      result = BLI_copy(paths[i], dest);
+      result = file_ops_copy_recursive(paths[i], dest);
     }
 
     if (result == 0) {

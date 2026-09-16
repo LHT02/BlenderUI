@@ -19,6 +19,7 @@ import bpy
 DST = os.environ.get("BLUI_PASTE_DST", "")
 NAME = os.environ.get("BLUI_PASTE_NAME", "")
 SRC = os.environ.get("BLUI_MOVE_SRC", "")
+SRCDIR = os.environ.get("BLUI_MOVE_DIR", "")
 
 _failures = []
 
@@ -81,7 +82,21 @@ def run():
         with open(target, "r", encoding="utf-8") as handle:
             report("move probe" in handle.read(), "it has the contents of the original")
     # The half a rename would have got wrong: the original must be gone.
-    report(not os.path.exists(SRC), "the original is gone - the cut really moved it")
+    report(not os.path.exists(SRC), "the original file is gone - the cut really moved it")
+
+    # And a folder, which `BLI_copy` cannot do at all: it is `CopyFileW`, so
+    # every folder paste used to do nothing.
+    dir_target = os.path.join(DST, os.path.basename(SRCDIR)) if SRCDIR else ""
+    report(bool(SRCDIR) and os.path.isdir(dir_target),
+           "the folder arrived (%s)" % dir_target)
+    if dir_target and os.path.isdir(dir_target):
+        inner = os.path.join(dir_target, "inner.txt")
+        report(os.path.exists(inner), "the file inside the folder came with it (%s)" % inner)
+        if os.path.exists(inner):
+            with open(inner, "r", encoding="utf-8") as handle:
+                report("inner payload" in handle.read(), "the inner file has its contents")
+    report(bool(SRCDIR) and not os.path.exists(SRCDIR),
+           "the original folder is gone - the cut really moved the tree")
 
 
 def guarded_run():

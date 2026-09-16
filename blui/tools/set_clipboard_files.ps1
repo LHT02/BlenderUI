@@ -18,12 +18,21 @@ back, and retries, so the caller gets a trustworthy yes or no.
     set_clipboard_files.ps1 -Paths C:\a.txt,C:\b.txt
 #>
 param(
-  [Parameter(Mandatory = $true)][string[]]$Paths,
+  # One comma-separated string, not [string[]]: cmd cannot pass an array, and
+  # `-Paths "a","b"` arrives as the single string `a,b` - which is how a
+  # two-item cut turned into one bogus path that pasted nothing.
+  [Parameter(Mandatory = $true)][string]$PathList,
   [switch]$Move
 )
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms
+
+$Paths = @($PathList -split ',' | Where-Object { $_ -ne "" })
+if ($Paths.Count -eq 0) {
+  Write-Host "ERROR: no paths given."
+  exit 1
+}
 
 $data = New-Object System.Windows.Forms.DataObject
 $data.SetData([System.Windows.Forms.DataFormats]::FileDrop, [string[]]$Paths)

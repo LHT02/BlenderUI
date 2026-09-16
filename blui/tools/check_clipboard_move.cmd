@@ -18,6 +18,7 @@ REM Source on the build volume, destination under %TEMP%; they must differ.
 set "MSRC=%ROOT%\build\move_probe_src"
 set "PDST=%TEMP%\blui_move_dst"
 set "PNAME=moveprobe.txt"
+set "DNAME=moveprobe_dir"
 
 if not exist "%EXE%" (
   echo ERROR: %EXE% not found - build first.
@@ -29,8 +30,10 @@ rmdir /s /q "%PDST%" 2>nul
 mkdir "%MSRC%" 2>nul
 mkdir "%PDST%" 2>nul
 echo move probe payload > "%MSRC%\%PNAME%"
+mkdir "%MSRC%\%DNAME%" 2>nul
+echo inner payload > "%MSRC%\%DNAME%\inner.txt"
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0set_clipboard_files.ps1" -Paths "%MSRC%\%PNAME%" -Move
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0set_clipboard_files.ps1" -PathList "%MSRC%\%PNAME%","%MSRC%\%DNAME%" -Move
 if %ERRORLEVEL% NEQ 0 (
   echo ERROR: could not put the file on the clipboard as a cut.
   exit /b 1
@@ -39,6 +42,7 @@ if %ERRORLEVEL% NEQ 0 (
 set "BLUI_PASTE_DST=%PDST%"
 set "BLUI_PASTE_NAME=%PNAME%"
 set "BLUI_MOVE_SRC=%MSRC%\%PNAME%"
+set "BLUI_MOVE_DIR=%MSRC%\%DNAME%"
 
 pushd "%SRC%"
 "%EXE%" --factory-startup --python blui\tools\check_clipboard_move.py
