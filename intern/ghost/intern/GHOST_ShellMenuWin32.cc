@@ -132,6 +132,26 @@ class ShellMenu {
 
   bool build(const char *const *utf8_paths, int count);
 
+  /**
+   * Take over a menu another thread built.
+   *
+   * `build()` is the half that runs third-party shell extension code and is
+   * therefore the half that can hang, so it runs on a worker thread that can be
+   * abandoned. `TrackPopupMenu` has to stay on the window's own thread, so the
+   * result has to cross back: the interface is marshalled through a stream and
+   * the menu handle is passed by value.
+   */
+  bool adopt(IStream *stream, HMENU menu);
+
+  /** Hand the menu handle to the caller and forget it, so that this object's
+   * destructor does not destroy a menu someone else now owns. */
+  HMENU release_menu()
+  {
+    HMENU menu = m_menu;
+    m_menu = nullptr;
+    return menu;
+  }
+
   HMENU menu() const { return m_menu; }
   IContextMenu *context_menu() const { return m_context_menu; }
 
@@ -275,6 +295,39 @@ bool ShellMenu::build(const char *const *utf8_paths, int count)
   }
 
   return GetMenuItemCount(m_menu) > 0;
+}
+
+bool ShellMenu::adopt(IStream *stream, HMENU menu)
+{
+  if (stream == nullptr || menu == nullptr) {
+    return false;
+  }
+
+  void *iface = nullptr;
+  if (FAILED(CoGetInterfaceAndReleaseStream(stream, IID_IContextMenu, &iface)) || iface == nullptr) {
+    return false;
+  }
+  m_context_menu = static_cast<IContextMenu *>(iface);
+  m_menu = menu;
+
+  /* The same question `build()` asks, asked again in this apartment: the
+   * interface that came across is a proxy, so the shell's own object has to be
+   * queried for its message-aware flavour here rather than there. */
+  if (FAILED(m_context_menu->QueryInterface(
+          IID_IContextMenu3, reinterpret_cast<void **>(&m_context_menu3))))
+  {
+    m_context_menu3 = nullptr;
+    if (FAILED(m_context_menu->QueryInterface(
+            IID_IContextMenu2, reinterpret_cast<void **>(&m_context_menu2))))
+    {
+      m_context_menu2 = nullptr;
+    }
+  }
+  else {
+    m_context_menu2 = m_context_menu3;
+  }
+
+  return true;
 }
 
 bool ShellMenu::handle_menu_msg(UINT msg, WPARAM wparam, LPARAM lparam, LRESULT *r_result)
@@ -467,17 +520,124 @@ static void shell_menu_log(const char *fmt, ...)
 
 /** \} */
 
+/**
+ * How long `build()` gets before it is abandoned.
+ *
+ * This is the only defence against an installed shell extension that hangs
+ * inside `QueryContextMenu`, which is exactly what happens on the machine this
+ * was written on: BLUI called it on the main thread and the whole UI stopped
+ * responding, which is how "the shell menu entry does nothing" was reported.
+ *
+ * The thread cannot be killed - it is inside third-party code holding unknown
+ * locks - so a timeout leaves it running and never answers. Five seconds is
+ * generous for loading extensions (measured at 16 ms for `GetUIObjectOf`) while
+ * still being short enough that a person does not conclude the app has died.
+ */
+constexpr DWORD kBuildTimeoutMs = 5000;
+
+/** What the worker thread produces, and how it says it is finished. */
+struct ShellMenuBuildJob {
+  std::vector<std::string> paths;
+  HANDLE done = nullptr;
+  bool ok = false;
+  IStream *stream = nullptr;
+  HMENU menu = nullptr;
+};
+
+static DWORD WINAPI shell_menu_build_thread(void *param)
+{
+  ShellMenuBuildJob *job = static_cast<ShellMenuBuildJob *>(param);
+  const HRESULT ole = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+  {
+    std::vector<const char *> raw;
+    raw.reserve(job->paths.size());
+    for (const std::string &path : job->paths) {
+      raw.push_back(path.c_str());
+    }
+
+    ShellMenu menu;
+    if (menu.build(raw.data(), int(raw.size()))) {
+      IStream *stream = nullptr;
+      if (SUCCEEDED(CoMarshalInterThreadInterfaceInStream(
+              IID_IContextMenu, menu.context_menu(), &stream)))
+      {
+        job->stream = stream;
+        job->menu = menu.release_menu();
+        job->ok = true;
+      }
+    }
+    /* `menu` is destroyed here, on the thread that created its COM objects -
+     * releasing them from the other apartment would be wrong. The menu handle
+     * has already been detached above. */
+  }
+
+  if (SUCCEEDED(ole)) {
+    CoUninitialize();
+  }
+  SetEvent(job->done);
+  return 0;
+}
+
 bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                 const char *const *utf8_paths,
                                 int count,
                                 int screen_x,
                                 int screen_y)
 {
-  ShellMenu shell_menu;
-  if (!shell_menu.build(utf8_paths, count)) {
-    shell_menu_log("build FAILED for %d path(s), first=%s",
+  if (utf8_paths == nullptr || count <= 0) {
+    return false;
+  }
+
+  /* The paths belong to the caller and are freed as soon as this returns, so
+   * the worker needs its own copy. */
+  ShellMenuBuildJob *job = new ShellMenuBuildJob();
+  job->paths.assign(utf8_paths, utf8_paths + count);
+  job->done = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  if (job->done == nullptr) {
+    delete job;
+    return false;
+  }
+
+  const ULONGLONG t_start = GetTickCount64();
+  HANDLE thread = CreateThread(nullptr, 0, shell_menu_build_thread, job, 0, nullptr);
+  if (thread == nullptr) {
+    CloseHandle(job->done);
+    delete job;
+    return false;
+  }
+
+  if (WaitForSingleObject(job->done, kBuildTimeoutMs) != WAIT_OBJECT_0) {
+    shell_menu_log("build abandoned after %lu ms - a shell extension is hung in "
+                   "QueryContextMenu. The worker thread is left running; it cannot be "
+                   "killed safely.",
+                   (unsigned long)kBuildTimeoutMs);
+    /* `job`, its event and the thread handle are deliberately leaked. The thread
+     * is alive inside third-party code and will call SetEvent() if it ever
+     * wakes, so closing the handles now would be a use-after-free, and freeing
+     * `job` would hand it a dangling pointer. One leaked thread per hung attempt
+     * is the price of not killing the application instead. */
+    CloseHandle(thread);
+    MessageBoxW(static_cast<HWND>(hwnd),
+                L"The Windows shell menu did not respond in time and was cancelled.\n\n"
+                L"An installed shell extension is hung while building the menu for this "
+                L"file. BLUI is still usable; the extension should be updated or removed.",
+                L"BLUI - Shell Menu",
+                MB_OK | MB_ICONWARNING);
+    return false;
+  }
+
+  const ULONGLONG elapsed = GetTickCount64() - t_start;
+  CloseHandle(thread);
+  CloseHandle(job->done);
+  job->done = nullptr;
+
+  if (!job->ok) {
+    shell_menu_log("build FAILED for %d path(s), first=%s (after %llu ms)",
                    count,
-                   (count > 0) ? utf8_paths[0] : "(none)");
+                   utf8_paths[0],
+                   elapsed);
+    delete job;
     /* BLUI has no info bar, so a failed build is indistinguishable from a menu
      * entry that does nothing. Say so out loud instead. */
     MessageBoxW(static_cast<HWND>(hwnd),
@@ -489,10 +649,21 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
     return false;
   }
 
-  shell_menu_log("build ok for %d path(s), first=%s", count, utf8_paths[0]);
-  shell_menu_log("menu handle=%p item count=%d",
-                 (void *)shell_menu.menu(),
-                 GetMenuItemCount(shell_menu.menu()));
+  shell_menu_log("build ok for %d path(s), first=%s (%llu ms, %d item(s))",
+                 count,
+                 utf8_paths[0],
+                 elapsed,
+                 (int)GetMenuItemCount(job->menu));
+
+  ShellMenu shell_menu;
+  if (!shell_menu.adopt(job->stream, job->menu)) {
+    shell_menu_log("the built menu could not be taken over in this apartment");
+    DestroyMenu(job->menu);
+    delete job;
+    return false;
+  }
+  /* `adopt` consumed the stream; `job` holds nothing else that needs freeing. */
+  delete job;
 
   HWND window = static_cast<HWND>(hwnd);
 
