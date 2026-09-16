@@ -99,6 +99,32 @@ int BLI_windows_get_executable_dir(char r_dirpath[/*FILE_MAXDIR*/]);
 bool BLI_windows_external_operation_supported(const char *filepath, const char *operation);
 bool BLI_windows_external_operation_execute(const char *filepath, const char *operation);
 
+/* Shell icon helpers. */
+
+/**
+ * Ask the shell for the icon it would show for \a filepath, as RGBA pixels.
+ *
+ * This is how a shortcut gets its own icon: a `.lnk` displays the icon of
+ * whatever it points at, which is what makes it recognisable, and resolving
+ * that is the shell's job rather than something to parse out of the file. It
+ * works for any path - the shell returns the icon registered for the
+ * extension - but it costs a shell round trip per call, so call it for the
+ * files that need it rather than for every entry in a listing.
+ *
+ * \param r_pixels: Receives a newly allocated `width * height * 4` RGBA buffer,
+ *        top row first. Free with #BLI_windows_file_icon_free.
+ * \param r_width: Receives the icon width in pixels.
+ * \param r_height: Receives the icon height in pixels.
+ * \return True on success.
+ */
+bool BLI_windows_file_icon_load(const char *filepath,
+                                unsigned char **r_pixels,
+                                int *r_width,
+                                int *r_height);
+
+/** Free a buffer produced by #BLI_windows_file_icon_load. */
+void BLI_windows_file_icon_free(unsigned char *pixels);
+
 #ifdef __cplusplus
 }
 #endif

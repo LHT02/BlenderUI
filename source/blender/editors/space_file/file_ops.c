@@ -2065,15 +2065,33 @@ static bool file_shell_context_menu_poll(bContext *C)
   return sfile != NULL && sfile->files != NULL;
 }
 
-static int file_shell_context_menu_invoke(bContext *C,
-                                          wmOperator *op,
-                                          const wmEvent *UNUSED(event))
+static bool file_ensure_hovered_is_active(bContext *C, const wmEvent *event);
+
+static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   SpaceFile *sfile = CTX_wm_space_file(C);
   wmWindow *win = CTX_wm_window(C);
 
   if (sfile == NULL || sfile->files == NULL || win == NULL || win->ghostwin == NULL) {
     return OPERATOR_CANCELLED;
+  }
+
+  /* Right-clicking does not select in Blender's file browser - selection happens
+   * on left press - so right-clicking a file that is not already selected left
+   * the previous selection alone. The operator then found no selected paths,
+   * reported "No file selected" and cancelled, which from the outside is
+   * indistinguishable from a menu entry that does nothing at all.
+   *
+   * So: if the item under the cursor is not part of the current selection, make
+   * it the selection first, exactly as FILE_OT_mouse_execute does before acting
+   * on the hovered file. When it *is* part of the selection the selection is
+   * left alone, so right-clicking inside a multi-selection still acts on all of
+   * it rather than collapsing to one file. */
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  if (params != NULL &&
+      !filelist_entry_select_index_get(sfile->files, params->active_file, CHECK_ALL))
+  {
+    file_ensure_hovered_is_active(C, event);
   }
 
   const int num_files = filelist_files_ensure(sfile->files);

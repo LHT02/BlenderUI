@@ -12,6 +12,7 @@
 #  include <shlwapi.h>
 #  include <stdio.h>
 #  include <stdlib.h>
+#  include <string.h>
 
 #  include "MEM_guardedalloc.h"
 
@@ -234,6 +235,106 @@ bool BLI_windows_external_operation_execute(const char *filepath, const char *op
   shellinfo.nShow = SW_SHOW;
 
   return ShellExecuteExW(&shellinfo);
+}
+
+bool BLI_windows_file_icon_load(const char *filepath,
+                                unsigned char **r_pixels,
+                                int *r_width,
+                                int *r_height)
+{
+  if (r_pixels == NULL || r_width == NULL || r_height == NULL) {
+    return false;
+  }
+  *r_pixels = NULL;
+  *r_width = 0;
+  *r_height = 0;
+
+  WCHAR wpath[FILE_MAX];
+  if (conv_utf_8_to_16(filepath, wpath, ARRAY_SIZE(wpath)) != 0) {
+    return false;
+  }
+
+  /* `SHGFI_ICON` hands back an HICON this function owns and must destroy;
+   * `SHGFI_SYSICONINDEX` would instead point into a shared image list. */
+  SHFILEINFOW sfi = {0};
+  if (SHGetFileInfoW(wpath, 0, &sfi, sizeof(sfi), SHGFI_ICON | SHGFI_LARGEICON) == 0 ||
+      sfi.hIcon == NULL)
+  {
+    return false;
+  }
+
+  const int w = GetSystemMetrics(SM_CXICON);
+  const int h = GetSystemMetrics(SM_CYICON);
+
+  /* A 32-bit top-down DIB to draw the icon into, so the first row of `bits` is
+   * the top of the icon and the bytes come out BGRA. */
+  BITMAPV5HEADER bi = {0};
+  bi.bV5Size = sizeof(bi);
+  bi.bV5Width = w;
+  bi.bV5Height = -h;
+  bi.bV5Planes = 1;
+  bi.bV5BitCount = 32;
+  bi.bV5Compression = BI_BITFIELDS;
+  bi.bV5RedMask = 0x00FF0000;
+  bi.bV5GreenMask = 0x0000FF00;
+  bi.bV5BlueMask = 0x000000FF;
+  bi.bV5AlphaMask = 0xFF000000;
+
+  HDC screen_dc = GetDC(NULL);
+  if (screen_dc == NULL) {
+    DestroyIcon(sfi.hIcon);
+    return false;
+  }
+
+  void *bits = NULL;
+  HBITMAP dib = CreateDIBSection(screen_dc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, &bits, NULL, 0);
+  HDC mem_dc = CreateCompatibleDC(screen_dc);
+  ReleaseDC(NULL, screen_dc);
+
+  if (dib == NULL || mem_dc == NULL || bits == NULL) {
+    if (mem_dc != NULL) {
+      DeleteDC(mem_dc);
+    }
+    if (dib != NULL) {
+      DeleteObject(dib);
+    }
+    DestroyIcon(sfi.hIcon);
+    return false;
+  }
+
+  HGDIOBJ old_bitmap = SelectObject(mem_dc, dib);
+  /* Cleared first: a transparent icon leaves its pixels untouched, and an
+   * uninitialised DIB would otherwise be drawn as garbage. */
+  memset(bits, 0, (size_t)w * (size_t)h * 4);
+  DrawIconEx(mem_dc, 0, 0, sfi.hIcon, w, h, 0, NULL, DI_NORMAL);
+  SelectObject(mem_dc, old_bitmap);
+
+  DeleteDC(mem_dc);
+  DestroyIcon(sfi.hIcon);
+
+  unsigned char *pixels = MEM_mallocN((size_t)w * (size_t)h * 4, __func__);
+  const unsigned char *src = (const unsigned char *)bits;
+  for (int i = 0, count = w * h; i < count; i++) {
+    /* The DIB is BGRA; ImBuf's rect is RGBA. */
+    pixels[i * 4 + 0] = src[i * 4 + 2];
+    pixels[i * 4 + 1] = src[i * 4 + 1];
+    pixels[i * 4 + 2] = src[i * 4 + 0];
+    pixels[i * 4 + 3] = src[i * 4 + 3];
+  }
+
+  DeleteObject(dib);
+
+  *r_pixels = pixels;
+  *r_width = w;
+  *r_height = h;
+  return true;
+}
+
+void BLI_windows_file_icon_free(unsigned char *pixels)
+{
+  if (pixels != NULL) {
+    MEM_freeN(pixels);
+  }
 }
 
 void BLI_windows_get_default_root_dir(char root[4])

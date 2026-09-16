@@ -37,7 +37,9 @@
 #include "BLI_linklist.h"
 #include "BLI_math.h"
 #include "BLI_stack.h"
+#include "BLI_path_util.h"
 #include "BLI_string_utils.h"
+#include "BLI_winstuff.h"
 #include "BLI_task.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
@@ -2101,6 +2103,38 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   if (entry->blenderlib_has_no_preview) {
     ret->flags |= FILE_ENTRY_BLENDERLIB_NO_PREVIEW;
   }
+#ifdef WIN32
+  /* BLUI: a shortcut carries its own icon.
+   *
+   * A `.lnk` shows the icon of whatever it points at, which is what makes it
+   * recognisable in a file manager. Blender's file browser has no notion of
+   * that - it picks an icon from the extension - so every shortcut came out
+   * looking like a generic file. Resolving the real one is the shell's job.
+   *
+   * Asked only for `.lnk`: a shell round trip per entry would be paid for every
+   * file in the directory, and a shortcut is the one case where the icon says
+   * something the extension does not. */
+  if (ret->preview_icon_id == 0 && !(ret->typeflag & FILE_TYPE_DIR) &&
+      BLI_path_extension_check(ret->name, ".lnk"))
+  {
+    char fullpath[FILE_MAX_LIBEXTRA];
+    filelist_file_get_full_path(filelist, ret, fullpath);
+
+    unsigned char *pixels = NULL;
+    int icon_w = 0;
+    int icon_h = 0;
+    if (BLI_windows_file_icon_load(fullpath, &pixels, &icon_w, &icon_h)) {
+      ImBuf *ibuf = IMB_allocImBuf(icon_w, icon_h, 32, IB_rect);
+      if (ibuf != NULL) {
+        memcpy(ibuf->rect, pixels, size_t(icon_w) * size_t(icon_h) * 4);
+        /* Takes ownership of `ibuf`; it is released with the icon by
+         * `BKE_icon_delete()` when the entry goes away. */
+        ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
+      }
+      BLI_windows_file_icon_free(pixels);
+    }
+  }
+#endif
   BLI_addtail(&cache->cached_entries, ret);
   return ret;
 }
