@@ -32,7 +32,7 @@ echo paste probe payload > "%PSRC%\%PNAME%"
 
 powershell -NoProfile -Command ^
   "Add-Type -AssemblyName System.Windows.Forms; $c = New-Object System.Collections.Specialized.StringCollection; [void]$c.Add('%PSRC%\%PNAME%'); [System.Windows.Forms.Clipboard]::SetFileDropList($c)"
-if errorlevel 1 (
+if %ERRORLEVEL% NEQ 0 (
   echo ERROR: could not put a file list on the clipboard.
   exit /b 1
 )

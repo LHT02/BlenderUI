@@ -50,7 +50,7 @@ if not exist "%VCVARS%" (
 
 if "%VSCMD_VER%"=="" (
   call "%VCVARS%" >nul
-  if errorlevel 1 (
+  if %ERRORLEVEL% NEQ 0 (
     echo ERROR: failed to initialise the MSVC environment.
     exit /b 1
   )
@@ -70,7 +70,7 @@ if defined MUST_CONFIGURE (
     -DCMAKE_INSTALL_PREFIX="%BUILD%/bin" ^
     -S "%SRC%" ^
     -B "%BUILD%"
-  if errorlevel 1 (
+  if %ERRORLEVEL% NEQ 0 (
     echo ERROR: CMake configuration failed.
     exit /b 1
   )
@@ -86,7 +86,7 @@ REM `install` rather than plain `all`: Blender assembles the runnable layout
 REM (scripts/, datafiles/, python/ under the version directory) with install
 REM rules, so the executable is not usable on its own.
 ninja -C "%BUILD%" install
-if errorlevel 1 (
+if %ERRORLEVEL% NEQ 0 (
   echo ERROR: build failed.
   exit /b 1
 )

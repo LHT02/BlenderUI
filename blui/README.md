@@ -114,6 +114,36 @@ does its own shell work. `GHOST_ShellMenuWin32_WarmUp()` remains, with that
 measurement written next to it; a lazy call on first use of the file browser is
 still the thing to try, once the discriminator is known.
 
+### The build driver used to report success on a failed link
+
+Worth reading before trusting any "the build is green" claim in this document.
+
+`build.cmd` checked its tools with `if errorlevel 1`. That is a **signed
+greater-or-equal** test, so it is false for any negative exit code - and ninja
+returns **-1** for some failures. On one of those, the driver printed
+`=== Build finished ===` and exited **0** while the link had failed with 414
+unresolved externals. Every `if errorlevel 1` in `blui/*.cmd` is now
+`if %ERRORLEVEL% NEQ 0`.
+
+Proven rather than reasoned about, by feeding both patterns the exit code ninja
+actually returned:
+
+```
+child returns -1:   OLD: MISSED - would report success (exit 0)
+                    NEW: caught (exit 1)
+child returns 1:    OLD: caught (exit 1)
+```
+
+The second line is why it survived: failures usually return 1, and the check
+works for those. Only a negative code slips through, which is rare enough to
+have gone unnoticed until a link failed in exactly that way.
+
+It cost a wrong measurement here: the first attempt to size the 3D block's
+closure read "0 unresolved externals" off a build that had never linked,
+because the running BLUI still held `bin\BLUI.exe`. Two guards now, both cheap:
+check the exit code honestly, and never measure a closure with the application
+running.
+
 ### The 3D block is one link unit, not a sequence
 
 The plan in open-work item 4 used to read as though the 3D modules could be

@@ -35,7 +35,7 @@ if not defined VSDIR (
 
 if "%VSCMD_VER%"=="" (
   call "%VSDIR%\VC\Auxiliary\Build\vcvars64.bat" >nul
-  if errorlevel 1 exit /b 1
+  if %ERRORLEVEL% NEQ 0 exit /b 1
 )
 
 if not exist "%OUT%" mkdir "%OUT%"
@@ -47,7 +47,7 @@ cl /nologo /EHsc /std:c++17 /utf-8 ^
    /Fe:"%OUT%\dragsource_selftest.exe" ^
    /Fo:"%OUT%\\" ^
    /link ole32.lib shell32.lib user32.lib
-if errorlevel 1 (
+if %ERRORLEVEL% NEQ 0 (
   popd
   echo ERROR: compilation failed.
   exit /b 1
@@ -62,7 +62,7 @@ echo.
 echo clipboard lifetime across processes:
 "%OUT%\dragsource_selftest.exe" --set
 "%OUT%\dragsource_selftest.exe" --check
-if errorlevel 1 set "RC=1"
+if %ERRORLEVEL% NEQ 0 set "RC=1"
 
 echo.
 echo for comparison, the transport this replaced:
