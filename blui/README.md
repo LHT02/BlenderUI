@@ -62,6 +62,58 @@
 >   success. Redirect to a file and read the file, and check the exit code on
 >   its own line.
 
+### The shell menu stall is in the shell, not in an installed extension
+
+`QueryContextMenu` stalls for over 150 seconds on some items. The obvious
+suspect is one of the eight context-menu extensions installed on the machine
+that reported it, and that suspect is **wrong** - tested, not argued.
+
+`blui/tools/shellmenu_handler_probe.cc` loads a single registered handler and
+times its `QueryContextMenu`; `blui/tools/probe_shellmenu_handlers.ps1` drives it
+one process per handler with a timeout, so a handler that never returns is named
+rather than stalling the investigation. All 24 CLSIDs registered for a folder
+come back, the slowest at 157 ms, about 330 ms in total - and they do so for the
+items that stall as well as the ones that do not:
+
+```
+7-Zip 0 ms · Bandizip 15 ms · TortoiseSVN 31 ms · Nextcloud 47 ms
+YunShellExt 157 ms · HRShredShell 15 ms · OneDrive 0 ms · WinMerge 0 ms
+```
+
+So the stall is in the shell's own aggregation - the single `IContextMenu` it
+builds out of all of those handlers plus its own verbs - which is also why
+testing them one at a time cannot reproduce it. Giving the aggregate its own
+mode in the same probe makes the difference visible:
+
+| item | aggregate `QueryContextMenu` |
+| --- | --- |
+| `C:\Windows` | 672 ms, 53 items |
+| `C:\Users\LHT02\Documents` | 641 ms, 51 items |
+| `C:\Windows\System32\notepad.exe` | 1312 ms, 41 items |
+| `C:\Windows\System32\drivers\etc\hosts` | 875 ms, 37 items |
+| `C:\Users\LHT02` | **stalled, > 150 s, never returned** |
+| every child of `Documents` tested | **stalled, > 15 s each** |
+
+No discriminator was found: not file versus folder (`C:\Windows` and
+`notepad.exe` both work), not NTFS compression (`C:\Windows` is compressed and
+works, `3D-CoatV4` is compressed and stalls), not a reparse point or a cloud
+placeholder (`3D-CoatV4` is neither).
+
+What this changes: the cause is outside BLUI, so "uninstall the extension" would
+have been wrong advice, and no amount of care inside BLUI will make the shell
+aggregate faster. What BLUI owes the user is what it now does - build the menu
+on a worker thread with a 30 s bound, so a stall costs a dialog instead of the
+application. `%TEMP%\blui_shellmenu.log` says which phase stalled.
+
+**One rejected approach, kept because it looked obviously right.** Warming the
+extensions up at startup on a detached thread, so the first real menu would be
+fast. It made things worse: `check_keymap_config` and `check_window_isolation`
+both began hanging and stopped as soon as the call was removed. Whatever the
+stalled call holds, it is not safe to have it running while the rest of BLUI
+does its own shell work. `GHOST_ShellMenuWin32_WarmUp()` remains, with that
+measurement written next to it; a lazy call on first use of the file browser is
+still the thing to try, once the discriminator is known.
+
 ### The 3D block is one link unit, not a sequence
 
 The plan in open-work item 4 used to read as though the 3D modules could be

@@ -4,18 +4,20 @@
 /**
  * Load ONE shell context-menu handler and time its `QueryContextMenu`.
  *
- * BLUI's shell menu hangs, and the phase timings say it hangs inside
- * `QueryContextMenu` - where every handler registered for the item gets to run.
- * Nothing in that call says which one failed to return, so this takes them one
- * at a time: give it a path and a CLSID, and the process either prints a time or
- * never comes back. The driver (`probe_shellmenu_handlers.ps1`) runs one of
- * these per handler with a timeout, so a hang names the extension instead of
- * stalling the whole investigation.
+ * BLUI's shell menu stalls, and the phase timings say it stalls inside
+ * `QueryContextMenu`. Testing the registered handlers one at a time ruled every
+ * one of them out - all 24 come back within 125 ms - so what stalls is the
+ * shell's own aggregation of them.
+ *
+ * With two arguments this tests one handler, which is how that was established.
+ * With one argument it tests the aggregate, which is the call BLUI actually
+ * makes, so a file and a folder can be compared directly.
  *
  * Usage:
- *   shellmenu_handler_probe.exe <path> <clsid>
+ *   shellmenu_handler_probe.exe <path>            aggregate, as BLUI does it
+ *   shellmenu_handler_probe.exe <path> <clsid>    one handler
  *
- * Exits 0 when the handler returned, 2 when it could not be loaded at all
+ * Exits 0 when the call returned, 2 when a handler could not be loaded at all
  * (which is normal - most CLSIDs are registered for other item types).
  */
 
@@ -38,16 +40,17 @@ static void print_hr(const char *what, HRESULT hr)
 
 int main(int argc, char **argv)
 {
-  if (argc < 3) {
-    printf("usage: shellmenu_handler_probe.exe <path> <clsid>\n");
+  if (argc < 2) {
+    printf("usage: shellmenu_handler_probe.exe <path> [clsid]\n");
     return 3;
   }
 
   const char *path = argv[1];
-  const char *clsid_text = argv[2];
+  const char *clsid_text = (argc >= 3) ? argv[2] : nullptr;
+  const bool aggregate = (clsid_text == nullptr);
 
-  CLSID clsid;
-  {
+  CLSID clsid = {0};
+  if (!aggregate) {
     wchar_t wide_clsid[64];
     if (MultiByteToWideChar(CP_UTF8, 0, clsid_text, -1, wide_clsid, ARRAY_SIZE(wide_clsid)) == 0) {
       printf("  bad clsid %s\n", clsid_text);
@@ -75,6 +78,50 @@ int main(int argc, char **argv)
   PIDLIST_ABSOLUTE parent = ILClone(pidl);
   ILRemoveLastID(parent);
   PCUITEMID_CHILD child = ILFindLastID(pidl);
+
+  if (aggregate) {
+    /* Exactly what BLUI does: bind to the parent folder and ask it for the
+     * IContextMenu that stands for all of the item's handlers at once. */
+    IShellFolder *folder = nullptr;
+    HRESULT hr = SHBindToParent(pidl, IID_IShellFolder, reinterpret_cast<void **>(&folder), nullptr);
+    if (FAILED(hr) || folder == nullptr) {
+      print_hr("SHBindToParent", hr);
+      return 2;
+    }
+
+    IContextMenu *agg = nullptr;
+    const ULONGLONG t_obj = GetTickCount64();
+    hr = folder->GetUIObjectOf(
+        nullptr, 1, &child, IID_IContextMenu, nullptr, reinterpret_cast<void **>(&agg));
+    printf("  GetUIObjectOf          %llu ms (hr=0x%08lX)\n",
+           GetTickCount64() - t_obj,
+           (unsigned long)hr);
+    fflush(stdout);
+    if (FAILED(hr) || agg == nullptr) {
+      return 2;
+    }
+
+    HMENU hmenu = CreatePopupMenu();
+    printf("  QueryContextMenu...\n");
+    fflush(stdout);
+    const ULONGLONG t_qcm = GetTickCount64();
+    hr = agg->QueryContextMenu(hmenu, 0, 1, 0x7FFF, CMF_NORMAL);
+    printf("  QueryContextMenu       %llu ms (hr=0x%08lX, items=%d)\n",
+           GetTickCount64() - t_qcm,
+           (unsigned long)hr,
+           (int)GetMenuItemCount(hmenu));
+    fflush(stdout);
+
+    DestroyMenu(hmenu);
+    agg->Release();
+    folder->Release();
+    ILFree(parent);
+    ILFree(pidl);
+    if (SUCCEEDED(ole)) {
+      CoUninitialize();
+    }
+    return 0;
+  }
 
   IShellExtInit *init = nullptr;
   HRESULT hr = CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER, IID_IShellExtInit,
