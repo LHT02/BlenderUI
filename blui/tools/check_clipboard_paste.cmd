@@ -30,8 +30,11 @@ mkdir "%PSRC%" 2>nul
 mkdir "%PDST%" 2>nul
 echo paste probe payload > "%PSRC%\%PNAME%"
 
-powershell -NoProfile -Command ^
-  "Add-Type -AssemblyName System.Windows.Forms; $c = New-Object System.Collections.Specialized.StringCollection; [void]$c.Add('%PSRC%\%PNAME%'); [System.Windows.Forms.Clipboard]::SetFileDropList($c)"
+REM Setting the clipboard is not enough - it can fail silently, and OLE data that
+REM was never flushed dies with the process that set it. set_clipboard_files.ps1
+REM sets it with copy:true, reads it back and retries, so a failure here is the
+REM harness saying so rather than BLUI looking broken three steps later.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0set_clipboard_files.ps1" -Paths "%PSRC%\%PNAME%"
 if %ERRORLEVEL% NEQ 0 (
   echo ERROR: could not put a file list on the clipboard.
   exit /b 1
