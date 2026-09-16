@@ -16,6 +16,16 @@ window to start from, so it only ever exercises the copy branch.
 The result is written to a log file as well as stdout, and for a reason: the
 script has to close its own window to reach the interesting state, so if the
 process dies there, stdout goes with it. The log is what is left.
+
+Falsify-tested, and the result is worth keeping. Removing the single line
+`win_fresh->scene = scene;` from `wm_window_new_exec()` makes this check report
+
+    FAIL  the new window has a scene
+
+and then the process dies with `EXCEPTION_ACCESS_VIOLATION`, exit code 11. Both
+halves matter: the assertion says which property broke, and the crash is the
+same abrupt disappearance a user sees when the tray opens a window. That is the
+diagnosis in 434dc94 confirmed by experiment rather than by reading.
 """
 
 import os
