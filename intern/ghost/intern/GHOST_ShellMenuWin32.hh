@@ -83,4 +83,28 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                 int screen_x,
                                 int screen_y);
 
+/**
+ * Ask the shell for the icon it shows for \a utf8_path, as RGBA pixels.
+ *
+ * This is how a shortcut gets its own icon: a `.lnk` displays the icon of what
+ * it points at, which is what makes it recognisable, and resolving that is the
+ * shell's job rather than something to parse out of the file. It works for any
+ * path - the shell returns the icon registered for the extension.
+ *
+ * The icon is fetched through the system image list (`SHGetImageList`), not
+ * `SHGFI_ICON`, because the latter only ever returns the small system icon.
+ * Tiers are tried largest first and the caller scales down.
+ *
+ * \param r_pixels: Receives a newly allocated `width * height * 4` RGBA buffer,
+ *        top row first. Free with #GHOST_ShellMenuWin32_FreeIconRgba.
+ * \return True on success.
+ */
+bool GHOST_ShellMenuWin32_LoadFileIconRgba(const char *utf8_path,
+                                           unsigned char **r_pixels,
+                                           int *r_width,
+                                           int *r_height);
+
+/** Free a buffer produced by #GHOST_ShellMenuWin32_LoadFileIconRgba. */
+void GHOST_ShellMenuWin32_FreeIconRgba(unsigned char *pixels);
+
 #endif /* _WIN32 */

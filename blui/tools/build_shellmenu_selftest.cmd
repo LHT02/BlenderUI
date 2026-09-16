@@ -40,7 +40,7 @@ cl /nologo /EHsc /std:c++17 /utf-8 ^
    blui\tools\shellmenu_selftest.cc intern\ghost\intern\GHOST_ShellMenuWin32.cc ^
    /Fe:"%OUT%\shellmenu_selftest.exe" ^
    /Fo:"%OUT%\\" ^
-   /link ole32.lib shell32.lib shlwapi.lib user32.lib
+   /link ole32.lib shell32.lib shlwapi.lib user32.lib gdi32.lib
 if errorlevel 1 (
   popd
   echo ERROR: compilation failed.

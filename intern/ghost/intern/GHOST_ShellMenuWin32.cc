@@ -21,6 +21,11 @@
 #  include <windows.h>
 #  include <shlobj.h>
 #  include <shlwapi.h>
+/* After `windows.h`, which they need - included before it they are a parse
+ * error rather than a warning. `commoncontrols.h` is where `IImageList` and
+ * `SHGetImageList` live, which is how an icon is fetched at a chosen size. */
+#  include <commctrl.h>
+#  include <commoncontrols.h>
 #  include <winternl.h>
 
 /**
@@ -466,6 +471,168 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
 
   return SUCCEEDED(
       shell_menu.context_menu()->InvokeCommand(reinterpret_cast<LPCMINVOKECOMMANDINFO>(&info)));
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name File icons
+ * \{ */
+
+bool GHOST_ShellMenuWin32_LoadFileIconRgba(const char *utf8_path,
+                                           unsigned char **r_pixels,
+                                           int *r_width,
+                                           int *r_height)
+{
+  if (utf8_path == nullptr || r_pixels == nullptr || r_width == nullptr || r_height == nullptr) {
+    return false;
+  }
+  *r_pixels = nullptr;
+  *r_width = 0;
+  *r_height = 0;
+
+  std::wstring wide;
+  if (!utf8_to_utf16(utf8_path, wide)) {
+    return false;
+  }
+
+  /* The *index* into the system image list, rather than a ready `HICON`:
+   * `SHGFI_ICON` only ever returns the small system icon, while going through
+   * the image list lets the size be chosen. */
+  SHFILEINFOW file_info = {};
+  DWORD_PTR got = SHGetFileInfoW(
+      wide.c_str(), 0, &file_info, sizeof(file_info), SHGFI_SYSICONINDEX);
+  if (got == 0) {
+    /* A path that does not resolve yet still has an icon, if the shell is told
+     * what kind of thing it is. */
+    const DWORD attributes = PathIsDirectoryW(wide.c_str()) ? FILE_ATTRIBUTE_DIRECTORY :
+                                                              FILE_ATTRIBUTE_NORMAL;
+    got = SHGetFileInfoW(wide.c_str(),
+                         attributes,
+                         &file_info,
+                         sizeof(file_info),
+                         SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES);
+  }
+  if (got == 0) {
+    return false;
+  }
+
+  /* Largest first: the caller scales down, and a shortcut's icon is only
+   * recognisable at a decent size. */
+  const int tiers[] = {SHIL_JUMBO, SHIL_EXTRALARGE, SHIL_LARGE, SHIL_SMALL};
+  HICON icon = nullptr;
+  for (int tier : tiers) {
+    IImageList *image_list = nullptr;
+    if (FAILED(SHGetImageList(tier, IID_IImageList, reinterpret_cast<void **>(&image_list))) ||
+        image_list == nullptr)
+    {
+      continue;
+    }
+    image_list->GetIcon(file_info.iIcon, ILD_TRANSPARENT, &icon);
+    image_list->Release();
+    if (icon != nullptr) {
+      break;
+    }
+  }
+  if (icon == nullptr) {
+    return false;
+  }
+
+  /* The real size, rather than an assumption about it - the image list tier
+   * that answered decides this. */
+  int width = GetSystemMetrics(SM_CXICON);
+  int height = GetSystemMetrics(SM_CYICON);
+  ICONINFO icon_info = {};
+  if (GetIconInfo(icon, &icon_info)) {
+    BITMAP bitmap = {};
+    if (icon_info.hbmColor != nullptr && GetObjectW(icon_info.hbmColor, sizeof(bitmap), &bitmap)) {
+      width = bitmap.bmWidth;
+      height = bitmap.bmHeight;
+    }
+    if (icon_info.hbmColor != nullptr) {
+      DeleteObject(icon_info.hbmColor);
+    }
+    if (icon_info.hbmMask != nullptr) {
+      DeleteObject(icon_info.hbmMask);
+    }
+  }
+  if (width <= 0 || height <= 0) {
+    DestroyIcon(icon);
+    return false;
+  }
+
+  BITMAPV5HEADER header = {};
+  header.bV5Size = sizeof(header);
+  header.bV5Width = width;
+  header.bV5Height = -height; /* Top-down, so row 0 is the top of the icon. */
+  header.bV5Planes = 1;
+  header.bV5BitCount = 32;
+  header.bV5Compression = BI_BITFIELDS;
+  header.bV5RedMask = 0x00FF0000;
+  header.bV5GreenMask = 0x0000FF00;
+  header.bV5BlueMask = 0x000000FF;
+  header.bV5AlphaMask = 0xFF000000;
+
+  HDC screen_dc = GetDC(nullptr);
+  if (screen_dc == nullptr) {
+    DestroyIcon(icon);
+    return false;
+  }
+
+  void *bits = nullptr;
+  HBITMAP dib = CreateDIBSection(
+      screen_dc, reinterpret_cast<BITMAPINFO *>(&header), DIB_RGB_COLORS, &bits, nullptr, 0);
+  HDC memory_dc = CreateCompatibleDC(screen_dc);
+  ReleaseDC(nullptr, screen_dc);
+
+  if (dib == nullptr || memory_dc == nullptr || bits == nullptr) {
+    if (memory_dc != nullptr) {
+      DeleteDC(memory_dc);
+    }
+    if (dib != nullptr) {
+      DeleteObject(dib);
+    }
+    DestroyIcon(icon);
+    return false;
+  }
+
+  HGDIOBJ old_bitmap = SelectObject(memory_dc, dib);
+  /* Cleared first: a transparent icon leaves its pixels untouched, so an
+   * uninitialised DIB would be handed back as garbage. */
+  memset(bits, 0, size_t(width) * size_t(height) * 4);
+  DrawIconEx(memory_dc, 0, 0, icon, width, height, 0, nullptr, DI_NORMAL);
+  SelectObject(memory_dc, old_bitmap);
+
+  DeleteDC(memory_dc);
+  DestroyIcon(icon);
+
+  unsigned char *pixels = static_cast<unsigned char *>(
+      malloc(size_t(width) * size_t(height) * 4));
+  if (pixels == nullptr) {
+    DeleteObject(dib);
+    return false;
+  }
+
+  const unsigned char *src = static_cast<const unsigned char *>(bits);
+  for (int i = 0, count = width * height; i < count; i++) {
+    /* The DIB is BGRA; the caller wants RGBA. */
+    pixels[i * 4 + 0] = src[i * 4 + 2];
+    pixels[i * 4 + 1] = src[i * 4 + 1];
+    pixels[i * 4 + 2] = src[i * 4 + 0];
+    pixels[i * 4 + 3] = src[i * 4 + 3];
+  }
+
+  DeleteObject(dib);
+
+  *r_pixels = pixels;
+  *r_width = width;
+  *r_height = height;
+  return true;
+}
+
+void GHOST_ShellMenuWin32_FreeIconRgba(unsigned char *pixels)
+{
+  free(pixels);
 }
 
 /** \} */

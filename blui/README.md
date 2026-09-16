@@ -538,13 +538,24 @@ them:
   started in. So the load path runs and the `.lnk` branch is simply never
   reached, because no `.lnk` is ever in the list.
 
-The right instrument is the one the shell menu already has: move the extraction
-out of BLI into the GHOST SDK-only pattern and give it a self test, which needs
-no window, no CMake and no file browser. `shellmenu_selftest.cc` and
-`dragsource_selftest.cc` are the templates, and both were written for exactly
-this reason - a native path that the UI cannot exercise.
+The right instrument is the one the shell menu already has: the GHOST SDK-only
+pattern, which needs no window, no CMake and no file browser.
+`shellmenu_selftest.cc` and `dragsource_selftest.cc` are the templates, and both
+were written for exactly this reason - a native path that the UI cannot
+exercise.
 
-Until then this is code that compiles, not a feature.
+**That instrument now exists and the extraction is verified.**
+`GHOST_ShellMenuWin32_LoadFileIconRgba()` does the work in the SDK-only C++
+translation unit - where `IImageList` is usable as a COM interface, which it is
+not from `winstuff.c` - and `shellmenu_selftest.cc` asserts it. On this machine
+a `.lnk` comes back at **256x256** (the Jumbo tier, not the small system icon
+`SHGFI_ICON` would have given), 27777 opaque and 31177 clear pixels of 65536:
+something was drawn *and* the transparent surround survived, which is what
+catches an uncleared DIB coming back as an opaque black square.
+
+What is left is the wiring, not the risk: `filelist.cc` still calls
+`BLI_windows_file_icon_load()`. Switching it to the verified GHOST call and
+deleting the BLI copy is the next step, and it is mechanical.
 
 ### A sibling project worth reading
 

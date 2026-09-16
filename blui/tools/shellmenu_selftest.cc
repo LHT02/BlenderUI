@@ -148,6 +148,63 @@ static void test_missing_path()
         "a null path list is rejected");
 }
 
+/**
+ * The icon extraction - the one part of the shortcut support the app cannot
+ * exercise, because the file list is not reachable from Python and driving the
+ * browser to a folder from a script does not rebuild it.
+ *
+ * Two things matter here and neither is visible from the app: that a `.lnk`
+ * gets an icon at a useful size, and that the alpha channel survives. An icon
+ * drawn into an uncleared DIB comes back as an opaque black square, which looks
+ * like a working icon right up until it is drawn on screen.
+ */
+static void test_file_icons()
+{
+  printf("file icons:\n");
+
+  const char *shortcut = "C:\\Users\\LHT02\\AppData\\Local\\Temp\\blui_lnk_test\\BLUI.lnk";
+
+  unsigned char *pixels = nullptr;
+  int width = 0;
+  int height = 0;
+  const bool ok = GHOST_ShellMenuWin32_LoadFileIconRgba(shortcut, &pixels, &width, &height);
+
+  check(ok, "an icon is returned for a shortcut");
+  if (ok) {
+    check(width > 0 && height > 0, "the icon has a size");
+    check(width >= 32, "the icon is at least the large system size, not the small one");
+
+    int opaque = 0;
+    int clear = 0;
+    const int count = width * height;
+    for (int i = 0; i < count; i++) {
+      const unsigned char alpha = pixels[i * 4 + 3];
+      if (alpha == 255) {
+        opaque++;
+      }
+      else if (alpha == 0) {
+        clear++;
+      }
+    }
+    printf("      %dx%d, %d opaque, %d clear of %d\n", width, height, opaque, clear, count);
+    check(opaque > 0, "something was drawn");
+    check(clear > 0, "the transparent surround survived, so the DIB was cleared");
+    check(opaque < count, "the icon is not a solid block");
+
+    GHOST_ShellMenuWin32_FreeIconRgba(pixels);
+  }
+
+  unsigned char *exe_pixels = nullptr;
+  int exe_w = 0;
+  int exe_h = 0;
+  check(GHOST_ShellMenuWin32_LoadFileIconRgba(g_exe, &exe_pixels, &exe_w, &exe_h),
+        "an icon is returned for an executable");
+  GHOST_ShellMenuWin32_FreeIconRgba(exe_pixels);
+
+  check(!GHOST_ShellMenuWin32_LoadFileIconRgba(nullptr, &pixels, &width, &height),
+        "a null path is rejected");
+}
+
 int main()
 {
   const HRESULT ole = OleInitialize(nullptr);
@@ -164,6 +221,7 @@ int main()
   test_menu_for_directory();
   test_multi_selection();
   test_menu_messages();
+  test_file_icons();
   test_missing_path();
 
   printf("\n%s (%d failure%s)\n",
