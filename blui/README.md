@@ -1312,6 +1312,98 @@ The work is staged so the build stays green at every step.
       be judged. Do not assume it is rejected for the reason `physics` was;
       the reason `physics` was "rejected" turned out not to hold.
 
+      ### `curves`, second measurement: 33 exported symbols, 9 callers, and a link graph that decides it
+
+      Re-measured on 2026-09-16 with the three-shape sweep from the `physics`
+      round. The verdict is **the same as physics, arrived at properly**: nothing
+      registers `curves`, its reference surface is 9 files, and every one of
+      those 9 is a call site that can be cut. The two are the same shape of
+      module, and both were mis-filed.
+
+      **Registry state - all three entries are dead, exactly as with physics:**
+
+      | Registry entry | Call sites |
+      | --- | --- |
+      | `ED_operatortypes_curves()` | **none** - not in `space_api/spacetypes.c`'s 13 `ED_operatortypes_*` calls |
+      | `ED_keymap_curves()` | **none** - not in `spacetypes.c`'s 10 `ED_keymap_*` calls |
+      | `ED_curves_undosys_type()` | **none** - `undo_system_types.cc` registers only `IMAGE`, `TEXT`, `MEMFILE` |
+      | any `CURVES_OT_*` name in keymap data or `bl_ui` | **none** - swept all of `presets/keyconfig/keymap_data/` and `startup/bl_ui/` |
+
+      So the 28 `WM_operatortype_append()` calls in `curves_ops.cc` append into
+      a list nobody reads, and the `"Curves"` keymap such as it is has no
+      `poll` reachable. **No keymap-data step.** The `property_unset()` trap does
+      not apply - third module in a row where the trap was assumed and measured
+      absent.
+
+      **The reference surface - 33 exported symbols, 9 consuming files:**
+
+      | Consumer | Symbols | Kept? |
+      | --- | --- | --- |
+      | `makesrna/intern/rna_curves.c` | `ED_curves_offsets_for_write` (4), `ED_curves_point_normals_array_create` | kept |
+      | `editors/util/ed_transverts.c` | `ED_curves_transverts_create` | kept |
+      | `editors/object/object_add.cc` | `primitive_random_sphere`, `ensure_surface_deformation_node_exists` | **doomed** (Stage 2 target 4) |
+      | `editors/space_view3d/view3d_select.cc` | `select_lasso`, `select_box`, `select_circle`, `closest_elem_find_screen_space`, `has_anything_selected`, `ensure_selection_attribute`, `fill_selection_false`, `apply_selection_operation_at_index` | **doomed** (target 4) |
+      | `editors/transform/transform_convert_curves.cc` | `retrieve_selected_points`, `has_anything_selected` | **doomed** (target 4) |
+      | `editors/transform/transform_gizmo_3d.cc` | `retrieve_selected_points` | **doomed** (target 4) |
+      | `editors/sculpt_paint/curves_sculpt_ops.cc` | `curves_poll`, `curves_with_surface_poll`, `editable_curves_poll`, `get_unique_editable_curves`, `has_anything_selected`, `retrieve_selected_points`, `select_random` (namespace only) | **doomed** (target 4) |
+      | `editors/sculpt_paint/curves_sculpt_{add,density,selection_paint,comb,delete,grow_shrink,pinch,puff,slide,smooth,snake_hook}.cc` | `retrieve_selected_curves`, `fill_selection_true/false` | **doomed** (target 4) |
+      | `editors/include/ED_curves.h` itself | the header is the only remaining "caller" of 12 symbols | - |
+
+      Six of the nine are modules already scheduled for deletion. The three that
+      are genuinely kept are `makesrna/rna_curves.c`, `editors/util/ed_transverts.c`
+      and `space_view3d` - and the first two are small.
+
+      **Why this is still not a one-round job: the reachability question is a
+      product question, and it is now sharper than for `physics`.** `curves`
+      exists to serve *hair-curve sculpting* - it is the edit mode for `OB_CURVES`
+      objects, driven by `sculpt_paint/curves_sculpt_*.cc` brush code. BLUI has
+      no 3D viewport (`startup/bl_ui/space_view3d.py` is deleted) and no
+      workspace that can host one, so `OB_CURVES` cannot be created *from the UI*.
+      But unlike particles, `OB_CURVES` datablocks still exist in `DNA_object_types.h`
+      and `object_add.cc` can still construct one programmatically.
+
+      So the cuts split cleanly into two groups, and the split is the thing to
+      decide:
+
+      1. **`ED_keymap_curves`, `ED_curves_undosys_type`, and the 12 operator
+         registrations** - unreachable by measurement, safe to cut whenever.
+      2. **The ~25-function `blender::ed::curves` API** - reachable from kept
+         modules only because `space_view3d` and `sculpt_paint` are still here.
+         Both are Stage 2 targets themselves. **Deleting them takes `curves`
+         with them for free**, the same way `transform` dissolved
+         `transform_convert_particle.c`.
+
+      #### The link-graph finding, which is the one genuinely new thing
+
+      `bf_editor_sculpt_paint` calls `curves::` seven times but **does not list
+      `bf_editor_curves` in its `LIB`**. It links anyway, because
+      `bf_editor_space_view3d` does list it, and the final executable merges all
+      editor archives. That means:
+
+      - `bf_editor_curves` has exactly **two** declared link consumers:
+        `space_view3d` (`CMakeLists.txt:76`) and `undo` (`CMakeLists.txt:33`).
+      - The `undo` one is **stale** - `undo_system_types.cc` no longer calls
+        `ED_curves_undosys_type`, so `bf_editor_curves` there is dead weight.
+        Same category as `bf_editor_physics` in the same file, which was
+        removed with `physics`.
+      - **`sculpt_paint`'s dependency on `curves` is a link-time accident, not a
+        declared one.** It compiles against `ED_curves.h` and resolves at link
+        because `space_view3d` happens to pull the archive in. So
+        "`sculpt_paint` needs `curves`" is *not* a reason to keep `curves` - the
+        dependency direction is the other way round: it is `space_view3d` that
+        makes the link work.
+
+      That is worth generalising, because it is the same shape as the
+      `overlay_edit_curves.cc` shader borrowing from this round's `physics`
+      deletion: **a declaration in a `CMakeLists.txt` is not the dependency
+      graph.** Read the graph off the linker, not off the build files - and
+      remember that a module can be reachable through an archive it never names.
+
+      **Status: measured, not yet cut.** It needs the `space_view3d` +
+      `sculpt_paint` decision first, because that is what decides whether the
+      `blender::ed::curves` API can go in one step or has to be severed
+      symbol-by-symbol from two modules that are about to be deleted anyway.
+
       ### `space_topbar` is scoped, and it is not the status bar's twin
 
       The status bar took one round. The top bar will not, and the reason is
