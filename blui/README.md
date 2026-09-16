@@ -701,6 +701,7 @@ memory. Run them after any change; none of them need a person watching.
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
 | Open-document isolation (item 4's target) | `check_window_isolation.py -- --strict` | FAILS today, by design |
 | Opening a component in its own window | `check_component_window.py` | PASS |
+| Opening a component with **no** window open (the tray's path) | `check_window_new_without_window.py` | PASS, 9 assertions |
 | Click sweep, 144 points, whole window | `click_sweep.py` | no crash, no crash log |
 | Configuration isolation | — | `%APPDATA%\Blender Foundation` untouched |
 
