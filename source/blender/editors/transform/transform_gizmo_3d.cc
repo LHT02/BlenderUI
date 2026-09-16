@@ -38,7 +38,6 @@
 #include "ED_gizmo_utils.h"
 #include "ED_gpencil_legacy.h"
 #include "ED_object.h"
-#include "ED_particle.h"
 #include "ED_screen.h"
 
 #include "UI_resources.h"
@@ -839,28 +838,6 @@ static int gizmo_3d_foreach_selected(const bContext *C,
     if (ob->mode & OB_MODE_SCULPT) {
       totsel = 1;
       run_coord_with_matrix(ob->sculpt->pivot_pos, false, ob->object_to_world);
-    }
-  }
-  else if (ob && ob->mode & OB_MODE_PARTICLE_EDIT) {
-    PTCacheEdit *edit = PE_get_current(depsgraph, scene, ob);
-    PTCacheEditPoint *point;
-    PTCacheEditKey *ek;
-    int k;
-
-    if (edit) {
-      point = edit->points;
-      for (a = 0; a < edit->totpoint; a++, point++) {
-        if (point->flag & PEP_HIDE) {
-          continue;
-        }
-
-        for (k = 0, ek = point->keys; k < point->totkey; k++, ek++) {
-          if (ek->flag & PEK_SELECT) {
-            user_fn((ek->flag & PEK_USE_WCO) ? ek->world_co : ek->co);
-            totsel++;
-          }
-        }
-      }
     }
   }
   else {

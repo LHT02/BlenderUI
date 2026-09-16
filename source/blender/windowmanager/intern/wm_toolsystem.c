@@ -160,22 +160,7 @@ static void toolsystem_ref_link(bContext *C, WorkSpace *workspace, bToolRef *tre
   if (tref_rt->data_block[0]) {
     Main *bmain = CTX_data_main(C);
 
-    if ((tref->space_type == SPACE_VIEW3D) && (tref->mode == CTX_MODE_PARTICLE)) {
-      const EnumPropertyItem *items = rna_enum_particle_edit_hair_brush_items;
-      const int i = RNA_enum_from_identifier(items, tref_rt->data_block);
-      if (i != -1) {
-        const int value = items[i].value;
-        wmWindowManager *wm = bmain->wm.first;
-        LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-          if (workspace == WM_window_get_active_workspace(win)) {
-            Scene *scene = WM_window_get_active_scene(win);
-            ToolSettings *ts = scene->toolsettings;
-            ts->particle.brushtype = value;
-          }
-        }
-      }
-    }
-    else {
+    {
       const ePaintMode paint_mode = BKE_paintmode_get_from_tool(tref);
       BLI_assert(paint_mode != PAINT_MODE_INVALID);
       const EnumPropertyItem *items = BKE_paint_get_tool_enum_from_paintmode(paint_mode);
@@ -375,18 +360,7 @@ void WM_toolsystem_ref_sync_from_context(Main *bmain, WorkSpace *workspace, bToo
     if (ob == NULL) {
       /* pass */
     }
-    if ((tref->space_type == SPACE_VIEW3D) && (tref->mode == CTX_MODE_PARTICLE)) {
-      if (ob->mode & OB_MODE_PARTICLE_EDIT) {
-        const EnumPropertyItem *items = rna_enum_particle_edit_hair_brush_items;
-        const int i = RNA_enum_from_value(items, ts->particle.brushtype);
-        const EnumPropertyItem *item = &items[i];
-        if (!STREQ(tref_rt->data_block, item->identifier)) {
-          STRNCPY(tref_rt->data_block, item->identifier);
-          SNPRINTF(tref->idname, "builtin_brush.%s", item->name);
-        }
-      }
-    }
-    else {
+    {
       const ePaintMode paint_mode = BKE_paintmode_get_from_tool(tref);
       Paint *paint = BKE_paint_get_active_from_paintmode(scene, paint_mode);
       const EnumPropertyItem *items = BKE_paint_get_tool_enum_from_paintmode(paint_mode);

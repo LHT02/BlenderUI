@@ -469,6 +469,47 @@ GPU_SHADER_CREATE_INFO(overlay_edit_curve_wire_clipped)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Edit Curves
+ * \{ */
+
+GPU_SHADER_INTERFACE_INFO(overlay_edit_curves_point_iface, "").flat(Type::VEC4, "finalColor");
+GPU_SHADER_INTERFACE_INFO(overlay_edit_curves_wire_iface, "").flat(Type::VEC4, "finalColor");
+
+GPU_SHADER_CREATE_INFO(overlay_edit_curves_point)
+    .do_static_compilation(true)
+    .builtins(BuiltinBits::POINT_SIZE)
+    .typedef_source("overlay_shader_shared.h")
+    .vertex_in(0, Type::VEC3, "pos")
+    .vertex_in(1, Type::FLOAT, "selection")
+    .vertex_out(overlay_edit_curves_point_iface)
+    .fragment_out(0, Type::VEC4, "fragColor")
+    .vertex_source("overlay_edit_curves_point_vert.glsl")
+    .fragment_source("overlay_point_varying_color_frag.glsl")
+    .additional_info("draw_modelmat", "draw_globals");
+
+GPU_SHADER_CREATE_INFO(overlay_edit_curves_point_clipped)
+    .do_static_compilation(true)
+    .additional_info("overlay_edit_curves_point", "drw_clipped");
+
+GPU_SHADER_CREATE_INFO(overlay_edit_curves_wire)
+    .do_static_compilation(true)
+    .typedef_source("overlay_shader_shared.h")
+    .vertex_in(0, Type::VEC3, "pos")
+    .vertex_in(1, Type::FLOAT, "selection")
+    .push_constant(Type::BOOL, "useWeight")
+    .vertex_out(overlay_edit_curves_wire_iface)
+    .fragment_out(0, Type::VEC4, "fragColor")
+    .vertex_source("overlay_edit_curves_wire_vert.glsl")
+    .fragment_source("overlay_point_varying_color_frag.glsl")
+    .additional_info("draw_modelmat", "draw_globals");
+
+GPU_SHADER_CREATE_INFO(overlay_edit_curves_wire_clipped)
+    .do_static_compilation(true)
+    .additional_info("overlay_edit_curves_wire", "drw_clipped");
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Edit Curve
  * \{ */
 
@@ -500,42 +541,6 @@ GPU_SHADER_CREATE_INFO(overlay_edit_lattice_wire)
 GPU_SHADER_CREATE_INFO(overlay_edit_lattice_wire_clipped)
     .do_static_compilation(true)
     .additional_info("overlay_edit_lattice_wire", "drw_clipped");
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Edit Particle
- * \{ */
-
-GPU_SHADER_CREATE_INFO(overlay_edit_particle_strand)
-    .do_static_compilation(true)
-    .vertex_in(0, Type::VEC3, "pos")
-    .vertex_in(1, Type::FLOAT, "selection")
-    .sampler(0, ImageType::FLOAT_1D, "weightTex")
-    .push_constant(Type::BOOL, "useWeight")
-    .vertex_out(overlay_edit_smooth_color_iface)
-    .fragment_out(0, Type::VEC4, "fragColor")
-    .vertex_source("overlay_edit_particle_strand_vert.glsl")
-    .fragment_source("overlay_varying_color.glsl")
-    .additional_info("draw_mesh", "draw_globals");
-
-GPU_SHADER_CREATE_INFO(overlay_edit_particle_strand_clipped)
-    .do_static_compilation(true)
-    .additional_info("overlay_edit_particle_strand", "drw_clipped");
-
-GPU_SHADER_CREATE_INFO(overlay_edit_particle_point)
-    .do_static_compilation(true)
-    .vertex_in(0, Type::VEC3, "pos")
-    .vertex_in(1, Type::FLOAT, "selection")
-    .vertex_out(overlay_edit_flat_color_iface)
-    .fragment_out(0, Type::VEC4, "fragColor")
-    .vertex_source("overlay_edit_particle_point_vert.glsl")
-    .fragment_source("overlay_point_varying_color_frag.glsl")
-    .additional_info("draw_mesh", "draw_globals");
-
-GPU_SHADER_CREATE_INFO(overlay_edit_particle_point_clipped)
-    .do_static_compilation(true)
-    .additional_info("overlay_edit_particle_point", "drw_clipped");
 
 /** \} */
 

@@ -27,7 +27,7 @@
 #include "DEG_depsgraph_query.h"
 
 #include "ED_mesh.h"
-#include "ED_particle.h"
+#include "ED_paint.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 
@@ -1281,9 +1281,6 @@ static int viewselected_exec(bContext *C, wmOperator *op)
   }
   else if (BKE_paint_select_face_test(ob_eval)) {
     ok = paintface_minmax(ob_eval, min, max);
-  }
-  else if (ob_eval && (ob_eval->mode & OB_MODE_PARTICLE_EDIT)) {
-    ok = PE_minmax(depsgraph, scene, CTX_data_view_layer(C), min, max);
   }
   else if (ob_eval && (ob_eval->mode & (OB_MODE_SCULPT | OB_MODE_VERTEX_PAINT |
                                         OB_MODE_WEIGHT_PAINT | OB_MODE_TEXTURE_PAINT)))

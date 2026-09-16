@@ -3080,28 +3080,6 @@ GPUBatch *DRW_cache_particles_get_dots(Object *object, ParticleSystem *psys)
   return DRW_particles_batch_cache_get_dots(object, psys);
 }
 
-GPUBatch *DRW_cache_particles_get_edit_strands(Object *object,
-                                               ParticleSystem *psys,
-                                               struct PTCacheEdit *edit,
-                                               bool use_weight)
-{
-  return DRW_particles_batch_cache_get_edit_strands(object, psys, edit, use_weight);
-}
-
-GPUBatch *DRW_cache_particles_get_edit_inner_points(Object *object,
-                                                    ParticleSystem *psys,
-                                                    struct PTCacheEdit *edit)
-{
-  return DRW_particles_batch_cache_get_edit_inner_points(object, psys, edit);
-}
-
-GPUBatch *DRW_cache_particles_get_edit_tip_points(Object *object,
-                                                  ParticleSystem *psys,
-                                                  struct PTCacheEdit *edit)
-{
-  return DRW_particles_batch_cache_get_edit_tip_points(object, psys, edit);
-}
-
 GPUBatch *DRW_cache_particles_get_prim(int type)
 {
   switch (type) {

@@ -32,6 +32,8 @@ struct OVERLAY_Shaders {
   GPUShader *edit_curve_handle;
   GPUShader *edit_curve_point;
   GPUShader *edit_curve_wire;
+  GPUShader *edit_curves_point;
+  GPUShader *edit_curves_wire;
   GPUShader *edit_gpencil_guide_point;
   GPUShader *edit_gpencil_point;
   GPUShader *edit_gpencil_wire;
@@ -48,8 +50,6 @@ struct OVERLAY_Shaders {
   GPUShader *edit_mesh_normals;
   GPUShader *edit_mesh_fnormals;
   GPUShader *edit_mesh_analysis;
-  GPUShader *edit_particle_strand;
-  GPUShader *edit_particle_point;
   GPUShader *edit_uv_verts;
   GPUShader *edit_uv_faces;
   GPUShader *edit_uv_edges;
@@ -341,6 +341,30 @@ GPUShader *OVERLAY_shader_edit_curve_wire(void)
   return sh_data->edit_curve_wire;
 }
 
+GPUShader *OVERLAY_shader_edit_curves_point(void)
+{
+  const DRWContextState *draw_ctx = DRW_context_state_get();
+  OVERLAY_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
+  if (!sh_data->edit_curves_point) {
+    sh_data->edit_curves_point = GPU_shader_create_from_info_name(
+        (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) ? "overlay_edit_curves_point_clipped" :
+                                                       "overlay_edit_curves_point");
+  }
+  return sh_data->edit_curves_point;
+}
+
+GPUShader *OVERLAY_shader_edit_curves_wire(void)
+{
+  const DRWContextState *draw_ctx = DRW_context_state_get();
+  OVERLAY_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
+  if (!sh_data->edit_curves_wire) {
+    sh_data->edit_curves_wire = GPU_shader_create_from_info_name(
+        (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) ? "overlay_edit_curves_wire_clipped" :
+                                                       "overlay_edit_curves_wire");
+  }
+  return sh_data->edit_curves_wire;
+}
+
 GPUShader *OVERLAY_shader_edit_gpencil_guide_point(void)
 {
   const DRWContextState *draw_ctx = DRW_context_state_get();
@@ -459,30 +483,6 @@ GPUShader *OVERLAY_shader_edit_mesh_skin_root(void)
                                                        "overlay_edit_mesh_skin_root");
   }
   return sh_data->edit_mesh_skin_root;
-}
-
-GPUShader *OVERLAY_shader_edit_particle_strand(void)
-{
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  OVERLAY_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
-  if (!sh_data->edit_particle_strand) {
-    sh_data->edit_particle_strand = GPU_shader_create_from_info_name(
-        (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) ? "overlay_edit_particle_strand_clipped" :
-                                                       "overlay_edit_particle_strand");
-  }
-  return sh_data->edit_particle_strand;
-}
-
-GPUShader *OVERLAY_shader_edit_particle_point(void)
-{
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  OVERLAY_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
-  if (!sh_data->edit_particle_point) {
-    sh_data->edit_particle_point = GPU_shader_create_from_info_name(
-        (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) ? "overlay_edit_particle_point_clipped" :
-                                                       "overlay_edit_particle_point");
-  }
-  return sh_data->edit_particle_point;
 }
 
 GPUShader *OVERLAY_shader_extra(bool is_select)

@@ -337,7 +337,6 @@ const EnumPropertyItem rna_enum_object_axis_items[] = {
 
 #  include "ED_curve.h"
 #  include "ED_object.h"
-#  include "ED_particle.h"
 
 static void rna_Object_internal_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
@@ -1256,18 +1255,6 @@ static void rna_Object_active_particle_system_index_set(PointerRNA *ptr, int val
 {
   Object *ob = (Object *)ptr->owner_id;
   psys_set_current_num(ob, value);
-}
-
-static void rna_Object_particle_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
-{
-  /* TODO: Disabled for now, because bContext is not available. */
-#  if 0
-  Object *ob = (Object *)ptr->owner_id;
-  PE_current_changed(NULL, scene, ob);
-#  else
-  (void)scene;
-  (void)ptr;
-#  endif
 }
 
 /* rotation - axis-angle */
@@ -2874,7 +2861,7 @@ static void rna_def_object_particle_systems(BlenderRNA *brna, PropertyRNA *cprop
                              "rna_Object_active_particle_system_index_range");
   RNA_def_property_ui_text(
       prop, "Active Particle System Index", "Index of active particle system slot");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_particle_update");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 }
 
 /* object.vertex_groups */

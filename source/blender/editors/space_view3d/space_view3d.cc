@@ -1492,10 +1492,6 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
   Object *obact = BKE_view_layer_active_object_get(view_layer);
   if (obact != nullptr) {
     switch (obact->mode) {
-      case OB_MODE_PARTICLE_EDIT:
-        WM_msg_subscribe_rna_anon_type(mbus, ParticleEdit, &msg_sub_value_region_tag_redraw);
-        break;
-
       case OB_MODE_SCULPT:
         WM_msg_subscribe_rna_anon_prop(
             mbus, WorkSpace, tools, &msg_sub_value_workbench_view_update);

@@ -31,7 +31,6 @@
 
 #include "ED_keyframes_edit.h"
 #include "ED_keyframing.h"
-#include "ED_particle.h"
 #include "ED_screen.h"
 #include "ED_screen_types.h"
 
@@ -729,8 +728,7 @@ static void init_proportional_edit(TransInfo *t)
             &TransConvertType_MeshUV,
             &TransConvertType_MeshVertCData,
             &TransConvertType_Node,
-            &TransConvertType_Object,
-            &TransConvertType_Particle))
+            &TransConvertType_Object))
   {
     /* Disable proportional editing */
     t->options |= CTX_NO_PET;
@@ -988,11 +986,6 @@ static TransConvertTypeInfo *convert_type_get(const TransInfo *t, Object **r_obj
       return &TransConvertType_Pose;
     }
     return NULL;
-  }
-  if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT) &&
-      PE_start_edit(PE_get_current(t->depsgraph, t->scene, ob)))
-  {
-    return &TransConvertType_Particle;
   }
   if (ob && ((ob->mode & OB_MODE_ALL_PAINT) || (ob->mode & OB_MODE_SCULPT_CURVES))) {
     if ((t->options & CTX_PAINT_CURVE) && !ELEM(t->mode, TFM_SHEAR, TFM_SHRINKFATTEN)) {

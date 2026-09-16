@@ -172,9 +172,6 @@ static void OVERLAY_cache_init(void *vedata)
     case CTX_MODE_EDIT_LATTICE:
       OVERLAY_edit_lattice_cache_init(data);
       break;
-    case CTX_MODE_PARTICLE:
-      OVERLAY_edit_particle_cache_init(data);
-      break;
     case CTX_MODE_POSE:
     case CTX_MODE_PAINT_WEIGHT:
     case CTX_MODE_PAINT_VERTEX:
@@ -315,8 +312,6 @@ static void OVERLAY_cache_populate(void *vedata, Object *ob)
                                                 overlay_object_is_edit_mode(
                                                     pd, DRW_object_get_dupli_parent(ob)) :
                                                 false;
-  const bool in_particle_edit_mode = (ob->mode == OB_MODE_PARTICLE_EDIT) &&
-                                     (pd->ctx_mode == CTX_MODE_PARTICLE);
   const bool in_paint_mode = (ob == draw_ctx->obact) &&
                              (draw_ctx->object_mode & OB_MODE_ALL_PAINT);
   const bool in_sculpt_curve_mode = (ob == draw_ctx->obact ||
@@ -439,9 +434,6 @@ static void OVERLAY_cache_populate(void *vedata, Object *ob)
       default:
         break;
     }
-  }
-  else if (in_particle_edit_mode) {
-    OVERLAY_edit_particle_cache_populate(data, ob);
   }
 
   if (in_sculpt_mode) {
@@ -703,9 +695,6 @@ static void OVERLAY_draw_scene(void *vedata)
       break;
     case CTX_MODE_POSE:
       OVERLAY_pose_draw(data);
-      break;
-    case CTX_MODE_PARTICLE:
-      OVERLAY_edit_particle_draw(data);
       break;
     case CTX_MODE_EDIT_GPENCIL:
     case CTX_MODE_PAINT_GPENCIL:

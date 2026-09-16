@@ -75,7 +75,6 @@
 #include "ED_mesh.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
-#include "ED_particle.h"
 #include "ED_screen.h"
 #include "ED_sculpt.h"
 #include "ED_select_utils.h"
@@ -1317,9 +1316,6 @@ static bool view3d_lasso_select(bContext *C,
     else if (ob &&
              (ob->mode & (OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT | OB_MODE_TEXTURE_PAINT))) {
       /* pass */
-    }
-    else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT)) {
-      changed_multi |= PE_lasso_select(C, mcoords, mcoords_len, sel_op) != OPERATOR_CANCELLED;
     }
     else if (ob && (ob->mode & OB_MODE_POSE)) {
       changed_multi |= do_lasso_select_pose(vc, mcoords, mcoords_len, sel_op);
@@ -3174,9 +3170,6 @@ static int view3d_select_exec(bContext *C, wmOperator *op)
       changed = ed_curves_select_pick(*C, mval, params);
     }
   }
-  else if (obact && obact->mode & OB_MODE_PARTICLE_EDIT) {
-    changed = PE_mouse_particles(C, mval, &params);
-  }
   else if (obact && BKE_paint_select_face_test(obact)) {
     changed = paintface_mouse_select(C, mval, &params, obact);
   }
@@ -4099,9 +4092,6 @@ static int view3d_box_select_exec(bContext *C, wmOperator *op)
     else if (vc.obact && BKE_paint_select_vert_test(vc.obact)) {
       changed_multi = do_paintvert_box_select(&vc, wm_userdata, &rect, sel_op);
     }
-    else if (vc.obact && vc.obact->mode & OB_MODE_PARTICLE_EDIT) {
-      changed_multi = PE_box_select(C, &rect, sel_op);
-    }
     else if (vc.obact && vc.obact->mode & OB_MODE_POSE) {
       changed_multi = do_pose_box_select(C, &vc, &rect, sel_op);
       if (changed_multi) {
@@ -5000,12 +4990,6 @@ static int view3d_circle_select_exec(bContext *C, wmOperator *op)
       }
     }
     FOREACH_OBJECT_IN_MODE_END;
-  }
-  else if (obact && (obact->mode & OB_MODE_PARTICLE_EDIT)) {
-    if (PE_circle_select(C, wm_userdata, sel_op, mval, float(radius))) {
-      return OPERATOR_FINISHED;
-    }
-    return OPERATOR_CANCELLED;
   }
   else if (obact && obact->mode & OB_MODE_SCULPT) {
     return OPERATOR_CANCELLED;

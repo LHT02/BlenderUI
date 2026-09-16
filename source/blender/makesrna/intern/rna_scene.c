@@ -3175,10 +3175,6 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_pointer_sdna(prop, NULL, "gp_weightpaint");
   RNA_def_property_ui_text(prop, "Grease Pencil Weight Paint", "");
 
-  prop = RNA_def_property(srna, "particle_edit", PROP_POINTER, PROP_NONE);
-  RNA_def_property_pointer_sdna(prop, NULL, "particle");
-  RNA_def_property_ui_text(prop, "Particle Edit", "");
-
   prop = RNA_def_property(srna, "uv_sculpt_lock_borders", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "uv_sculpt_settings", UV_SCULPT_LOCK_BORDERS);
   RNA_def_property_ui_text(prop, "Lock Borders", "Disable editing of boundary edges");

@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 9 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons`, `space_statusbar` (1,144 KB) |
+      | Editor modules deleted | 10 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons`, `space_statusbar`, `physics` (1,456 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -1156,41 +1156,161 @@ The work is staged so the build stays green at every step.
       invisible until the build breaks on it. `ED_lattice.h` and `ED_mball.h` each
       had one of these sitting in this very file.
 
-      ### Measured and rejected: `physics` and `curves`
+      ### `editors/physics/` is deleted, and the "rejected" verdict was a product question, not a technical one
 
-      Both looked like the next cheap rider after `lattice` and `metaball`.
-      Neither is, and the reasons differ - recorded so the next pass does not
-      spend a round rediscovering them.
+      CORRECTION. This section used to be titled *"Measured and rejected:
+      `physics` and `curves`"*, and it put `physics` in the reject pile on the
+      grounds that "the kept half is the particle-cache *draw* path plus the
+      particle-edit RNA, so deleting `physics` needs a product decision rather
+      than a mechanical cut."
 
-      **`physics` (304 KB).** Its two headers are clean: `ED_particle.h` and
-      `ED_physics.h` contain only function declarations and no macros, so the
-      `ED_mball.h` trap does not apply here. But the `PE_*` API is called from
-      *kept* modules, not only doomed ones:
+      That diagnosis was right and the conclusion was wrong. The kept half was
+      always severable - it was just work. LHT then made the product decision
+      ("粒子系统、毛发曲线都不需要"), which is the thing the old text said was
+      missing. So the reject pile held one genuinely-rejected module and one
+      module that was merely *expensive*; the section conflated the two, and a
+      future reader would have skipped a module that was ready to go.
 
-      | Consumer | Sites | Kept? |
-      | --- | --- | --- |
-      | `draw/intern/draw_cache_impl_particles.c` | 2 | kept |
-      | `draw/engines/overlay/overlay_particle.cc` | 4 | kept |
-      | `makesrna/intern/rna_sculpt_paint.c` | 4 | kept |
-      | `makesrna/intern/rna_object.c` | 1 | kept |
-      | `space_view3d` (5), `transform` (6), `object` (3), `space_buttons` (1) | 15 | doomed |
+      The measurement itself was accurate, and it is worth keeping in mind how
+      accurate: the five file/line targets in the old table were **every one of
+      them** a real call site. What the table understated was the *count* -
+      `physics` exports 346 symbols, 27 of them declared in `editors/include`,
+      and **42 have call sites outside the module**. The old table listed five
+      files; the actual cut touched fourteen.
 
-      The kept half is the particle-cache *draw* path plus the particle-edit RNA,
-      so deleting `physics` needs a product decision - does BLUI display particle
-      systems at all - rather than a mechanical cut. `ED_rigidbody_object_remove`
-      is also called from three places in `object_add.cc`.
+      | Symbol | External call sites |
+      | --- | --- |
+      | `ED_rigidbody_object_remove` | `object/object_add.cc:3032, 3148, 3380` |
+      | `PE_current_changed` | `makesrna/rna_object.c:1266` (inside `#if 0`) |
+      | `PE_get_current` | `makesrna/rna_sculpt_paint.c` (4), `transform/transform_convert.c:993`, `transform/transform_gizmo_3d.cc:845` |
+      | `PE_create_current` | `draw/intern/draw_cache_impl_particles.c:1455`, `draw/engines/overlay/overlay_particle.cc:66` |
+      | `PE_get_current_from_psys` | `overlay_particle.cc:78` |
+      | `PE_settings` | `overlay_particle.cc:29,128` |
+      | `PE_update_object` | `draw_cache_impl_particles.c:1433` |
+      | `PE_start_edit` | `transform/transform_convert.c:993` |
+      | `PE_minmax` | `space_view3d/view3d_navigate.cc:1286` |
+      | `PE_mouse_particles`, `PE_box_select`, `PE_circle_select`, `PE_lasso_select` | `space_view3d/view3d_select.cc:3178, 4103, 5005, 1322` |
+      | `ED_object_particle_edit_mode_supported/_exit_ex` | `object/object_modes.cc:118, 294` |
+      | `PARTICLE_OT_particle_edit_toggle` (name) | `object/object_modes.cc:78` |
+      | `rna_enum_particle_edit_hair_brush_items`, `..._disconnected_...` | `wm_toolsystem.c` (2), `bpy.c` via RNA |
 
-      **`curves` (84 KB).** The byte count misleads: `ED_curves.h` is 239 lines
-      exporting a ~25-function C++ API in `blender::ed::curves` - selection,
-      transverts, poll functions, the screen-space box/lasso/circle select
-      helpers. It is the hair-curves editor that sculpt mode drives. Small
-      module, large surface.
+      **What the old measurement got right and what it missed.** Everything in
+      the table above was found by a reference scan (`refscan.py`, ~16 s over the
+      whole `source/blender` corpus). What the scan *cannot* find - and what cost
+      three build iterations - is the third category below.
+
+      #### The three shapes the reference scan does not catch
+
+      This is the reusable part. A scan for symbols catches call sites. It does
+      not catch:
+
+      1. **Definition-side coupling.** `draw/engines/overlay/overlay_edit_curves.cc`
+         *calls* nothing from `physics` - it called
+         `OVERLAY_shader_edit_particle_point()` / `..._strand()`, which are
+         defined in `overlay_shader.cc`, a kept file. But those two wrappers were
+         the *only* thing making the two GLSL files
+         `overlay_edit_particle_{point,strand}_vert.glsl` exist, and the curves
+         editor was **borrowing them**. Deleting the particle overlay pass took
+         the curves editor's shaders with it. Fix: the two shaders were renamed
+         to `overlay_edit_curves_{point,wire}_vert.glsl` and given proper
+         `overlay_edit_curves_*` shader infos with the particle weight-brush
+         branch (`useWeight`, `weight_to_rgb()`, `no_active_weight`) stripped out
+         - that branch is a particle-hair brush feature and has no meaning in
+         curves edit. **A shared shader is a hidden dependency: grep for the
+         *file name*, not the symbol name.**
+      2. **RNA enum arrays.** `rna_enum_particle_edit_hair_brush_items` and
+         `rna_enum_particle_edit_disconnected_hair_brush_items` are `DEF_ENUM`
+         declarations in `makesrna/RNA_enum_items.h` whose *storage* was in the
+         deleted `rna_sculpt_paint.c`. They are named as strings from
+         `wm_toolsystem.c` and `bpy.c`, so nothing in C looked unreachable, and
+         the compiler could not tell me either - it was a **link** error
+         (`LNK2001`), only visible at the final link of `BLUI.exe`, after
+         `[642/642]` objects had compiled. Both use sites were dead anyway: each
+         is guarded on `tref->mode == CTX_MODE_PARTICLE`, a mode that can no
+         longer be entered.
+      3. **A `nullptr` in a `.c` file.** One renamed update callback was left as
+         `RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, nullptr)` - correct
+         in C++, a hard error in C (`error C2065: "nullptr": 未声明的标识符`).
+
+      #### Other findings worth keeping
+
+      - **`physics` was never wired into any registry.** A scan of all 79
+        `PARTICLE_*` / `RIGIDBODY_*` / `BOID_*` / `FLUID_*` / `DPAINT_*` /
+        `PTCACHE_OT_*` operator names found exactly **one** referenced outside the
+        module: `PARTICLE_OT_particle_edit_toggle`, named as a string in
+        `object_modes.cc:78`. `ED_operatortypes_physics()`,
+        `ED_keymap_physics()` and `ED_particle_undosys_type()` have **no call
+        sites at all** - not in `ED_spacetypes_init()`, not in `ed_undo.cc`.
+        And there are **zero** keymap-data or Python references to any of them.
+        So, contrary to what the old section implied, this deletion carried **no
+        keymap-data step** - the macro/`property_unset()` trap that bit
+        `space_script` and `space_statusbar` does not apply. That is the single
+        biggest reason this module was cheaper than the reject pile implied.
+      - **`OB_MODE_PARTICLE_EDIT` is an enum constant, not a symbol.** It is
+        still referenced in fourteen places. Every one of them is a branch that
+        can now never be taken, and none of them is a link error. They were cut
+        where they guarded a *call* into `physics` (or would crash on a null
+        second operand) and left where they are inert, in modules that are
+        themselves doomed later in Stage 2: `space_view3d/*` (3),
+        `object/object_modifier.cc` (4), `transform/*` (2),
+        `outliner_draw.cc`, `interface_icons.cc`, `view3d_draw.cc`,
+        `view3d_header.c`. Cleaning them up now would be churn against code that
+        is about to be deleted anyway.
+      - **`editors/undo/CMakeLists.txt` had `bf_editor_physics` in its `LIB`
+        list** although `undo_system_types.cc` registers only `IMAGE`, `TEXT`,
+        `MEMFILE`. It was already a stale link, so it was removed with the
+        module.
+      - **A duplicate function body survived a restore.** When
+        `rna_Paint_brush_update` was restored after an over-broad cut (see the
+        earlier session note), the restore landed *in addition to* the original
+        rather than in place of it, giving two definitions
+        (`error C2084: 函数...已有主体`). The file had the correct copy at line
+        119 and a redundant copy at line 309. Worth remembering: after a
+        "restore", grep for the symbol and assert the count is 1.
+
+      #### Verification, all seven scripts, after the build went green
+
+      | Check | Result |
+      | --- | --- |
+      | `check_editor_set.py` | PASS - 6 startup areas, all BLUI components |
+      | `check_preferences.py` | PASS - all 10 kept sections, 5 dropped sections empty |
+      | `check_keymap_config.py` | PASS - 116 keymaps, all 6 component hotkeys live |
+      | `check_window_isolation.py` | PASS - `RESULT_PASS`, 3 windows, 3 distinct screens |
+      | `check_component_window.py` | PASS - `RESULT_SETTINGS_WINDOW PASS` |
+      | `check_save_isolation.py` | PASS - text editor wrote the real file on disk |
+      | `click_sweep.py` | PASS - 144 clicks, no crash |
+
+      `check_keymap_config.py` at **116 keymaps** is the meaningful number here:
+      it is unchanged from before this deletion, which confirms the
+      "no keymap coupling" measurement empirically rather than by grep.
+
+      #### The reject pile, corrected
+
+      `physics` (304 KB) is **deleted**. `curves` (84 KB) stays in the reject
+      pile for now, on the grounds recorded below - and note that those grounds
+      are now the *only* ones left in it.
+
+      ### `curves` (84 KB) is still measured-and-rejected
+
+      The byte count misleads: `ED_curves.h` is 239 lines exporting a ~25-function
+      C++ API in `blender::ed::curves` - selection, transverts, poll functions,
+      the screen-space box/lasso/circle select helpers. It is the hair-curves
+      editor that sculpt mode drives. Small module, large surface.
 
       The pattern worth keeping: **module size is not a proxy for deletion
       cost.** `lattice` was 40 KB and cost four call sites. `curves` is 84 KB and
       exposes an API that would take a round of its own. Measure the header, not
       the directory - which is the same lesson as the include sweeps, arrived at
       from the other direction.
+
+      Note the asymmetry with `physics`, because it is the actual lesson: both
+      had a big exported API and neither was held by its *size*. `physics` fell
+      because nothing registered it, so every reference was a call to be cut.
+      `curves` is different - it is `ED_spacetypes_init`-visible work in the
+      sculpt/paint path, and it will need the same three-shape sweep above
+      (call sites, definition-side shared files, RNA/link symbols) before it can
+      be judged. Do not assume it is rejected for the reason `physics` was;
+      the reason `physics` was "rejected" turned out not to hold.
 
       ### `space_topbar` is scoped, and it is not the status bar's twin
 

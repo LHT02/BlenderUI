@@ -13,108 +13,7 @@
 
 #include "BKE_pointcache.h"
 
-#include "ED_particle.h"
-
 #include "overlay_private.hh"
-
-/* -------------------------------------------------------------------- */
-/** \name Edit Particles
- * \{ */
-
-void OVERLAY_edit_particle_cache_init(OVERLAY_Data *vedata)
-{
-  OVERLAY_PassList *psl = vedata->psl;
-  OVERLAY_PrivateData *pd = vedata->stl->pd;
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  ParticleEditSettings *pset = PE_settings(draw_ctx->scene);
-  GPUShader *sh;
-  DRWShadingGroup *grp;
-
-  pd->edit_particle.use_weight = (pset->brushtype == PE_BRUSH_WEIGHT);
-  pd->edit_particle.select_mode = pset->selectmode;
-
-  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL;
-  DRW_PASS_CREATE(psl->edit_particle_ps, state | pd->clipping_state);
-
-  sh = OVERLAY_shader_edit_particle_strand();
-  pd->edit_particle_strand_grp = grp = DRW_shgroup_create(sh, psl->edit_particle_ps);
-  DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
-  DRW_shgroup_uniform_bool_copy(grp, "useWeight", pd->edit_particle.use_weight);
-  DRW_shgroup_uniform_texture(grp, "weightTex", G_draw.weight_ramp);
-
-  sh = OVERLAY_shader_edit_particle_point();
-  pd->edit_particle_point_grp = grp = DRW_shgroup_create(sh, psl->edit_particle_ps);
-  DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
-}
-
-void OVERLAY_edit_particle_cache_populate(OVERLAY_Data *vedata, Object *ob)
-{
-  OVERLAY_PrivateData *pd = vedata->stl->pd;
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  Scene *scene_orig = (Scene *)DEG_get_original_id(&draw_ctx->scene->id);
-
-  /* Usually the edit structure is created by Particle Edit Mode Toggle
-   * operator, but sometimes it's invoked after tagging hair as outdated
-   * (for example, when toggling edit mode). That makes it impossible to
-   * create edit structure for until after next dependency graph evaluation.
-   *
-   * Ideally, the edit structure will be created here already via some
-   * dependency graph callback or so, but currently trying to make it nicer
-   * only causes bad level calls and breaks design from the past.
-   */
-  Object *ob_orig = DEG_get_original_object(ob);
-  PTCacheEdit *edit = PE_create_current(draw_ctx->depsgraph, scene_orig, ob_orig);
-  if (edit == nullptr) {
-    /* Happens when trying to edit particles in EMITTER mode without
-     * having them cached.
-     */
-    return;
-  }
-  /* NOTE: We need to pass evaluated particle system, which we need
-   * to find first.
-   */
-  ParticleSystem *psys = static_cast<ParticleSystem *>(ob->particlesystem.first);
-  LISTBASE_FOREACH (ParticleSystem *, psys_orig, &ob_orig->particlesystem) {
-    if (PE_get_current_from_psys(psys_orig) == edit) {
-      break;
-    }
-    psys = psys->next;
-  }
-  if (psys == nullptr) {
-    printf("Error getting evaluated particle system for edit.\n");
-    return;
-  }
-
-  struct GPUBatch *geom;
-  {
-    geom = DRW_cache_particles_get_edit_strands(ob, psys, edit, pd->edit_particle.use_weight);
-    DRW_shgroup_call(pd->edit_particle_strand_grp, geom, nullptr);
-  }
-
-  if (pd->edit_particle.select_mode == SCE_SELECT_POINT) {
-    geom = DRW_cache_particles_get_edit_inner_points(ob, psys, edit);
-    DRW_shgroup_call(pd->edit_particle_point_grp, geom, nullptr);
-  }
-
-  if (ELEM(pd->edit_particle.select_mode, SCE_SELECT_POINT, SCE_SELECT_END)) {
-    geom = DRW_cache_particles_get_edit_tip_points(ob, psys, edit);
-    DRW_shgroup_call(pd->edit_particle_point_grp, geom, nullptr);
-  }
-}
-
-void OVERLAY_edit_particle_draw(OVERLAY_Data *vedata)
-{
-  OVERLAY_PassList *psl = vedata->psl;
-  OVERLAY_FramebufferList *fbl = vedata->fbl;
-
-  if (DRW_state_is_fbo()) {
-    GPU_framebuffer_bind(fbl->overlay_default_fb);
-  }
-
-  DRW_draw_pass(psl->edit_particle_ps);
-}
-
-/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Particles
@@ -124,13 +23,8 @@ void OVERLAY_particle_cache_init(OVERLAY_Data *vedata)
 {
   OVERLAY_PassList *psl = vedata->psl;
   OVERLAY_PrivateData *pd = vedata->stl->pd;
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  ParticleEditSettings *pset = PE_settings(draw_ctx->scene);
   GPUShader *sh;
   DRWShadingGroup *grp;
-
-  pd->edit_particle.use_weight = (pset->brushtype == PE_BRUSH_WEIGHT);
-  pd->edit_particle.select_mode = pset->selectmode;
 
   DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL;
   DRW_PASS_CREATE(psl->particle_ps, state | pd->clipping_state);

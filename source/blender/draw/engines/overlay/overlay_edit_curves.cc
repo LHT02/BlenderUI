@@ -48,16 +48,15 @@ void OVERLAY_edit_curves_cache_init(OVERLAY_Data *vedata)
   for (int i = 0; i < 2; i++) {
     if (pd->edit_curves.do_points) {
       DRW_PASS_CREATE(psl->edit_curves_points_ps[i], (state | pd->clipping_state));
-      sh = OVERLAY_shader_edit_particle_point();
+      sh = OVERLAY_shader_edit_curves_point();
       grp = pd->edit_curves_points_grp[i] = DRW_shgroup_create(sh, psl->edit_curves_points_ps[i]);
       DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
     }
 
     DRW_PASS_CREATE(psl->edit_curves_lines_ps[i], (state | pd->clipping_state));
-    sh = OVERLAY_shader_edit_particle_strand();
+    sh = OVERLAY_shader_edit_curves_wire();
     grp = pd->edit_curves_lines_grp[i] = DRW_shgroup_create(sh, psl->edit_curves_lines_ps[i]);
     DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
-    DRW_shgroup_uniform_bool_copy(grp, "useWeight", false);
   }
 }
 

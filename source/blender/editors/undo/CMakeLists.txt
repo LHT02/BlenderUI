@@ -32,7 +32,6 @@ set(LIB
   bf_editor_curve
   bf_editor_curves
   bf_editor_mesh
-  bf_editor_physics
 )
 
 blender_add_lib(bf_editor_undo "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

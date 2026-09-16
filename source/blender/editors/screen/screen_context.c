@@ -616,20 +616,6 @@ static eContextResult screen_ctx_image_paint_object(const bContext *C, bContextD
 
   return CTX_RESULT_OK;
 }
-static eContextResult screen_ctx_particle_edit_object(const bContext *C,
-                                                      bContextDataResult *result)
-{
-  wmWindow *win = CTX_wm_window(C);
-  const Scene *scene = WM_window_get_active_scene(win);
-  ViewLayer *view_layer = WM_window_get_active_view_layer(win);
-  BKE_view_layer_synced_ensure(scene, view_layer);
-  Object *obact = BKE_view_layer_active_object_get(view_layer);
-  if (obact && (obact->mode & OB_MODE_PARTICLE_EDIT)) {
-    CTX_data_id_pointer_set(result, &obact->id);
-  }
-
-  return CTX_RESULT_OK;
-}
 static eContextResult screen_ctx_pose_object(const bContext *C, bContextDataResult *result)
 {
   wmWindow *win = CTX_wm_window(C);
@@ -1297,7 +1283,6 @@ static void ensure_ed_screen_context_functions(void)
   register_context_function("vertex_paint_object", screen_ctx_vertex_paint_object);
   register_context_function("weight_paint_object", screen_ctx_weight_paint_object);
   register_context_function("image_paint_object", screen_ctx_image_paint_object);
-  register_context_function("particle_edit_object", screen_ctx_particle_edit_object);
   register_context_function("pose_object", screen_ctx_pose_object);
   register_context_function("active_sequence_strip", screen_ctx_active_sequence_strip);
   register_context_function("sequences", screen_ctx_sequences);

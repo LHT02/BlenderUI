@@ -692,11 +692,6 @@ static eSnapTargetOP snap_target_select_from_spacetype(TransInfo *t)
   BLI_assert(t->tsnap.target_operation == SCE_SNAP_TARGET_ALL);
 
   if (ELEM(t->spacetype, SPACE_VIEW3D, SPACE_IMAGE) && !(t->options & CTX_CAMERA)) {
-    if (base_act && (base_act->object->mode & OB_MODE_PARTICLE_EDIT)) {
-      /* Particles edit mode. */
-      return ret;
-    }
-
     if (t->options & (CTX_GPENCIL_STROKES | CTX_CURSOR | CTX_OBMODE_XFORM_OBDATA)) {
       /* In "Edit Strokes" mode,
        * snap tool can perform snap to selected or active objects (see #49632)

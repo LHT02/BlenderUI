@@ -106,7 +106,6 @@
 #include "ED_node.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
-#include "ED_physics.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_select_utils.h"
@@ -3028,9 +3027,6 @@ static int object_convert_exec(bContext *C, wmOperator *op)
 
       if (newob->type == OB_CURVES_LEGACY) {
         BKE_object_free_modifiers(newob, 0); /* after derivedmesh calls! */
-        if (newob->rigidbody_object != nullptr) {
-          ED_rigidbody_object_remove(bmain, scene, newob);
-        }
       }
     }
     else if (ob->type == OB_MESH && target == OB_GPENCIL_LEGACY) {
@@ -3145,7 +3141,6 @@ static int object_convert_exec(bContext *C, wmOperator *op)
 
       if (newob->type == OB_POINTCLOUD) {
         BKE_object_free_modifiers(newob, 0); /* after derivedmesh calls! */
-        ED_rigidbody_object_remove(bmain, scene, newob);
       }
     }
     else if (ob->type == OB_MESH) {
@@ -3377,7 +3372,6 @@ static int object_convert_exec(bContext *C, wmOperator *op)
 
       if (newob->type == OB_MESH) {
         BKE_object_free_modifiers(newob, 0); /* after derivedmesh calls! */
-        ED_rigidbody_object_remove(bmain, scene, newob);
       }
     }
     else if (ob->type == OB_CURVES && target == OB_MESH) {

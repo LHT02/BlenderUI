@@ -46,7 +46,6 @@ set(SRC
   transform_convert_object.c
   transform_convert_object_texspace.c
   transform_convert_paintcurve.c
-  transform_convert_particle.c
   transform_convert_sculpt.cc
   transform_convert_sequencer.c
   transform_convert_sequencer_image.c

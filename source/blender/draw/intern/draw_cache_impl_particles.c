@@ -29,8 +29,6 @@
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
 
-#include "ED_particle.h"
-
 #include "GPU_batch.h"
 #include "GPU_capabilities.h"
 #include "GPU_context.h"
@@ -54,29 +52,12 @@ typedef struct ParticlePointCache {
 } ParticlePointCache;
 
 typedef struct ParticleBatchCache {
-  /* Object mode strands for hair and points for particle,
-   * strands for paths when in edit mode.
-   */
+  /* Strands for hair and points for particle. */
   ParticleHairCache hair;   /* Used for hair strands */
   ParticlePointCache point; /* Used for particle points. */
 
-  /* Control points when in edit mode. */
-  ParticleHairCache edit_hair;
-
-  GPUVertBuf *edit_pos;
-  GPUBatch *edit_strands;
-
-  GPUVertBuf *edit_inner_pos;
-  GPUBatch *edit_inner_points;
-  int edit_inner_point_len;
-
-  GPUVertBuf *edit_tip_pos;
-  GPUBatch *edit_tip_points;
-  int edit_tip_point_len;
-
   /* Settings to determine if cache is invalid. */
   bool is_dirty;
-  bool edit_is_weight;
 } ParticleBatchCache;
 
 /* GPUBatch cache management. */
@@ -86,26 +67,6 @@ typedef struct HairAttributeID {
   uint tan;
   uint ind;
 } HairAttributeID;
-
-typedef struct EditStrandData {
-  float pos[3];
-  float selection;
-} EditStrandData;
-
-static GPUVertFormat *edit_points_vert_format_get(uint *r_pos_id, uint *r_selection_id)
-{
-  static GPUVertFormat edit_point_format = {0};
-  static uint pos_id, selection_id;
-  if (edit_point_format.attr_len == 0) {
-    /* Keep in sync with EditStrandData */
-    pos_id = GPU_vertformat_attr_add(&edit_point_format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-    selection_id = GPU_vertformat_attr_add(
-        &edit_point_format, "selection", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
-  }
-  *r_pos_id = pos_id;
-  *r_selection_id = selection_id;
-  return &edit_point_format;
-}
 
 static bool particle_batch_cache_valid(ParticleSystem *psys)
 {
@@ -215,12 +176,6 @@ static void particle_batch_cache_clear(ParticleSystem *psys)
   particle_batch_cache_clear_point(&cache->point);
 
   particle_batch_cache_clear_hair(&cache->hair);
-  particle_batch_cache_clear_hair(&cache->edit_hair);
-
-  GPU_BATCH_DISCARD_SAFE(cache->edit_inner_points);
-  GPU_VERTBUF_DISCARD_SAFE(cache->edit_inner_pos);
-  GPU_BATCH_DISCARD_SAFE(cache->edit_tip_points);
-  GPU_VERTBUF_DISCARD_SAFE(cache->edit_tip_pos);
 }
 
 void DRW_particle_batch_cache_free(ParticleSystem *psys)
@@ -243,9 +198,7 @@ static void count_cache_segment_keys(ParticleCacheKey **pathcache,
   }
 }
 
-static void ensure_seg_pt_count(PTCacheEdit *edit,
-                                ParticleSystem *psys,
-                                ParticleHairCache *hair_cache)
+static void ensure_seg_pt_count(ParticleSystem *psys, ParticleHairCache *hair_cache)
 {
   if ((hair_cache->pos != NULL && hair_cache->indices != NULL) ||
       (hair_cache->proc_point_buf != NULL))
@@ -257,17 +210,12 @@ static void ensure_seg_pt_count(PTCacheEdit *edit,
   hair_cache->elems_len = 0;
   hair_cache->point_len = 0;
 
-  if (edit != NULL && edit->pathcache != NULL) {
-    count_cache_segment_keys(edit->pathcache, edit->totcached, hair_cache);
+  if (psys->pathcache && (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT))) {
+    count_cache_segment_keys(psys->pathcache, psys->totpart, hair_cache);
   }
-  else {
-    if (psys->pathcache && (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT))) {
-      count_cache_segment_keys(psys->pathcache, psys->totpart, hair_cache);
-    }
-    if (psys->childcache) {
-      const int child_count = psys->totchild * psys->part->disp / 100;
-      count_cache_segment_keys(psys->childcache, child_count, hair_cache);
-    }
+  if (psys->childcache) {
+    const int child_count = psys->totchild * psys->part->disp / 100;
+    count_cache_segment_keys(psys->childcache, child_count, hair_cache);
   }
 }
 
@@ -516,7 +464,6 @@ static int particle_batch_cache_fill_segments(ParticleSystem *psys,
   const bool is_simple = (psys->part->childtype == PART_CHILD_PARTICLES);
   const bool is_child = (particle_source == PARTICLE_SOURCE_CHILDREN);
   if (is_simple && *r_parent_uvs == NULL) {
-    /* TODO(sergey): For edit mode it should be edit->totcached. */
     *r_parent_uvs = MEM_callocN(sizeof(*r_parent_uvs) * psys->totpart, "Parent particle UVs");
   }
   if (is_simple && *r_parent_mcol == NULL) {
@@ -667,43 +614,6 @@ static float particle_key_weight(const ParticleData *particle, int strand, float
   return s1 + interp * (s2 - s1);
 }
 
-static int particle_batch_cache_fill_segments_edit(
-    const PTCacheEdit *UNUSED(edit), /* NULL for weight data */
-    const ParticleData *particle,    /* NULL for select data */
-    ParticleCacheKey **path_cache,
-    const int start_index,
-    const int num_path_keys,
-    GPUIndexBufBuilder *elb,
-    GPUVertBufRaw *attr_step)
-{
-  int curr_point = start_index;
-  for (int i = 0; i < num_path_keys; i++) {
-    ParticleCacheKey *path = path_cache[i];
-    if (path->segments <= 0) {
-      continue;
-    }
-    for (int j = 0; j <= path->segments; j++) {
-      EditStrandData *seg_data = (EditStrandData *)GPU_vertbuf_raw_step(attr_step);
-      copy_v3_v3(seg_data->pos, path[j].co);
-      float strand_t = (float)(j) / path->segments;
-      if (particle) {
-        float weight = particle_key_weight(particle, i, strand_t);
-        /* NaN or unclamped become 1.0f */
-        seg_data->selection = (weight < 1.0f) ? weight : 1.0f;
-      }
-      else {
-        /* Computed in psys_cache_edit_paths_iter(). */
-        seg_data->selection = path[j].col[0];
-      }
-      GPU_indexbuf_add_generic_vert(elb, curr_point);
-      curr_point++;
-    }
-    /* Finish the segment and add restart primitive. */
-    GPU_indexbuf_add_primitive_restart(elb);
-  }
-  return curr_point;
-}
-
 static int particle_batch_cache_fill_segments_indices(ParticleCacheKey **path_cache,
                                                       const int start_index,
                                                       const int num_path_keys,
@@ -744,7 +654,6 @@ static int particle_batch_cache_fill_strands_data(ParticleSystem *psys,
   const bool is_simple = (psys->part->childtype == PART_CHILD_PARTICLES);
   const bool is_child = (particle_source == PARTICLE_SOURCE_CHILDREN);
   if (is_simple && *r_parent_uvs == NULL) {
-    /* TODO(sergey): For edit mode it should be edit->totcached. */
     *r_parent_uvs = MEM_callocN(sizeof(*r_parent_uvs) * psys->totpart, "Parent particle UVs");
   }
   if (is_simple && *r_parent_mcol == NULL) {
@@ -822,8 +731,7 @@ static void particle_batch_cache_ensure_procedural_final_points(ParticleHairCach
                          cache->final[subdiv].strands_res * cache->strands_len);
 }
 
-static void particle_batch_cache_ensure_procedural_strand_data(PTCacheEdit *edit,
-                                                               ParticleSystem *psys,
+static void particle_batch_cache_ensure_procedural_strand_data(ParticleSystem *psys,
                                                                ModifierData *md,
                                                                ParticleHairCache *cache)
 {
@@ -965,25 +873,7 @@ static void particle_batch_cache_ensure_procedural_strand_data(PTCacheEdit *edit
     }
   }
 
-  if (edit != NULL && edit->pathcache != NULL) {
-    particle_batch_cache_fill_strands_data(psys,
-                                           psmd,
-                                           edit->pathcache,
-                                           PARTICLE_SOURCE_PARENT,
-                                           0,
-                                           edit->totcached,
-                                           &data_step,
-                                           &seg_step,
-                                           &parent_uvs,
-                                           uv_step,
-                                           mtfaces,
-                                           cache->num_uv_layers,
-                                           &parent_mcol,
-                                           col_step,
-                                           mcols,
-                                           cache->num_col_layers);
-  }
-  else {
+  {
     int curr_point = 0;
     if ((psys->pathcache != NULL) && (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT)))
     {
@@ -1026,7 +916,6 @@ static void particle_batch_cache_ensure_procedural_strand_data(PTCacheEdit *edit
   }
   /* Cleanup. */
   if (parent_uvs != NULL) {
-    /* TODO(sergey): For edit mode it should be edit->totcached. */
     for (int i = 0; i < psys->totpart; i++) {
       MEM_SAFE_FREE(parent_uvs[i]);
     }
@@ -1049,8 +938,7 @@ static void particle_batch_cache_ensure_procedural_strand_data(PTCacheEdit *edit
   }
 }
 
-static void particle_batch_cache_ensure_procedural_indices(PTCacheEdit *edit,
-                                                           ParticleSystem *psys,
+static void particle_batch_cache_ensure_procedural_indices(ParticleSystem *psys,
                                                            ParticleHairCache *cache,
                                                            int thickness_res,
                                                            int subdiv)
@@ -1079,11 +967,7 @@ static void particle_batch_cache_ensure_procedural_indices(PTCacheEdit *edit,
   GPUIndexBufBuilder elb;
   GPU_indexbuf_init_ex(&elb, prim_type, element_count, element_count);
 
-  if (edit != NULL && edit->pathcache != NULL) {
-    particle_batch_cache_fill_segments_indices(
-        edit->pathcache, 0, edit->totcached, verts_per_hair, &elb);
-  }
-  else {
+  {
     int curr_point = 0;
     if ((psys->pathcache != NULL) && (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT)))
     {
@@ -1101,8 +985,7 @@ static void particle_batch_cache_ensure_procedural_indices(PTCacheEdit *edit,
       prim_type, vbo, GPU_indexbuf_build(&elb), GPU_BATCH_OWNS_VBO | GPU_BATCH_OWNS_INDEX);
 }
 
-static void particle_batch_cache_ensure_procedural_pos(PTCacheEdit *edit,
-                                                       ParticleSystem *psys,
+static void particle_batch_cache_ensure_procedural_pos(ParticleSystem *psys,
                                                        ParticleHairCache *cache,
                                                        GPUMaterial *UNUSED(gpu_material))
 {
@@ -1130,27 +1013,20 @@ static void particle_batch_cache_ensure_procedural_pos(PTCacheEdit *edit,
     GPUVertBufRaw length_step;
     GPU_vertbuf_attr_get_raw_data(cache->proc_length_buf, length_id, &length_step);
 
-    if (edit != NULL && edit->pathcache != NULL) {
+    if ((psys->pathcache != NULL) &&
+        (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT))) {
       particle_batch_cache_fill_segments_proc_pos(
-          edit->pathcache, edit->totcached, &pos_step, &length_step);
+          psys->pathcache, psys->totpart, &pos_step, &length_step);
     }
-    else {
-      if ((psys->pathcache != NULL) &&
-          (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT))) {
-        particle_batch_cache_fill_segments_proc_pos(
-            psys->pathcache, psys->totpart, &pos_step, &length_step);
-      }
-      if (psys->childcache) {
-        const int child_count = psys->totchild * psys->part->disp / 100;
-        particle_batch_cache_fill_segments_proc_pos(
-            psys->childcache, child_count, &pos_step, &length_step);
-      }
+    if (psys->childcache) {
+      const int child_count = psys->totchild * psys->part->disp / 100;
+      particle_batch_cache_fill_segments_proc_pos(
+          psys->childcache, child_count, &pos_step, &length_step);
     }
   }
 }
 
-static void particle_batch_cache_ensure_pos_and_seg(PTCacheEdit *edit,
-                                                    ParticleSystem *psys,
+static void particle_batch_cache_ensure_pos_and_seg(ParticleSystem *psys,
                                                     ModifierData *md,
                                                     ParticleHairCache *hair_cache)
 {
@@ -1255,14 +1131,15 @@ static void particle_batch_cache_ensure_pos_and_seg(PTCacheEdit *edit,
     }
   }
 
-  if (edit != NULL && edit->pathcache != NULL) {
+  if ((psys->pathcache != NULL) && (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT)))
+  {
     curr_point = particle_batch_cache_fill_segments(psys,
                                                     psmd,
-                                                    edit->pathcache,
+                                                    psys->pathcache,
                                                     PARTICLE_SOURCE_PARENT,
                                                     0,
                                                     0,
-                                                    edit->totcached,
+                                                    psys->totpart,
                                                     num_uv_layers,
                                                     num_col_layers,
                                                     mtfaces,
@@ -1275,53 +1152,29 @@ static void particle_batch_cache_ensure_pos_and_seg(PTCacheEdit *edit,
                                                     &attr_id,
                                                     hair_cache);
   }
-  else {
-    if ((psys->pathcache != NULL) && (!psys->childcache || (psys->part->draw & PART_DRAW_PARENT)))
-    {
-      curr_point = particle_batch_cache_fill_segments(psys,
-                                                      psmd,
-                                                      psys->pathcache,
-                                                      PARTICLE_SOURCE_PARENT,
-                                                      0,
-                                                      0,
-                                                      psys->totpart,
-                                                      num_uv_layers,
-                                                      num_col_layers,
-                                                      mtfaces,
-                                                      mcols,
-                                                      uv_id,
-                                                      col_id,
-                                                      &parent_uvs,
-                                                      &parent_mcol,
-                                                      &elb,
-                                                      &attr_id,
-                                                      hair_cache);
-    }
-    if (psys->childcache != NULL) {
-      const int child_count = psys->totchild * psys->part->disp / 100;
-      curr_point = particle_batch_cache_fill_segments(psys,
-                                                      psmd,
-                                                      psys->childcache,
-                                                      PARTICLE_SOURCE_CHILDREN,
-                                                      psys->totpart,
-                                                      curr_point,
-                                                      child_count,
-                                                      num_uv_layers,
-                                                      num_col_layers,
-                                                      mtfaces,
-                                                      mcols,
-                                                      uv_id,
-                                                      col_id,
-                                                      &parent_uvs,
-                                                      &parent_mcol,
-                                                      &elb,
-                                                      &attr_id,
-                                                      hair_cache);
-    }
+  if (psys->childcache != NULL) {
+    const int child_count = psys->totchild * psys->part->disp / 100;
+    curr_point = particle_batch_cache_fill_segments(psys,
+                                                    psmd,
+                                                    psys->childcache,
+                                                    PARTICLE_SOURCE_CHILDREN,
+                                                    psys->totpart,
+                                                    curr_point,
+                                                    child_count,
+                                                    num_uv_layers,
+                                                    num_col_layers,
+                                                    mtfaces,
+                                                    mcols,
+                                                    uv_id,
+                                                    col_id,
+                                                    &parent_uvs,
+                                                    &parent_mcol,
+                                                    &elb,
+                                                    &attr_id,
+                                                    hair_cache);
   }
   /* Cleanup. */
   if (parent_uvs != NULL) {
-    /* TODO(sergey): For edit mode it should be edit->totcached. */
     for (int i = 0; i < psys->totpart; i++) {
       MEM_SAFE_FREE(parent_uvs[i]);
     }
@@ -1416,70 +1269,20 @@ static void particle_batch_cache_ensure_pos(Object *object,
   psys_sim_data_free(&sim);
 }
 
-static void drw_particle_update_ptcache_edit(Object *object_eval,
-                                             ParticleSystem *psys,
-                                             PTCacheEdit *edit)
-{
-  if (edit->psys == NULL) {
-    return;
-  }
-  /* NOTE: Get flag from particle system coming from drawing object.
-   * this is where depsgraph will be setting flags to.
-   */
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  Scene *scene_orig = (Scene *)DEG_get_original_id(&draw_ctx->scene->id);
-  Object *object_orig = DEG_get_original_object(object_eval);
-  if (psys->flag & PSYS_HAIR_UPDATED) {
-    PE_update_object(draw_ctx->depsgraph, scene_orig, object_orig, 0);
-    psys->flag &= ~PSYS_HAIR_UPDATED;
-  }
-  if (edit->pathcache == NULL) {
-    Depsgraph *depsgraph = draw_ctx->depsgraph;
-    psys_cache_edit_paths(depsgraph,
-                          scene_orig,
-                          object_orig,
-                          edit,
-                          DEG_get_ctime(depsgraph),
-                          DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-  }
-}
-
-static void drw_particle_update_ptcache(Object *object_eval, ParticleSystem *psys)
-{
-  if ((object_eval->mode & OB_MODE_PARTICLE_EDIT) == 0) {
-    return;
-  }
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  Scene *scene_orig = (Scene *)DEG_get_original_id(&draw_ctx->scene->id);
-  Object *object_orig = DEG_get_original_object(object_eval);
-  PTCacheEdit *edit = PE_create_current(draw_ctx->depsgraph, scene_orig, object_orig);
-  if (edit != NULL) {
-    drw_particle_update_ptcache_edit(object_eval, psys, edit);
-  }
-}
-
 typedef struct ParticleDrawSource {
   Object *object;
   ParticleSystem *psys;
   ModifierData *md;
-  PTCacheEdit *edit;
 } ParticleDrawSource;
 
 static void drw_particle_get_hair_source(Object *object,
                                          ParticleSystem *psys,
                                          ModifierData *md,
-                                         PTCacheEdit *edit,
                                          ParticleDrawSource *r_draw_source)
 {
-  const DRWContextState *draw_ctx = DRW_context_state_get();
   r_draw_source->object = object;
   r_draw_source->psys = psys;
   r_draw_source->md = md;
-  r_draw_source->edit = edit;
-  if (psys_in_edit_mode(draw_ctx->depsgraph, psys)) {
-    r_draw_source->object = DEG_get_original_object(object);
-    r_draw_source->psys = psys_orig_get(psys);
-  }
 }
 
 GPUBatch *DRW_particles_batch_cache_get_hair(Object *object,
@@ -1488,11 +1291,10 @@ GPUBatch *DRW_particles_batch_cache_get_hair(Object *object,
 {
   ParticleBatchCache *cache = particle_batch_cache_get(psys);
   if (cache->hair.hairs == NULL) {
-    drw_particle_update_ptcache(object, psys);
     ParticleDrawSource source;
-    drw_particle_get_hair_source(object, psys, md, NULL, &source);
-    ensure_seg_pt_count(source.edit, source.psys, &cache->hair);
-    particle_batch_cache_ensure_pos_and_seg(source.edit, source.psys, source.md, &cache->hair);
+    drw_particle_get_hair_source(object, psys, md, &source);
+    ensure_seg_pt_count(source.psys, &cache->hair);
+    particle_batch_cache_ensure_pos_and_seg(source.psys, source.md, &cache->hair);
     cache->hair.hairs = GPU_batch_create(
         GPU_PRIM_LINE_STRIP, cache->hair.pos, cache->hair.indices);
   }
@@ -1511,181 +1313,6 @@ GPUBatch *DRW_particles_batch_cache_get_dots(Object *object, ParticleSystem *psy
   return cache->point.points;
 }
 
-static void particle_batch_cache_ensure_edit_pos_and_seg(PTCacheEdit *edit,
-                                                         ParticleSystem *psys,
-                                                         ModifierData *UNUSED(md),
-                                                         ParticleHairCache *hair_cache,
-                                                         bool use_weight)
-{
-  if (hair_cache->pos != NULL && hair_cache->indices != NULL) {
-    return;
-  }
-
-  ParticleData *particle = (use_weight) ? psys->particles : NULL;
-
-  GPU_VERTBUF_DISCARD_SAFE(hair_cache->pos);
-  GPU_INDEXBUF_DISCARD_SAFE(hair_cache->indices);
-
-  GPUVertBufRaw data_step;
-  GPUIndexBufBuilder elb;
-  uint pos_id, selection_id;
-  GPUVertFormat *edit_point_format = edit_points_vert_format_get(&pos_id, &selection_id);
-
-  hair_cache->pos = GPU_vertbuf_create_with_format(edit_point_format);
-  GPU_vertbuf_data_alloc(hair_cache->pos, hair_cache->point_len);
-  GPU_vertbuf_attr_get_raw_data(hair_cache->pos, pos_id, &data_step);
-
-  GPU_indexbuf_init_ex(&elb, GPU_PRIM_LINE_STRIP, hair_cache->elems_len, hair_cache->point_len);
-
-  if (edit != NULL && edit->pathcache != NULL) {
-    particle_batch_cache_fill_segments_edit(
-        edit, particle, edit->pathcache, 0, edit->totcached, &elb, &data_step);
-  }
-  else {
-    BLI_assert_msg(0, "Hairs are not in edit mode!");
-  }
-  hair_cache->indices = GPU_indexbuf_build(&elb);
-}
-
-GPUBatch *DRW_particles_batch_cache_get_edit_strands(Object *object,
-                                                     ParticleSystem *psys,
-                                                     PTCacheEdit *edit,
-                                                     bool use_weight)
-{
-  ParticleBatchCache *cache = particle_batch_cache_get(psys);
-  if (cache->edit_is_weight != use_weight) {
-    GPU_VERTBUF_DISCARD_SAFE(cache->edit_hair.pos);
-    GPU_BATCH_DISCARD_SAFE(cache->edit_hair.hairs);
-  }
-  if (cache->edit_hair.hairs != NULL) {
-    return cache->edit_hair.hairs;
-  }
-  drw_particle_update_ptcache_edit(object, psys, edit);
-  ensure_seg_pt_count(edit, psys, &cache->edit_hair);
-  particle_batch_cache_ensure_edit_pos_and_seg(edit, psys, NULL, &cache->edit_hair, use_weight);
-  cache->edit_hair.hairs = GPU_batch_create(
-      GPU_PRIM_LINE_STRIP, cache->edit_hair.pos, cache->edit_hair.indices);
-  cache->edit_is_weight = use_weight;
-  return cache->edit_hair.hairs;
-}
-
-static void ensure_edit_inner_points_count(const PTCacheEdit *edit, ParticleBatchCache *cache)
-{
-  if (cache->edit_inner_pos != NULL) {
-    return;
-  }
-  cache->edit_inner_point_len = 0;
-  for (int point_index = 0; point_index < edit->totpoint; point_index++) {
-    const PTCacheEditPoint *point = &edit->points[point_index];
-    if (point->flag & PEP_HIDE) {
-      continue;
-    }
-    BLI_assert(point->totkey >= 1);
-    cache->edit_inner_point_len += (point->totkey - 1);
-  }
-}
-
-static void particle_batch_cache_ensure_edit_inner_pos(PTCacheEdit *edit,
-                                                       ParticleBatchCache *cache)
-{
-  if (cache->edit_inner_pos != NULL) {
-    return;
-  }
-
-  uint pos_id, selection_id;
-  GPUVertFormat *edit_point_format = edit_points_vert_format_get(&pos_id, &selection_id);
-
-  cache->edit_inner_pos = GPU_vertbuf_create_with_format(edit_point_format);
-  GPU_vertbuf_data_alloc(cache->edit_inner_pos, cache->edit_inner_point_len);
-
-  int global_key_index = 0;
-  for (int point_index = 0; point_index < edit->totpoint; point_index++) {
-    const PTCacheEditPoint *point = &edit->points[point_index];
-    if (point->flag & PEP_HIDE) {
-      continue;
-    }
-    for (int key_index = 0; key_index < point->totkey - 1; key_index++) {
-      PTCacheEditKey *key = &point->keys[key_index];
-      float selection = (key->flag & PEK_SELECT) ? 1.0f : 0.0f;
-      GPU_vertbuf_attr_set(cache->edit_inner_pos, pos_id, global_key_index, key->world_co);
-      GPU_vertbuf_attr_set(cache->edit_inner_pos, selection_id, global_key_index, &selection);
-      global_key_index++;
-    }
-  }
-}
-
-GPUBatch *DRW_particles_batch_cache_get_edit_inner_points(Object *object,
-                                                          ParticleSystem *psys,
-                                                          PTCacheEdit *edit)
-{
-  ParticleBatchCache *cache = particle_batch_cache_get(psys);
-  if (cache->edit_inner_points != NULL) {
-    return cache->edit_inner_points;
-  }
-  drw_particle_update_ptcache_edit(object, psys, edit);
-  ensure_edit_inner_points_count(edit, cache);
-  particle_batch_cache_ensure_edit_inner_pos(edit, cache);
-  cache->edit_inner_points = GPU_batch_create(GPU_PRIM_POINTS, cache->edit_inner_pos, NULL);
-  return cache->edit_inner_points;
-}
-
-static void ensure_edit_tip_points_count(const PTCacheEdit *edit, ParticleBatchCache *cache)
-{
-  if (cache->edit_tip_pos != NULL) {
-    return;
-  }
-  cache->edit_tip_point_len = 0;
-  for (int point_index = 0; point_index < edit->totpoint; point_index++) {
-    const PTCacheEditPoint *point = &edit->points[point_index];
-    if (point->flag & PEP_HIDE) {
-      continue;
-    }
-    cache->edit_tip_point_len += 1;
-  }
-}
-
-static void particle_batch_cache_ensure_edit_tip_pos(PTCacheEdit *edit, ParticleBatchCache *cache)
-{
-  if (cache->edit_tip_pos != NULL) {
-    return;
-  }
-
-  uint pos_id, selection_id;
-  GPUVertFormat *edit_point_format = edit_points_vert_format_get(&pos_id, &selection_id);
-
-  cache->edit_tip_pos = GPU_vertbuf_create_with_format(edit_point_format);
-  GPU_vertbuf_data_alloc(cache->edit_tip_pos, cache->edit_tip_point_len);
-
-  int global_point_index = 0;
-  for (int point_index = 0; point_index < edit->totpoint; point_index++) {
-    const PTCacheEditPoint *point = &edit->points[point_index];
-    if (point->flag & PEP_HIDE) {
-      continue;
-    }
-    PTCacheEditKey *key = &point->keys[point->totkey - 1];
-    float selection = (key->flag & PEK_SELECT) ? 1.0f : 0.0f;
-
-    GPU_vertbuf_attr_set(cache->edit_tip_pos, pos_id, global_point_index, key->world_co);
-    GPU_vertbuf_attr_set(cache->edit_tip_pos, selection_id, global_point_index, &selection);
-    global_point_index++;
-  }
-}
-
-GPUBatch *DRW_particles_batch_cache_get_edit_tip_points(Object *object,
-                                                        ParticleSystem *psys,
-                                                        PTCacheEdit *edit)
-{
-  ParticleBatchCache *cache = particle_batch_cache_get(psys);
-  if (cache->edit_tip_points != NULL) {
-    return cache->edit_tip_points;
-  }
-  drw_particle_update_ptcache_edit(object, psys, edit);
-  ensure_edit_tip_points_count(edit, cache);
-  particle_batch_cache_ensure_edit_tip_pos(edit, cache);
-  cache->edit_tip_points = GPU_batch_create(GPU_PRIM_POINTS, cache->edit_tip_pos, NULL);
-  return cache->edit_tip_points;
-}
-
 bool particles_ensure_procedural_data(Object *object,
                                       ParticleSystem *psys,
                                       ModifierData *md,
@@ -1696,10 +1323,8 @@ bool particles_ensure_procedural_data(Object *object,
 {
   bool need_ft_update = false;
 
-  drw_particle_update_ptcache(object, psys);
-
   ParticleDrawSource source;
-  drw_particle_get_hair_source(object, psys, md, NULL, &source);
+  drw_particle_get_hair_source(object, psys, md, &source);
 
   ParticleSettings *part = source.psys->part;
   ParticleBatchCache *cache = particle_batch_cache_get(source.psys);
@@ -1711,16 +1336,15 @@ bool particles_ensure_procedural_data(Object *object,
   if ((*r_hair_cache)->proc_point_buf == NULL ||
       (gpu_material && (*r_hair_cache)->proc_length_buf == NULL))
   {
-    ensure_seg_pt_count(source.edit, source.psys, &cache->hair);
-    particle_batch_cache_ensure_procedural_pos(
-        source.edit, source.psys, &cache->hair, gpu_material);
+    ensure_seg_pt_count(source.psys, &cache->hair);
+    particle_batch_cache_ensure_procedural_pos(source.psys, &cache->hair, gpu_material);
     need_ft_update = true;
   }
 
   /* Refreshed if active layer or custom data changes. */
   if ((*r_hair_cache)->proc_strand_buf == NULL) {
     particle_batch_cache_ensure_procedural_strand_data(
-        source.edit, source.psys, source.md, &cache->hair);
+        source.psys, source.md, &cache->hair);
   }
 
   /* Refreshed only on subdiv count change. */
@@ -1730,7 +1354,7 @@ bool particles_ensure_procedural_data(Object *object,
   }
   if ((*r_hair_cache)->final[subdiv].proc_hairs[thickness_res - 1] == NULL) {
     particle_batch_cache_ensure_procedural_indices(
-        source.edit, source.psys, &cache->hair, thickness_res, subdiv);
+        source.psys, &cache->hair, thickness_res, subdiv);
   }
 
   return need_ft_update;

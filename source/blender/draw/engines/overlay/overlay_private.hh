@@ -79,7 +79,6 @@ typedef struct OVERLAY_PassList {
   DRWPass *edit_curves_lines_ps[2];
   DRWPass *edit_mesh_analysis_ps;
   DRWPass *edit_mesh_normals_ps;
-  DRWPass *edit_particle_ps;
   DRWPass *edit_text_cursor_ps;
   DRWPass *edit_text_selection_ps;
   DRWPass *edit_text_highlight_ps;
@@ -257,8 +256,6 @@ typedef struct OVERLAY_PrivateData {
   DRWShadingGroup *edit_mesh_skin_roots_grp[2];
   DRWShadingGroup *edit_mesh_normals_grp;
   DRWShadingGroup *edit_mesh_analysis_grp;
-  DRWShadingGroup *edit_particle_strand_grp;
-  DRWShadingGroup *edit_particle_point_grp;
   DRWShadingGroup *edit_text_cursor_grp;
   DRWShadingGroup *edit_text_selection_grp;
   DRWShadingGroup *edit_text_wire_grp[2];
@@ -370,10 +367,6 @@ typedef struct OVERLAY_PrivateData {
     bool do_points;
     bool do_zbufclip;
   } edit_curves;
-  struct {
-    bool use_weight;
-    int select_mode;
-  } edit_particle;
   struct {
     bool do_uv_overlay;
     bool do_uv_shadow_overlay;
@@ -574,10 +567,6 @@ void OVERLAY_edit_mesh_cache_init(OVERLAY_Data *vedata);
 void OVERLAY_edit_mesh_cache_populate(OVERLAY_Data *vedata, Object *ob);
 void OVERLAY_edit_mesh_draw(OVERLAY_Data *vedata);
 
-void OVERLAY_edit_particle_cache_init(OVERLAY_Data *vedata);
-void OVERLAY_edit_particle_cache_populate(OVERLAY_Data *vedata, Object *ob);
-void OVERLAY_edit_particle_draw(OVERLAY_Data *vedata);
-
 void OVERLAY_edit_uv_init(OVERLAY_Data *vedata);
 void OVERLAY_edit_uv_cache_init(OVERLAY_Data *vedata);
 void OVERLAY_edit_uv_cache_finish(OVERLAY_Data *vedata);
@@ -727,6 +716,8 @@ GPUShader *OVERLAY_shader_depth_only(void);
 GPUShader *OVERLAY_shader_edit_curve_handle(void);
 GPUShader *OVERLAY_shader_edit_curve_point(void);
 GPUShader *OVERLAY_shader_edit_curve_wire(void);
+GPUShader *OVERLAY_shader_edit_curves_point(void);
+GPUShader *OVERLAY_shader_edit_curves_wire(void);
 GPUShader *OVERLAY_shader_edit_gpencil_guide_point(void);
 GPUShader *OVERLAY_shader_edit_gpencil_point(void);
 GPUShader *OVERLAY_shader_edit_gpencil_wire(void);
@@ -740,8 +731,7 @@ GPUShader *OVERLAY_shader_edit_mesh_facedot(void);
 GPUShader *OVERLAY_shader_edit_mesh_normal(void);
 GPUShader *OVERLAY_shader_edit_mesh_skin_root(void);
 GPUShader *OVERLAY_shader_edit_mesh_vert(void);
-GPUShader *OVERLAY_shader_edit_particle_strand(void);
-GPUShader *OVERLAY_shader_edit_particle_point(void);
+GPUShader *OVERLAY_shader_extra(bool is_select);
 GPUShader *OVERLAY_shader_edit_uv_edges_get(void);
 GPUShader *OVERLAY_shader_edit_uv_edges_for_edge_select_get(void);
 GPUShader *OVERLAY_shader_edit_uv_face_get(void);
