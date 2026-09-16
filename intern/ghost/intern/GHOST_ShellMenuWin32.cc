@@ -13,6 +13,8 @@
 
 #ifdef _WIN32
 
+#  include <cstdarg>
+#  include <cstdio>
 #  include <cstdlib>
 #  include <cstring>
 #  include <string>
@@ -413,6 +415,42 @@ static LRESULT CALLBACK shell_menu_msg_filter(int code, WPARAM wparam, LPARAM lp
 
 /** \} */
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Diagnostics
+ *
+ * BLUI has no info bar, so a shell menu that fails leaves nothing behind at
+ * all - which is how it was reported ("the entry does nothing"). The popup
+ * path cannot show a dialog for every outcome either, because dismissing the
+ * menu on purpose is not a failure. So it appends to a log file instead, and
+ * `%TEMP%\blui_shellmenu.log` is the first thing to read when the menu does not
+ * appear.
+ * \{ */
+
+static void shell_menu_log(const char *fmt, ...)
+{
+  char path[MAX_PATH];
+  const DWORD len = GetTempPathA(MAX_PATH, path);
+  if (len == 0 || len + 32 >= MAX_PATH) {
+    return;
+  }
+  strcat_s(path, MAX_PATH, "blui_shellmenu.log");
+
+  FILE *file = nullptr;
+  if (fopen_s(&file, path, "a") != 0 || file == nullptr) {
+    return;
+  }
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(file, fmt, args);
+  va_end(args);
+  fputc('\n', file);
+  fclose(file);
+}
+
+/** \} */
+
 bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                 const char *const *utf8_paths,
                                 int count,
@@ -421,9 +459,11 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
 {
   ShellMenu shell_menu;
   if (!shell_menu.build(utf8_paths, count)) {
+    shell_menu_log("build FAILED for %d path(s), first=%s",
+                   count,
+                   (count > 0) ? utf8_paths[0] : "(none)");
     /* BLUI has no info bar, so a failed build is indistinguishable from a menu
-     * entry that does nothing - which is exactly how this was reported. Say so
-     * out loud instead. */
+     * entry that does nothing. Say so out loud instead. */
     MessageBoxW(static_cast<HWND>(hwnd),
                 L"The Windows shell menu could not be built for the selected file(s).\n\n"
                 L"This normally means the shell extension that owns the file type did not "
@@ -433,25 +473,42 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
     return false;
   }
 
+  shell_menu_log("build ok for %d path(s), first=%s", count, utf8_paths[0]);
+  shell_menu_log("menu handle=%p item count=%d",
+                 (void *)shell_menu.menu(),
+                 GetMenuItemCount(shell_menu.menu()));
+
   HWND window = static_cast<HWND>(hwnd);
 
   /* TrackPopupMenu only dismisses correctly if the owning window is in the
    * foreground, and the documented follow-up WM_NULL avoids the menu sticking
-   * around afterwards. */
-  SetForegroundWindow(window);
+   * around afterwards. A refused SetForegroundWindow is the classic reason the
+   * menu never appears, so its result is recorded rather than assumed. */
+  const BOOL was_foreground = SetForegroundWindow(window);
+  shell_menu_log("SetForegroundWindow -> %d (already foreground=%d)",
+                 (int)was_foreground,
+                 (int)(GetForegroundWindow() == window));
 
   /* Active only while the menu is up. */
   g_msgfilter_menu = &shell_menu;
   HHOOK hook = SetWindowsHookExW(
       WH_MSGFILTER, shell_menu_msg_filter, nullptr, GetCurrentThreadId());
+  shell_menu_log("msg filter hook=%p", (void *)hook);
 
   const int command = TrackPopupMenu(shell_menu.menu(),
-                                     TPM_RETURNCMD | TPM_RIGHTBUTTON,
+                                     TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_LEFTALIGN |
+                                         TPM_TOPALIGN,
                                      screen_x,
                                      screen_y,
                                      0,
                                      window,
                                      nullptr);
+
+  shell_menu_log("TrackPopupMenu at (%d,%d) -> command=%d (err=%lu)",
+                 screen_x,
+                 screen_y,
+                 command,
+                 (unsigned long)GetLastError());
 
   if (hook != nullptr) {
     UnhookWindowsHookEx(hook);
@@ -481,8 +538,10 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
   if (SUCCEEDED(shell_menu.context_menu()->InvokeCommand(
           reinterpret_cast<LPCMINVOKECOMMANDINFO>(&info))))
   {
+    shell_menu_log("InvokeCommand by offset %u ok", offset);
     return true;
   }
+  shell_menu_log("InvokeCommand by offset %u failed, trying canonical verb", offset);
 
   /* Some extensions answer only to their canonical verb, not to the menu
    * offset they were handed - they populate the menu and then fail to
