@@ -429,6 +429,7 @@ set:
 
 | Script | Purpose |
 | --- | --- |
+| `check_all.ps1` | **start here.** Runs every check below with the flags its own docstring needs, counts a SKIP as a failure, and kills a check that hangs. `check_all.cmd` forwards to it. |
 | `verify_startup.py` | prints the workspace set and each area's active editor |
 | `check_editor_set.py` | asserts only BLUI's editors exist, and that the startup file uses them |
 | `check_preferences.py` | asserts the preferences sections and panels are BLUI's set |
