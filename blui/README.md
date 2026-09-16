@@ -515,13 +515,20 @@ The work is staged so the build stays green at every step.
       | Keymaps | 135 → 116 |
       | Startup warning lines | 10 → 2 |
 
-      **Target 4 (`object` + `space_view3d`, 2.3 MB) is measured and rejected.**
+      **Target 4 (`object` + `space_view3d`, 2.3 MB) is measured and blocked.**
       See *`object` + `space_view3d` measured* below: both public headers are
       100% live (263 symbols, zero unreferenced), with 63 kept files depending on
       them - 7 of those in `makesrna/intern`, 18 in the kept `gpencil_legacy`
       annotation stack, and 7 in `windowmanager`. Nothing in targets 1-3 shrank
-      that surface. It needs a product decision and a projection-math refactor,
-      not a cut.
+      that surface.
+
+      **LHT answered the blocking question on 2026-09-16: annotation drawing is
+      not kept.** That removes the largest kept consumer and turns the next step
+      into `editors/gpencil_legacy/` (**1.6 MB, 35 files** - larger than either
+      of them). It is scoped, not cut; the 63-entry keymap coupling and the
+      object/annotation split are the work. See *The annotation question was
+      answered* below. Until that lands, `object` + `space_view3d` remain in
+      place, and the measurement above is still the reason.
 
       Everything still registered belongs to a component BLUI keeps, or is
       blocked by one - the rejections and the reason for each are in the tables
@@ -1743,6 +1750,138 @@ The work is staged so the build stays green at every step.
       removed first, and the compiler then named every call site. `ED_object.h`
       and `ED_view3d.h` have no dead surface at all - removing any symbol
       breaks a link immediately. There is no enum-first move available.
+
+      ### The annotation question was answered, and it opens `gpencil_legacy` (1.6 MB)
+
+      LHT's answer to point 3 above was **no, annotation drawing is not kept**.
+      That removes the single largest kept consumer of `space_view3d`, and the
+      next target is therefore not `object` or `space_view3d` - it is
+      `editors/gpencil_legacy/` itself, which is **35 files / 1,597,392 B**,
+      larger than `object` (1.19 MB) and `space_view3d` (1.15 MB) individually.
+      Scoped here, not yet cut.
+
+      #### The distinction that decides the whole job
+
+      Grease Pencil is two unrelated things that share one module:
+
+      - **`OB_GPENCIL_LEGACY`** - a real object type, a 3D drawing medium, with
+        its own modifier stack (`gpencil_modifiers_legacy/`, 30 files), its own
+        node/mask/palette system, its own paint and sculpt and weight brushes,
+        and its own file format. `object.cc` has it in **fifteen** switch arms.
+      - **Annotation** - the screen-level scratch layer you scribble on in any
+        editor. It is `bGPdata` hanging off a `Screen`, not off an `Object`, and
+        it is drawn by `ED_annotation_draw_view2d()` /
+        `ED_annotation_draw_view3d()` / `ED_annotation_draw_2dimage()`.
+
+      Both halves live in `editors/gpencil_legacy/` and both are in
+      `ED_gpencil_legacy.h` (86 exported functions, 24 consuming files outside
+      the module). **Retiring annotation does not retire the object** - which is
+      the good news, because the object half is the expensive one.
+
+      #### What is actually reachable in BLUI
+
+      Swept `bl_ui/space_blui.py` and `bl_ui/space_topbar.py`:
+
+      - `space_blui.py` has **zero** references to annotation, gpencil or
+        `GPENCIL`. The annotation tool is not in BLUI's tool system, and BLUI
+        has no 3D viewport to annotate in.
+      - `space_topbar.py` has five, and **all five are file-format menu items**:
+        "SVG as Grease Pencil", "Grease Pencil as SVG", "Grease Pencil as PDF",
+        each guarded on `bpy.app.build_options.io_gpencil`. They are about the
+        *object* type and `io/gpencil/`, not annotation.
+
+      So the annotation layer is unreachable from BLUI's UI. It survives only
+      because kept draw paths still call into it.
+
+      #### The kept consumers of the annotation API - 8 files
+
+      These are the call sites that keep annotation alive, and every one is a
+      draw pass in a module BLUI keeps:
+
+      | File | Symbols | Stays? |
+      | --- | --- | --- |
+      | `draw/intern/draw_manager.c` | `ED_annotation_draw_view2d`, `_view3d` | yes - the draw manager itself |
+      | `editors/space_sequencer/sequencer_draw.c` | `ED_annotation_draw_2dimage`, `_view2d` | **yes - a BLUI component** |
+      | `editors/render/render_opengl.cc` | `ED_annotation_draw_ex` | yes (viewport render) |
+      | `editors/space_node/node_draw.cc` | `ED_annotation_draw_view2d` | doomed (node editor) |
+      | `editors/space_clip/clip_draw.cc` | `ED_annotation_draw_2dimage`, `_view2d` | doomed (clip editor) |
+      | `editors/undo/ed_undo.cc` | `ED_gpencil_session_active` | yes |
+      | `editors/util/ed_util.cc` | `ED_gpencil_toggle_brush_cursor` | yes |
+      | `editors/screen/screen_context.c` | 11 `ED_annotation_*` / `ED_gpencil_data_*` | yes |
+
+      **`sequencer_draw.c` is the one to look at first.** It is a BLUI component
+      and it calls `ED_annotation_draw_2dimage()` - that is the annotation layer
+      being composited over the video sequencer. Removing annotation means
+      removing that call, not moving it: a sequencer has nothing to annotate.
+      Same for `render_opengl.cc`, `ed_undo.cc` and `ed_util.cc` - all four are
+      call removals, not relocations.
+
+      `draw_manager.c` and `screen_context.c` are the two that need care, because
+      they are the annotation *dispatch*: `screen_context.c` registers 11 context
+      members (`ED_annotation_data_get_pointers` and friends) whose whole job is
+      to make `bpy.context.annotation_data` resolve. Those are the RNA-facing
+      half and go with the feature.
+
+      #### The keymap trap applies here, and it is large
+
+      This is the part that makes it a real round rather than an afternoon. All
+      **three** registration entry points are live in `ED_spacetypes_init()`:
+
+      ```
+      spacetypes.c:87   ED_operatortypes_gpencil();
+      spacetypes.c:167  ED_operatormacros_gpencil();
+      spacetypes.c:184  ED_keymap_gpencil(keyconf);
+      ```
+
+      and the keymap data names **63 distinct gpencil operators**:
+
+      | File | Distinct `gpencil.*` / `GPENCIL_OT_*` names |
+      | --- | --- |
+      | `keymap_data/blender_default.py` | 39 |
+      | `keymap_data/industry_compatible_data.py` | 24 |
+
+      That is the largest keymap-data dependency measured in this whole effort -
+      `space_script` had one binding, `physics` and `curves` had none. And
+      `ED_operatormacros_gpencil()` is one of the three surviving `ED_operatormacros_*`
+      calls, so `property_unset()` is in play: **the operator registration and
+      all 63 keymap-data entries have to be removed in the same step**, or the
+      key configuration collapses the way it did when `ED_operatormacros_mesh()`
+      was cut alone (135 keymaps → 7).
+
+      Also `keymap_data` and `bl_ui` are not the only Python: four `bl_ui`
+      modules touch it - `properties_grease_pencil_common.py` (29 ops),
+      `space_toolsystem_toolbar.py` (16), `properties_paint_common.py` and
+      `space_image.py` (1) - and `properties_grease_pencil_common.py` is the
+      shared mixin, so its `AnnotationDataPanel` class is the annotation half
+      while the rest is the object half. It has to be split, not deleted.
+
+      #### Recommended split, in order
+
+      1. **Annotation first, and only annotation.** Cut
+         `annotate_paint.c` + `annotate_draw.c` (126 KB) and the eight draw call
+         sites above, the `ED_annotation_*` declarations, and the
+         annotation-specific context members in `screen_context.c`. This is a
+         coherent product statement - "BLUI has no annotation scratch layer" -
+         and it does not touch the object.
+      2. **Then re-measure `object` and `space_view3d`.** The `gpencil_legacy`
+         bucket in the target-4 table was 6 files for `ED_object.h` and **12**
+         for `ED_view3d.h`, and most of the 12 are the annotation painter's
+         depth/projection calls. Step 1 should take them out of the table; how
+         much of the remaining 25 + 38 it takes has to be measured, not assumed.
+      3. **The `OB_GPENCIL_LEGACY` object is a separate decision**, and a much
+         bigger one: 15 switch arms in `object.cc`, the whole
+         `gpencil_modifiers_legacy/` tree, `rna_gpencil_legacy.c` +
+         `rna_gpencil_legacy_modifier.c`, `io/gpencil/`, and the three file
+         menu items in `space_topbar.py`. Worth asking separately - if BLUI is a
+         file browser, a text editor and a viewer, a 3D drawing object is out of
+         scope, but it is LHT's call and it is not implied by the annotation
+         answer.
+
+      **Status: scoped, nothing deleted.** The honest summary is that
+      "annotation is not kept" converts target 4 from *blocked* to *unblocked*,
+      and identifies `gpencil_legacy` as the next 1.6 MB - but the 63-entry
+      keymap coupling and the object/annotation split mean it wants its own
+      round with its own build and verify, exactly like every other module here.
 
       ### `editors/space_statusbar/` is deleted, and the Python half is not optional
 
