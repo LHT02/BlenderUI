@@ -500,9 +500,15 @@ are still **called**; each needs its keymap data removed with it.
 
 Nothing in the suite noticed at the time, which is why `check_keymap_config.py`
 now exists. It was verified against the failure on purpose: dropping
-`ED_operatormacros_mesh()` alone takes the key configuration from 135 keymaps to
-7, and the check reports 11 failures and exits 1. Restoring it returns 135
-keymaps, PASS and exit 0.
+`ED_operatormacros_mesh()` alone collapses the key configuration to single-digit
+keymaps, and the check reports failures and exits 1. Restoring it returns the
+configuration to its normal size and a clean run.
+
+**That verification is itself a cautionary note.** The 135 in the original write-up
+was Blender's count, not BLUI's - this build measures 112 / 103 / 103. The
+check "worked" because 7 keymaps is below any sane floor, so the test proved it
+detects collapse, and said nothing about the number it was calibrated against.
+See the corrections under blind spot 1 below.
 
 ## Verification suite coverage boundaries
 
@@ -519,7 +525,7 @@ but it means "the suite is green" is a much weaker statement than it sounds.
 | --- | --- | --- |
 | `check_editor_set.py` | the `Area.type` / `Panel.bl_space_type` enums, the editor menu, and the areas present in the **startup file** | a workspace created at runtime, or an area type reachable only through an operator |
 | `check_preferences.py` | every registered `Panel` subclass with `bl_space_type == "PREFERENCES"`, grouped by `bl_context` | preferences that are not panels (operators, RNA properties, the `Input`/`Keymap` editors' contents) |
-| `check_keymap_config.py` | all three shipped presets, keymap counts, four required global keymaps, Ctrl+S, Shift+F1..F6, **and that every bound `idname` still resolves** | keymap items whose behaviour is wrong but whose operator exists; `Node Editor`-style editors with no keymap at all |
+| `check_keymap_config.py` | all three shipped presets, their exact keymap counts, four required global keymaps, Ctrl+S, Shift+F1..F6, **and that every bound `idname` still resolves** | keymap items whose behaviour is wrong but whose operator exists; `Node Editor`-style editors with no keymap at all; whether a key bound to a *live* operator does anything useful |
 | `check_window_isolation.py` | whether two windows share a screen, and whether the open-document list is per-window | editor types other than `TEXT_EDITOR` / `IMAGE_EDITOR`; anything about saving |
 | `check_component_window.py` | that `wm.window_new(workspace=...)` opens the named workspace in a new window | what the new window *contains* beyond its workspace name; `--strict` isolation |
 | `check_save_isolation.py` | Ctrl+S (via `wm.save_active_file`) writes the focused text editor's own file, read back from disk | the image editor's save path; a viewer with nothing to save; failure/cancel paths |
@@ -556,6 +562,40 @@ Measured counts, 2026-09-16, `--factory-startup`:
 | `Blender_27x` | 103 |
 | `Industry_Compatible` | 103 |
 
+Two corrections fell out of measuring this. The first is that the earlier value
+quoted for a healthy configuration - 135, in the script's own comment - is
+**Blender's** unmodified count and was never BLUI's; the floor of 100 was set from
+a number this build cannot reach. The second is that a threshold alone is too
+weak: a preset that silently lost 40 keymaps still passes it. The script now
+asserts the exact counts above (`MEASURED_KEYMAP_COUNTS`) as well as the floor, so
+a change is visible in either direction.
+
+**Two invocation traps, both of which cost a round:**
+
+- `--background` does **not** work. It builds the key configuration only part way:
+  `keyconfigs` holds `Blender` (74 keymaps), `Blender addon` and `Blender user`,
+  and `Blender_27x` / `Industry_Compatible` are not there at all. The script
+  detects `bpy.app.background` and exits 0 with a SKIP line rather than reporting a
+  false pass.
+- Use `--factory-startup`. Without it the run picks up whatever user
+  configuration is on disk and the counts will not match the table.
+- `bpy.ops.preferences.keyconfig_activate()` takes **`filepath`**, not `file`.
+  `file=` raises `keyword "file" unrecognized`, and because this runs inside a
+  timer callback the process then dies of an access violation instead of printing
+  a readable failure - the exit status the harness sees is a crash, not a result.
+  `activate()` now wraps the call and `guarded_run()` catches anything that
+  escapes, so a future mistake of this shape reports as an ordinary FAIL.
+
+A preset whose script **raises** does not merely fail either: `bpy.utils.
+keyconfig_set()` calls `execfile(filepath)` inside a bare `try/except` that only
+stores the traceback for a `report` callback the operator never passes, so the
+exception propagates straight out through the operator call. Measured:
+
+    AttributeError: 'NoneType' object has no attribute 'loader'
+
+from `bpy/utils/__init__.py:93`. That is why `activate()` catches rather than
+trusts; a check that dies cannot report anything.
+
 ### Blind spot 2: "is what should be there present" without "does what is there still exist"
 
 Counting keymaps cannot see a keymap item that names an operator which is no
@@ -576,14 +616,80 @@ the scan is not blanket-failing.
 
 | Operator | Presets | Root cause |
 | --- | --- | --- |
-| `view2d.ndof` | all 3 | ndof operator unregistered |
-| `image.view_ndof` | all 3 | ndof operator unregistered |
-| `view3d.select` | `Blender`, `Industry_Compatible` | `space_view3d` deleted |
-| `view3d.select_box` / `select_lasso` / `select_circle` | `Blender`, `Blender_27x` | `space_view3d` deleted |
+| `view2d.ndof` | `Blender`, `Blender_27x`, `Industry_Compatible` | `WITH_INPUT_NDOF` is **OFF** in `blui.cmake`, so `VIEW2D_OT_ndof` is not registered |
+| `image.view_ndof` | `Blender`, `Blender_27x`, `Industry_Compatible` | same - `IMAGE_OT_view_ndof` is behind `#ifdef WITH_INPUT_NDOF` |
+| `view3d.select` | `Blender` (Weight Paint **and** GP Stroke Weight Mode), `Industry_Compatible` (Weight Paint) | `space_view3d` deleted |
+| `view3d.select_box` / `select_lasso` (×2) / `select_circle` | `Blender`, `Blender_27x` | `space_view3d` deleted |
 | `view3d.object_mode_pie_or_toggle` | `Blender` | `space_view3d` deleted |
-| `object.duplicate_move` / `duplicate_move_linked` | all 3 | `ED_operatormacros_object()` no longer called |
+| `object.duplicate_move` | all 3 | `ED_operatormacros_object()` no longer called |
+| `object.duplicate_move_linked` | `Blender`, `Blender_27x` | same |
 | `collection.create` / `objects_remove` / `objects_remove_all` / `objects_add_active` / `objects_remove_active` | `Blender`, `Blender_27x` | `ED_operatormacros_collection()` no longer called |
-| `text.uncomment` | `Industry_Compatible` | Text operator unregistered |
+| `text.uncomment` | `Industry_Compatible` | **not** a deleted operator - see below |
+
+Three of these root causes were wrong in the first pass and are corrected here.
+The corrections matter more than the table, because two of them change what the
+fix should be:
+
+**1. The `ndof` group is a build-configuration issue, not a deletion.** Both
+`VIEW2D_OT_ndof` and `IMAGE_OT_view_ndof` still exist in the source
+(`editors/interface/view2d_ops.cc:1517`, `editors/space_image/image_ops.c:793`)
+and are still appended in their registration functions - but each append is
+inside `#ifdef WITH_INPUT_NDOF`, and `build_files/cmake/config/blui.cmake:74` sets
+`WITH_INPUT_NDOF OFF`. So the operators are absent from the binary while the
+keymap data still names them. **Re-registering them is not the fix and neither is
+touching the source**: BLUI has no use for a 3D space-navigator input path, so the
+right move is deleting the keymap entries. What is worth noting is that this is
+the only *nondeterministic-looking* group - if someone ever flips
+`WITH_INPUT_NDOF` on, these bindings become valid again and the allowlist story
+changes.
+
+**2. `text.uncomment` is a keymap-only name; the operator is
+`text.comment_toggle`.** There is no `TEXT_OT_uncomment` anywhere in the tree. The
+real operator is `text.comment_toggle`, registered at
+`editors/space_text/space_text.c:175`, with a `type` enum of
+`TOGGLE` / `COMMENT` / `UNCOMMENT`. `blender_default.py:1407` binds the correct
+name on Ctrl+/ ; `industry_compatible_data.py:794` binds the nonexistent
+`text.uncomment` on Shift+Ctrl+D. This is inherited upstream breakage in Blender's
+own preset, **not** something BLUI deleted - and it is the one finding that the
+"a module deletion left this" narrative would have mis-attributed. The fix is a
+one-line change to `text.comment_toggle` with
+`{"properties": [("type", 'UNCOMMENT')]}`, which is what the original binding
+plainly intended.
+
+**3. `view3d.select` in the GP and weight-paint keymaps is not GP annotation
+residue.** It is a "bone selection for combined weight paint + pose mode" binding
+(`blender_default.py:2648`), guarded by `params.select_mouse == 'LEFTMOUSE'`. It
+lives in `EMPTY`-space keymaps for paint modes, so it falls with `space_view3d`
+rather than with anything GP-specific.
+
+Where each group lives, and whether it is reachable at all:
+
+| Keymap | Space type | Reachable in BLUI? |
+| --- | --- | --- |
+| `View2D` | `EMPTY` | **yes** - every 2D view uses it (file browser, image, text, sequencer) |
+| `Image` | `IMAGE_EDITOR` | **yes** - Image Editor is a BLUI component |
+| `Text` | `TEXT_EDITOR` | **yes** - Text Editor is a BLUI component |
+| `Object Mode` | `EMPTY` | **yes** |
+| `Object Non-modal` | `EMPTY` | **yes** |
+| `Weight Paint` | `EMPTY` | only if a weight-paint-capable context exists without a 3D view |
+| `Paint Vertex Selection (Weight, Vertex)` | `EMPTY` | same |
+| `Grease Pencil Stroke Weight Mode` | `EMPTY` | same |
+
+The space types matter because they are what makes a binding live. A dangling
+binding in `View2D` or `Image` is on a real code path in a workspace BLUI ships; a
+dangling binding in a paint-mode `EMPTY` keymap is not, because there is no 3D
+view to enter paint mode from. Two of the 34 findings sit on genuinely live paths:
+
+- `View2D -> view2d.ndof`, in the keymap every 2D view uses.
+- `Image -> image.view_ndof`, in the Image Editor's own keymap.
+
+Both are inert only because `WITH_INPUT_NDOF` is off - no ndof event is ever
+generated, so nothing dispatches the item. They are still wrong entries in data
+that ships, and they are the two that should be cleaned up first, because they are
+the two that are one `cmake` flag away from being live.
+
+The third live-path finding is `Text -> text.uncomment` in
+`Industry_Compatible`, which is a stale name rather than a missing operator.
 
 The `view3d.*` group is **expected and accepted**: BLUI has no 3D view, so those
 bindings are unreachable by construction. The `object.*` and `collection.*`
@@ -592,6 +698,16 @@ whose registration was removed to stop an abort, and the keymap data was never
 removed alongside. That is the same "registration and the data naming it must go
 in one step" rule from the macro section above, applied to the *leftovers* of a
 previous round rather than to a new deletion.
+
+A related trap this run exposed: **a dangling binding is not necessarily a
+`TypeError` waiting to happen, and its absence of symptoms is not evidence it is
+fine.** All 34 are silent. All three presets still report 112/103/103 keymaps and
+activate with `{'FINISHED'}`. `bl_keymap_utils/io.py` only *raises* when it has to
+walk a dropped macro's nested properties with `property_unset()`; a plain
+unregistered operator is stored as a name and never resolved at load time. So the
+suite was blind in exactly the way that matters - the failure mode of a dangling
+plain binding is a key that does nothing, which no count, no load check, and no
+crash-detector can see.
 
 The `DANGLING_ALLOWED` allowlist in the script is intentionally **empty**, so
 the check can fail. It currently fails, which is the honest state: **the
@@ -607,19 +723,39 @@ of this exercise. **The fix is to delete the keymap items, not to excuse
 them.** A red run here is the signal working.
 
 The immediate next step is to decide, per group, whether the binding or the
-operator should go:
+operator should go. Ordered by how live the code path is:
 
-- `object.duplicate_move`, `object.duplicate_move_linked` - bound to Shift+D /
-  Alt+D in Object Mode and reachable. Either re-register
-  `ED_operatormacros_object()` or remove the two bindings.
-- `collection.*` (5 items) - bound to Ctrl+G and friends in Object Mode and
-  reachable. Same choice.
-- `view3d.*` (7 items), `view2d.ndof`, `image.view_ndof` - unreachable, since
-  there is no 3D viewport and ndof is not a BLUI input path. Removing the
-  bindings is pure cleanup.
-- `text.uncomment` - bound in the `Industry_Compatible` Text keymap only. The
-  Text editor is a BLUI component, so this one wants looking at rather than
-  assuming.
+1. `View2D -> view2d.ndof`, `Image -> image.view_ndof` (**2 items, all 3 presets**)
+   - live keymaps in components BLUI ships; inert only because
+   `WITH_INPUT_NDOF OFF`. Delete the two keymap entries in
+   `keymap_data/blender_default.py` (lines 836 and 1060) and the two in
+   `keymap_data/industry_compatible_data.py` (lines 324 and 495). Cheapest fix,
+   smallest blast radius. **Do these first** - they are the ones a cmake flag
+   change would wake up.
+2. `Text -> text.uncomment` (**1 item, `Industry_Compatible` only**) - change the
+   name to `text.comment_toggle` and add
+   `{"properties": [("type", 'UNCOMMENT')]}`. This is a correctness fix, not a
+   deletion: the keybinding intent is fine, only the name is stale. Inherited from
+   upstream, so it is also worth a one-line note that BLUI did not cause it.
+3. `object.duplicate_move` / `duplicate_move_linked` (**3 items**) - bound to
+   Shift+D / Alt+D in Object Mode and reachable. Either re-register
+   `ED_operatormacros_object()` or remove the bindings. This is the one that needs
+   a **product decision**, not a mechanical fix: bringing the macro family back
+   re-opens the abort risk documented above.
+4. `collection.*` (**9 items**) - bound to Ctrl+G and friends in Object Mode and
+   reachable. Same choice as 3, same decision.
+5. `view3d.*` (**7 items across `Blender`/`Blender_27x`) - unreachable: there is no
+   3D viewport to enter paint or object mode from. Pure cleanup, no decision
+   needed.
+
+Also worth doing while in these files: **the assertion is not yet exact.**
+`MEASURED_KEYMAP_COUNTS` and `MEASURED_DANGLING_BINDINGS` in the script record the
+counts but only assert "not worse than", so that the check fails for the right
+reason (`has no dangling operator bindings`) without also failing on a
+known-and-accepted number. Once groups 1, 2 and 5 are cleaned up, tighten
+`MEASURED_DANGLING_BINDINGS` down to whatever groups 3 and 4 leave behind - and
+when those are decided too, the allowlist can stay empty and the check goes
+green on its own.
 
 
 ## Roadmap
