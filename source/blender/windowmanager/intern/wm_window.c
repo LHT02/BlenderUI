@@ -1131,8 +1131,15 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
     /* Workspace names carry the two character ID prefix, hence the `+ 2`. */
     workspace = BLI_findstring(&bmain->workspaces, workspace_name, offsetof(ID, name) + 2);
     if (workspace == NULL) {
+      /* A component this build does not have still gets you a window, on
+       * whatever is available.
+       *
+       * This used to return early, which with no window open meant the operator
+       * reported success and produced nothing at all - indistinguishable from a
+       * dead tray entry, and there is no info bar left to show the warning in.
+       * Naming the missing component in the report is the useful half; refusing
+       * to open anything is not. */
       BKE_reportf(op->reports, RPT_WARNING, "No component named \"%s\"", workspace_name);
-      return OPERATOR_FINISHED;
     }
   }
 

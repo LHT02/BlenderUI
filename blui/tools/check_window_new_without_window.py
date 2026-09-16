@@ -110,6 +110,39 @@ def reopen():
     return None
 
 
+def bad_component():
+    """Ask for a component that does not exist, still with nothing open.
+
+    This used to return FINISHED and produce nothing at all, so a stale tray
+    entry looked exactly like a dead one. The window is what matters; the report
+    naming the missing component is there for whoever can see reports.
+    """
+    window_manager = bpy.context.window_manager
+
+    for window in list(window_manager.windows):
+        with bpy.context.temp_override(window=window):
+            bpy.ops.wm.window_close()
+    report(len(window_manager.windows) == 0,
+           "back to no windows before the bad request (%d)" % len(window_manager.windows))
+
+    result = None
+    try:
+        result = bpy.ops.wm.window_new(workspace="BLUI_NoSuchComponent")
+    except Exception as exc:  # noqa: BLE001
+        report(False, "an unknown component raised %s: %s" % (type(exc).__name__, exc))
+        return None
+
+    report(result == {"FINISHED"}, "an unknown component returns FINISHED (got %r)" % (result,))
+    report(len(window_manager.windows) == 1,
+           "an unknown component still opens a window (%d)" % len(window_manager.windows))
+
+    if window_manager.windows:
+        window = window_manager.windows[0]
+        report(window.screen is not None, "that window has a screen")
+        report(window.workspace is not None, "that window fell back to some workspace")
+    return None
+
+
 # Reaching this line at all is half the test.
 if bpy.app.background:
     print("check_window_new_without_window: SKIP (needs a window; do not pass --background)")
@@ -122,4 +155,5 @@ _log("start")
 main()
 
 bpy.app.timers.register(reopen, first_interval=1.5)
-bpy.app.timers.register(finish, first_interval=4.0)
+bpy.app.timers.register(bad_component, first_interval=3.0)
+bpy.app.timers.register(finish, first_interval=5.0)
