@@ -2275,6 +2275,15 @@ static int file_clipboard_cut_exec(bContext *C, wmOperator *op)
   return file_clipboard_put_exec(C, op, true);
 }
 
+/* BLUI has no info bar and no top bar, so `BKE_report()` on its own goes into a
+ * list nothing draws: a paste that skipped every file, or a delete that failed,
+ * looks exactly like one that worked. Anything that did not fully succeed is
+ * put in a dialog as well - an interruption is better than a file operation
+ * that silently does nothing. */
+static void file_ops_message(const char *title, const char *body)
+{
+  GHOST_MessageBox(title, body);
+}
 static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
 {
   SpaceFile *sfile = CTX_wm_space_file(C);
@@ -2311,12 +2320,21 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
 
   GHOST_FreeClipboardFiles(paths, count);
 
-  BKE_reportf(op->reports,
-              RPT_INFO,
-              "%d file(s) %s%s",
-              done,
-              move ? "moved" : "copied",
-              skipped > 0 ? ", the rest skipped - the name already exists" : "");
+  if (skipped > 0 || done == 0) {
+    char message[256];
+    BLI_snprintf(message,
+                 sizeof(message),
+                 "%d file(s) %s. %d skipped because the name already exists.%s",
+                 done,
+                 move ? "moved" : "copied",
+                 skipped,
+                 done == 0 ? " Nothing was pasted." : "");
+    BKE_reportf(op->reports, (done == 0) ? RPT_ERROR : RPT_WARNING, "%s", message);
+    file_ops_message("BLUI - Paste", message);
+  }
+  else {
+    BKE_reportf(op->reports, RPT_INFO, "%d file(s) %s", done, move ? "moved" : "copied");
+  }
 
   if (move) {
     /* Those paths no longer exist, so the clipboard must not keep offering
@@ -3520,15 +3538,14 @@ static int file_delete_exec(bContext *C, wmOperator *op)
   }
 
   if (report_error) {
-    if (error_message != NULL) {
-      BKE_reportf(op->reports, RPT_ERROR, "Could not delete file or directory: %s", error_message);
-    }
-    else {
-      BKE_reportf(op->reports,
-                  RPT_ERROR,
-                  "Could not delete file or directory: %s",
-                  errno ? strerror(errno) : "unknown error");
-    }
+    const char *reason = (error_message != NULL) ? error_message :
+                                                    (errno ? strerror(errno) : "unknown error");
+    char message[512];
+    BLI_snprintf(message, sizeof(message), "Could not delete: %s", reason);
+    /* This one has to reach the user: a delete that silently did nothing is
+     * the worst outcome a file manager can have. */
+    BKE_reportf(op->reports, RPT_ERROR, "%s", message);
+    file_ops_message("BLUI - Delete", message);
   }
 
   ED_fileselect_clear(wm, sfile);

@@ -216,6 +216,19 @@ void GHOST_WarmUpShellMenu(void)
 #endif
 }
 
+void GHOST_MessageBox(const char *title, const char *body)
+{
+#ifdef WIN32
+  MessageBoxA(nullptr,
+              (body != nullptr) ? body : "",
+              (title != nullptr) ? title : "BLUI",
+              MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+#else
+  (void)title;
+  (void)body;
+#endif
+}
+
 GHOST_TSuccess GHOST_GetCursorScreenPosition(int *r_x, int *r_y)
 {
 #ifdef WIN32

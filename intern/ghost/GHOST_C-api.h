@@ -155,6 +155,15 @@ extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle
 extern void GHOST_WarmUpShellMenu(void);
 
 /**
+ * Show a message the user must see - a file operation that failed, for instance.
+ *
+ * BLUI has no info bar and no top bar, so `BKE_report()` writes into a report
+ * list nothing displays: a delete that failed looks exactly like a delete that
+ * worked. This is the one channel that reaches a person.
+ */
+extern void GHOST_MessageBox(const char *title, const char *body);
+
+/**
  * Put files on the system clipboard, so they can be pasted into another
  * application and so another application's copy can be pasted into BLUI.
  *
