@@ -2172,6 +2172,15 @@ The work is staged so the build stays green at every step.
       and no top-bar area can exist in BLUI. The dummy `ScrArea` at line 515 only
       needs a different non-`SPACE_EMPTY` spacetype, and `SPACE_INFO` will do.
 
+      > **Correction to an earlier estimate here.** Removing the now-dead
+      > `include_all_areas` path is *not* a five-minute cleanup of one block at
+      > line 505. The flag is read at **six** places - 505, 573, 650, 817 and 882
+      > inside `menu_items_from_ui_create()`, plus the parameter on line 428 and
+      > the initialisation on 1142 - and they interleave with the normal path
+      > rather than sitting in one branch. Budget a real round for it, with a
+      > build after each branch, and do not start it believing it is small. That
+      > is why it is still there.
+
       ### `editors/space_topbar/` is deleted, and the scope above held exactly
 
       The module (330-line `space_topbar.c`, 10,327 B) is gone, and the two
