@@ -1201,6 +1201,20 @@ static int filelist_geticon_ex(const FileList *filelist,
                                const bool is_main,
                                const bool ignore_libdir)
 {
+  /* BLUI: a shortcut was given the icon of what it points at when the entry was
+   * built - see the `.lnk` block in `filelist_file_cache_add_entry()`.
+   *
+   * Prefer it here, because this is the function the list view asks for its row
+   * icons, and the extension-based icon below can only ever say "some
+   * shortcut". Extracting the icon was not enough on its own: it was stored on
+   * the entry and then nothing asked for it, so every `.lnk` still drew as a
+   * generic file. Guarded on the extension so that files which carry a real
+   * preview (`preview_icon_id` is also set from `local_data.preview_image`) are
+   * left exactly as they were. */
+  if (file->preview_icon_id != 0 && BLI_path_extension_check(file->name, ".lnk")) {
+    return file->preview_icon_id;
+  }
+
   const eFileSel_File_Types typeflag = (eFileSel_File_Types)file->typeflag;
 
   if ((typeflag & FILE_TYPE_DIR) &&
