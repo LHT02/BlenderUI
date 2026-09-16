@@ -1947,6 +1947,18 @@ static void file_os_operations_menu_draw(const bContext *C_const, Menu *menu)
   }
 
   if (!fileentry || num_selected > 1) {
+    /* BLUI: say why the menu is empty instead of drawing nothing.
+     *
+     * These entries act on one file, so with none or several selected there is
+     * genuinely nothing to offer - but an empty submenu reads as a broken menu,
+     * not as a menu with nothing to say. This started as a user report that
+     * "外部菜单显示不完整", and the sibling Electron project reached the same fix
+     * independently ("不选中文件时不再只显示空菜单"). */
+    uiLayout *row = uiLayoutRow(menu->layout, false);
+    uiLayoutSetEnabled(row, false);
+    uiItemL(row,
+            (num_selected > 1) ? IFACE_("Select a single file") : IFACE_("Select a file"),
+            ICON_NONE);
     return;
   }
 
@@ -2007,15 +2019,13 @@ static bool file_os_operations_menu_poll(const bContext *C_const, MenuType *UNUS
       }
     }
 
-    if (num_selected > 1) {
-      CTX_wm_operator_poll_msg_set(C, "More than one item is selected");
-    }
-    else if (num_selected < 1) {
-      CTX_wm_operator_poll_msg_set(C, "No items are selected");
-    }
-    else {
-      return true;
-    }
+    /* BLUI: always offered while browsing.
+     *
+     * This used to fail its poll unless exactly one item was selected, which
+     * greys the entry out - and a submenu that refuses to open is
+     * indistinguishable from a broken one. The draw function now says what is
+     * missing instead. */
+    return true;
   }
 
   return false;
