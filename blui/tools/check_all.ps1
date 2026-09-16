@@ -72,6 +72,7 @@ $checks = @(
   @{ Name = "check_menu_draw";         Timeout = 300; Cmd = (Blui @("--factory-startup", "--enable-event-simulate", "--python", "$tools\check_menu_draw.py")) }
 
   # --- self-contained ------------------------------------------------------
+  @{ Name = "check_new_folder";      Timeout = 300; Cmd = @{ Exe = "cmd.exe"; Args = @("/c", "$tools\check_new_folder.cmd") } }
   @{ Name = "check_delete_files";    Timeout = 300; Cmd = @{ Exe = "cmd.exe"; Args = @("/c", "$tools\check_delete_files.cmd") } }
   @{ Name = "check_drop_into_folder"; Timeout = 300; Cmd = @{ Exe = "cmd.exe"; Args = @("/c", "$tools\check_drop_into_folder.cmd") } }
   @{ Name = "check_clipboard_move";    Timeout = 300; Cmd = @{ Exe = "cmd.exe"; Args = @("/c", "$tools\check_clipboard_move.cmd") } }
