@@ -2180,6 +2180,16 @@ The work is staged so the build stays green at every step.
       > rather than sitting in one branch. Budget a real round for it, with a
       > build after each branch, and do not start it believing it is small. That
       > is why it is still there.
+      >
+      > Read properly, the sites are not all the same kind, which is what makes
+      > the job what it is. Three of them - 517, 585 and 894 - are **`if`/`else`
+      > pairs where the `else` is the live path**, so each is a
+      > *promote-the-else* restructure rather than a deletion. The `if` at 517 is
+      > the one that populates `space_type_ui_items`, so promoting its `else` is
+      > not mechanical: whatever the live path needs from those arrays has to be
+      > established first. The other two are trivial by comparison - 662 is a
+      > stale comment, 829 appends a prefix to item names in a branch that never
+      > runs.
 
       ### `editors/space_topbar/` is deleted, and the scope above held exactly
 
