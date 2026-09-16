@@ -39,7 +39,8 @@
 #include "BLI_stack.h"
 #include "BLI_path_util.h"
 #include "BLI_string_utils.h"
-#include "BLI_winstuff.h"
+
+#include "GHOST_C-api.h"
 #include "BLI_task.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
@@ -2113,7 +2114,12 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
    *
    * Asked only for `.lnk`: a shell round trip per entry would be paid for every
    * file in the directory, and a shortcut is the one case where the icon says
-   * something the extension does not. */
+   * something the extension does not.
+   *
+   * The extraction itself lives in GHOST's SDK-only translation unit, which is
+   * the only place it compiles - it needs `IImageList`, a COM interface - and
+   * the only place it can be tested without a window. See
+   * `blui/tools/shellmenu_selftest.cc`. */
   if (ret->preview_icon_id == 0 && !(ret->typeflag & FILE_TYPE_DIR) &&
       BLI_path_extension_check(ret->name, ".lnk"))
   {
@@ -2123,7 +2129,7 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
     unsigned char *pixels = NULL;
     int icon_w = 0;
     int icon_h = 0;
-    if (BLI_windows_file_icon_load(fullpath, &pixels, &icon_w, &icon_h)) {
+    if (GHOST_LoadFileIconRgba(fullpath, &pixels, &icon_w, &icon_h) == GHOST_kSuccess) {
       ImBuf *ibuf = IMB_allocImBuf(icon_w, icon_h, 32, IB_rect);
       if (ibuf != NULL) {
         memcpy(ibuf->rect, pixels, size_t(icon_w) * size_t(icon_h) * 4);
@@ -2131,7 +2137,7 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
          * `BKE_icon_delete()` when the entry goes away. */
         ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
       }
-      BLI_windows_file_icon_free(pixels);
+      GHOST_FreeFileIconRgba(pixels);
     }
   }
 #endif

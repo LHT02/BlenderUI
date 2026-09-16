@@ -152,6 +152,38 @@ void GHOST_FreeClipboardFiles(char **filepaths, int filepath_count)
 #endif
 }
 
+GHOST_TSuccess GHOST_LoadFileIconRgba(const char *filepath,
+                                      unsigned char **r_pixels,
+                                      int *r_width,
+                                      int *r_height)
+{
+#ifdef WIN32
+  return GHOST_ShellMenuWin32_LoadFileIconRgba(filepath, r_pixels, r_width, r_height) ?
+             GHOST_kSuccess :
+             GHOST_kFailure;
+#else
+  if (r_pixels != nullptr) {
+    *r_pixels = nullptr;
+  }
+  if (r_width != nullptr) {
+    *r_width = 0;
+  }
+  if (r_height != nullptr) {
+    *r_height = 0;
+  }
+  return GHOST_kFailure;
+#endif
+}
+
+void GHOST_FreeFileIconRgba(unsigned char *pixels)
+{
+#ifdef WIN32
+  GHOST_ShellMenuWin32_FreeIconRgba(pixels);
+#else
+  (void)pixels;
+#endif
+}
+
 GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
                                           const char *const *filepaths,
                                           int filepath_count,

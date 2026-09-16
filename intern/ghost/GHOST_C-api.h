@@ -113,6 +113,30 @@ extern GHOST_TSuccess GHOST_StartDragFiles(GHOST_WindowHandle windowhandle,
  * \return #GHOST_kSuccess if the user picked an entry and it ran,
  *         #GHOST_kFailure otherwise (including "the menu was dismissed").
  */
+/**
+ * Ask the shell for the icon it shows for \a filepath, as RGBA pixels.
+ *
+ * This is how a shortcut gets its own icon: a `.lnk` displays the icon of what
+ * it points at, which is what makes it recognisable in a file manager. It works
+ * for any path - the shell returns the icon registered for the extension.
+ *
+ * Fetched through the system image list, so the icon comes at a useful size
+ * rather than the small one `SHGFI_ICON` is limited to.
+ *
+ * \param r_pixels: Receives a newly allocated `width * height * 4` RGBA buffer,
+ *        top row first. Free with #GHOST_FreeFileIconRgba.
+ * \param r_width: Receives the icon width in pixels.
+ * \param r_height: Receives the icon height in pixels.
+ * \return #GHOST_kSuccess on success.
+ */
+extern GHOST_TSuccess GHOST_LoadFileIconRgba(const char *filepath,
+                                             unsigned char **r_pixels,
+                                             int *r_width,
+                                             int *r_height);
+
+/** Free a buffer produced by #GHOST_LoadFileIconRgba. */
+extern void GHOST_FreeFileIconRgba(unsigned char *pixels);
+
 extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
                                                  const char *const *filepaths,
                                                  int filepath_count,
