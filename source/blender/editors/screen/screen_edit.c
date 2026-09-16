@@ -1096,6 +1096,12 @@ void ED_screen_global_areas_sync(wmWindow *win)
   /* Update screen flags from height in window, this is weak and perhaps
    * global areas should just become part of the screen instead. */
   bScreen *screen = BKE_workspace_active_screen_get(win->workspace_hook);
+  if (screen == NULL) {
+    /* A window can be between screens - during a workspace switch, or after
+     * every window has been closed and the tray opens a new one. This used to
+     * dereference the result unconditionally. */
+    return;
+  }
 
   /* BLUI removed `editors/space_statusbar`, so there is never a status-bar area
    * to collapse and `SCREEN_COLLAPSE_STATUSBAR` stays clear. */
