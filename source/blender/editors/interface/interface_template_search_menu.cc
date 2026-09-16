@@ -862,14 +862,10 @@ static MenuSearch_Data *menu_items_from_ui_create(
 
   data->memarena = memarena;
 
-  if (include_all_areas) {
-    CTX_wm_area_set(C, area_init);
-    CTX_wm_region_set(C, region_init);
-
-    if (space_type_ui_items_free) {
-      MEM_freeN((void *)space_type_ui_items);
-    }
-  }
+  /* This is where an `include_all_areas` branch used to put the context back and
+   * free the `Area.ui_type` items it had gathered. It never ran: only the top
+   * bar's menu search scanned every area, and the top bar space is gone. The
+   * items themselves are gathered under that same flag, further up. */
 
   /* Include all operators for developers,
    * since it can be handy to have a quick way to access any operator,
