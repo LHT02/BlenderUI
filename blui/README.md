@@ -690,12 +690,12 @@ memory. Run them after any change; none of them need a person watching.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| OLE drop source (`CF_HDROP` payload + COM contract) | `build\dragsource_selftest.exe` | PASS, 0 failures |
-| Shell context menu (bind, populate, enumerate) | `build\shellmenu_selftest.exe` | PASS, 0 failures |
+| OLE drop source (`CF_HDROP` payload + COM contract + clipboard round trip) | `build\dragsource_selftest.exe` | PASS, 0 failures |
+| Shell context menu (bind, populate, enumerate, file icons) | `build\shellmenu_selftest.exe` | PASS, 0 failures |
 | Embedded startup workspace set | `verify_startup.py` | 6 workspaces: Console, Files, Images, Settings, Text, Video |
 | Editor set (enum, menu operator, panels, startup file) | `check_editor_set.py` | PASS, 0 failures |
 | Preferences panel set (sections, dropped sections, reworked panels) | `check_preferences.py` | PASS, 0 failures |
-| Key configuration: all 3 presets load, Ctrl+S, Shift+F1..F6 | `check_keymap_config.py` | PASS on those; **FAILS on 15 dangling bindings** - see below |
+| Key configuration: all 3 presets load, Ctrl+S, Shift+F1..F6 | `check_keymap_config.py` | PASS on all three; **0 dangling bindings**, strict assertion armed |
 | Unreachable `_template_*` helpers in the keymap data | `scan_dead_keymap_helpers.py --check` | PASS, 0 unreachable helpers (plain Python, no BLUI needed) |
 | Save isolation (edit a text file, save, read back) | `check_save_isolation.py` | PASS |
 | Window / editor isolation (two Text windows) | `check_window_isolation.py` | EDITORS-ISOLATED, DOCUMENTS-SHARED |
@@ -703,6 +703,13 @@ memory. Run them after any change; none of them need a person watching.
 | Opening a component in its own window | `check_component_window.py` | PASS |
 | Click sweep, 144 points, whole window | `click_sweep.py` | no crash, no crash log |
 | Configuration isolation | — | `%APPDATA%\Blender Foundation` untouched |
+
+The dangling-binding row is worth spelling out, because it was red for a while
+and this table said so: the backlog was 34 bindings, then 16, then 7, and is now
+**0** for all three presets. `MEASURED_DANGLING_BINDINGS` is the switch - while a
+baseline is non-zero the scan prints a WARN, and at zero it asserts. It is 0, so
+a dangling binding is a hard failure again rather than a note. Falsify-tested by
+injecting one and watching it fail with exit 1.
 
 Two things are deliberately *not* covered, and are worth doing by hand:
 
