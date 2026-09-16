@@ -703,6 +703,7 @@ memory. Run them after any change; none of them need a person watching.
 | Opening a component in its own window | `check_component_window.py` | PASS |
 | Opening a component with **no** window open, unknown components, repeated cycles | `check_window_new_without_window.py` | PASS, 18 assertions |
 | Pasting files from the system clipboard, onto disk | `check_clipboard_paste.cmd` | PASS, 5 assertions |
+| The window title names the content and not the product | `check_window_title.ps1` | PASS, 3 assertions |
 | Click sweep, 144 points, whole window | `click_sweep.py` | no crash, no crash log |
 | Configuration isolation | — | `%APPDATA%\Blender Foundation` untouched |
 
