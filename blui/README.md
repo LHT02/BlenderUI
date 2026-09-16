@@ -114,6 +114,39 @@ does its own shell work. `GHOST_ShellMenuWin32_WarmUp()` remains, with that
 measurement written next to it; a lazy call on first use of the file browser is
 still the thing to try, once the discriminator is known.
 
+### What it costs to remove `sculpt_paint`, measured
+
+`editors/sculpt_paint` is the largest remaining module (2,219 KB) and the largest
+single consumer of the 3D block (98 of the 169 unresolved symbols), so it is the
+obvious next target. Taking it out of the build - its `add_subdirectory`, its two
+registrar calls in `spacetypes.c`, and its entry in `makesrna`'s link list - gives
+a complete work list rather than a guess: **22 distinct symbols from 9 libraries**.
+
+```
+bf_editor_object      8    ED_object_{sculpt,vpaint,wpaint,texture_paint}mode_*_ex,
+                           ED_sculpt_undo_push_multires_mesh_{begin,end}
+bf_editor_util        5    ED_paint_cursor_start, ED_paint_proj_mesh_data_check,
+                           ED_space_image_paint_update, ...
+bf_editor_space_image 3    ED_imapaint_bucket_fill, ED_imapaint_clear_partial_redraw,
+                           ED_image_tools_paint_poll
+bf_editor_transform   3    ED_sculpt_init/update_modal/end_transform
+bf_rna                3    rna_sculpt_paint.c and the paint halves of rna_space
+                           and rna_workspace
+bf_draw               2    ED_paint_shading_color_override (workbench)
+bf_editor_render      2    bf_editor_interface 1    bf_editor_mesh 1
+```
+
+The finding that matters is the third line. **`bf_editor_space_image` is a module
+BLUI keeps**, and it calls into paint for texture painting. Removing
+`sculpt_paint` therefore is not a matter of stubbing out 3D code: it means
+deciding what BLUI's image viewer does with Blender's 2D paint mode, which is a
+product question before it is a build question.
+
+That is why this is written down instead of half-done. The seven other libraries
+are either doomed already (`object`, `mesh`, `render`, `transform`) or a small
+kept cut (`draw`, `rna`, `util`), but the image editor is a component, and
+breaking it to save 2 MB would be trading the product for the metric.
+
 ### The build driver used to report success on a failed link
 
 Worth reading before trusting any "the build is green" claim in this document.
