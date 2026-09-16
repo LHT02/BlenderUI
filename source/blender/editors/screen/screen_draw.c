@@ -151,6 +151,13 @@ static void drawscredge_area(ScrArea *area, int sizex, int sizey, float edge_thi
 void ED_screen_draw_edges(wmWindow *win)
 {
   bScreen *screen = WM_window_get_active_screen(win);
+  if (screen == NULL) {
+    /* A window between screens - during a workspace switch, or between being
+     * created and having one set - has no edges to draw. Several callers of the
+     * active screen assume it exists; this one is on the draw path, where that
+     * assumption costs a crash rather than a frame that does not draw. */
+    return;
+  }
   screen->do_draw = false;
 
   if (screen->state == SCREENFULL) {
