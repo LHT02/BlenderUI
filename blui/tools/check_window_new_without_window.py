@@ -70,6 +70,11 @@ def main():
     report(len(window_manager.windows) >= MINIMUM_WINDOWS,
            "there is a window to start from (%d)" % len(window_manager.windows))
 
+    global _screens_at_start
+    _screens_at_start = len(bpy.data.screens)
+    print("  NOTE  %d screen(s) before any cycling" % _screens_at_start)
+    _log("screens at start: %d" % _screens_at_start)
+
     # Close everything. The process is expected to stay alive with none open.
     for window in list(window_manager.windows):
         try:
@@ -140,6 +145,30 @@ def bad_component():
         window = window_manager.windows[0]
         report(window.screen is not None, "that window has a screen")
         report(window.workspace is not None, "that window fell back to some workspace")
+
+    # Cycle again, and check the screen count. Each cycle used to add one: the
+    # fresh-window path duplicated the workspace's layout, and a duplicated
+    # screen is not freed when the window that owns it closes. Measured before
+    # the fix, the second cycle's window was on `Default.001`.
+    for window in list(window_manager.windows):
+        with bpy.context.temp_override(window=window):
+            bpy.ops.wm.window_close()
+    bpy.ops.wm.window_new(workspace="Files")
+
+    report(len(window_manager.windows) == 1,
+           "a second cycle leaves exactly one window (%d)" % len(window_manager.windows))
+    screens_now = len(bpy.data.screens)
+    report(screens_now == _screens_at_start,
+           "cycling windows does not accumulate screens (%d, was %d)"
+           % (screens_now, _screens_at_start))
+
+    if window_manager.windows:
+        window = window_manager.windows[0]
+        report(window.screen is not None and window.workspace is not None and
+               window.screen.name == window.workspace.name,
+               "the window is on its workspace's own screen (%s vs %s)"
+               % (window.screen.name if window.screen else None,
+                  window.workspace.name if window.workspace else None))
     return None
 
 

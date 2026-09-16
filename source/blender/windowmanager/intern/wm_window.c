@@ -1181,14 +1181,20 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
       if (workspace != NULL) {
         BKE_workspace_active_set(win_fresh->workspace_hook, workspace);
 
-        /* Its own layout, so this window does not share a screen with whichever
-         * window owned the workspace's first layout. */
-        WorkSpaceLayout *layout_src = workspace->layouts.first;
-        if (layout_src != NULL) {
-          WorkSpaceLayout *layout_new = ED_workspace_layout_duplicate(
-              bmain, workspace, layout_src, win_fresh);
+        /* Reuse the workspace's own layout instead of duplicating it.
+         *
+         * The copy path duplicates, because there a second window on the same
+         * component would otherwise share a screen with the first. This path
+         * only runs when there is no window at all, so nothing else can be
+         * using it - and duplicating was both wrong and expensive. Measured:
+         * each close-everything-then-reopen cycle added a screen that is never
+         * freed (the second cycle produced `Default.001`), and the new window
+         * landed on a copy called "Default" rather than on the workspace's own
+         * screen, so it did not match the workspace it was asked for. */
+        WorkSpaceLayout *layout = workspace->layouts.first;
+        if (layout != NULL) {
           BKE_workspace_active_layout_set(
-              win_fresh->workspace_hook, win_fresh->winid, workspace, layout_new);
+              win_fresh->workspace_hook, win_fresh->winid, workspace, layout);
         }
       }
 
