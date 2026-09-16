@@ -62,6 +62,31 @@
 >   success. Redirect to a file and read the file, and check the exit code on
 >   its own line.
 
+### Double-click cannot be tested, and that is why it never was
+
+Worth knowing before trusting the suite's coverage of the most basic gesture in
+a file manager.
+
+`window.event_simulate()` accepts only `PRESS`, `RELEASE` and `NOTHING` for a
+value - it says so itself:
+
+```
+RuntimeError: Error: Value: only 'PRESS/RELEASE/NOTHING' are supported
+```
+
+A double-click cannot be synthesised with it. Two press/release pairs do not
+work either: the first version of this probe sent exactly that, nothing
+happened, and it looked for a while like double-clicking a folder did not open
+it. That was the simulation failing to produce the event the keymap is bound to,
+not the application. The binding itself is there and was checked by reading it -
+`file.mouse_execute` on `LEFTMOUSE` `DOUBLE_CLICK` in `km_file_browser_main`.
+
+So a check was written, measured, and deleted rather than kept: a check that
+cannot fail is worse than no check, because it looks like coverage. **Double-
+clicking a folder to enter it, and double-clicking a file to open it, remain
+things only a person can confirm** - along with the tray icon and dragging a file
+out to another application.
+
 ### The file manager's operation surface is complete, and a retry does not fix the stall
 
 Two results from taking "improve the file manager" literally.
