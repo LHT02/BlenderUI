@@ -512,6 +512,48 @@ indistinguishable from a dead menu entry. The invoke now makes the item under th
 cursor the selection first, unless it is already part of it, so right-clicking
 inside a multi-selection still acts on all of it.
 
+`InvokeCommand` is tried by menu offset first and, if that is refused, again with
+the canonical verb from `GetCommandString(GCS_VERBW)`. Some extensions populate
+the menu and then fail to recognise their own command id, which is how an entry
+ends up visible and inert.
+
+#### The shell menu is not isolated, and cannot be moved as one piece
+
+Opening the menu calls `QueryContextMenu`, which instantiates the COM object of
+**every installed shell extension**. A slow one freezes the UI and a hung one
+freezes it indefinitely, and this machine has seven or eight installed. That is
+the problem the sibling Electron project solved, and the fix is not a straight
+port, because of one constraint found while assessing it:
+
+> **`TrackPopupMenu` must run on the thread that owns the window.** So
+> `GHOST_ShellMenuWin32_Popup()` cannot simply be moved to a worker thread or a
+> child process.
+
+What can be split is the two halves:
+
+| Phase | Where it can go | Why |
+| --- | --- | --- |
+| Build - `ShellMenu::build()`, i.e. bind, `GetUIObjectOf`, `QueryContextMenu` | worker thread or child process | this is where extensions are instantiated, so this is where the freeze is |
+| Show - `TrackPopupMenu` and `InvokeCommand` | **main thread only** | modal loop, and it needs the owner window's thread |
+
+Splitting them puts an `IContextMenu` created on one thread to use on another,
+which is a COM apartment question that has to be settled deliberately rather
+than by trying it. The sibling project sidestepped it entirely: it *enumerates*
+the menu in a child process and renders the result in its own UI, invoking the
+chosen verb back in the child. That avoids cross-apartment use, at the cost of a
+menu that no longer looks native.
+
+For BLUI the decisions to make first are therefore:
+1. Worker thread (a hung extension leaks a thread but the UI survives) or child
+   process (killable, which also survives a crash)?
+2. Apartment model, if the object crosses threads.
+3. Whether a menu that cannot be built within the timeout should fall back to
+   BLUI's own context menu or open empty.
+
+The measured numbers to design against are in the sibling project's `PROJECT.md`:
+a per-request timeout, pending-request cleanup, and a **15-second cooldown after
+a crash** so one bad provider cannot cause a spawn storm.
+
 ### Known gap: shortcut icons are not verified
 
 `BLI_windows_file_icon_load()` asks the shell for the icon of what a `.lnk`
