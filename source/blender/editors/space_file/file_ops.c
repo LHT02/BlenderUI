@@ -2302,6 +2302,13 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
 
   int done = 0;
   int skipped = 0;
+  int failed = 0;
+
+  /* A copy of a large file takes as long as it takes, and with no feedback the
+   * window simply stops responding - which for a file manager is the moment a
+   * person starts clicking again. The cursor is the least that can be done
+   * while the operation is synchronous. */
+  WM_cursor_wait(true);
   for (int i = 0; i < count; i++) {
     char dest[FILE_MAX_LIBEXTRA];
     BLI_path_join(dest, sizeof(dest), params->dir, BLI_path_basename(paths[i]));
@@ -2313,21 +2320,52 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
       continue;
     }
 
-    if ((move ? BLI_rename(paths[i], dest) : BLI_copy(paths[i], dest)) == 0) {
+    /* A cut across volumes cannot be a rename.
+     *
+     * `BLI_rename` is `rename()`, which fails with EXDEV when the destination is
+     * on another filesystem - so cutting a file from D: and pasting it into C:
+     * did nothing at all, silently. Every file manager falls back to
+     * copy-then-delete, and this now does too. */
+    int result;
+    if (move) {
+      result = BLI_rename(paths[i], dest);
+      if (result != 0) {
+        result = BLI_copy(paths[i], dest);
+        if (result == 0) {
+          const bool dest_is_dir = BLI_is_dir(dest);
+          if (BLI_delete(paths[i], dest_is_dir, dest_is_dir) != 0) {
+            /* Copied, but the original is still there: the cut did not happen,
+             * and saying so matters more than the copy that worked. */
+            failed++;
+          }
+        }
+      }
+    }
+    else {
+      result = BLI_copy(paths[i], dest);
+    }
+
+    if (result == 0) {
       done++;
+    }
+    else {
+      failed++;
     }
   }
 
   GHOST_FreeClipboardFiles(paths, count);
 
-  if (skipped > 0 || done == 0) {
-    char message[256];
+  WM_cursor_wait(false);
+
+  if (skipped > 0 || failed > 0 || done == 0) {
+    char message[384];
     BLI_snprintf(message,
                  sizeof(message),
-                 "%d file(s) %s. %d skipped because the name already exists.%s",
+                 "%d file(s) %s. %d skipped because the name already exists. %d failed.%s",
                  done,
                  move ? "moved" : "copied",
                  skipped,
+                 failed,
                  done == 0 ? " Nothing was pasted." : "");
     BKE_reportf(op->reports, (done == 0) ? RPT_ERROR : RPT_WARNING, "%s", message);
     file_ops_message("BLUI - Paste", message);

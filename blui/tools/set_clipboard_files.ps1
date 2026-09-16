@@ -17,13 +17,27 @@ back, and retries, so the caller gets a trustworthy yes or no.
 
     set_clipboard_files.ps1 -Paths C:\a.txt,C:\b.txt
 #>
-param([Parameter(Mandatory = $true)][string[]]$Paths)
+param(
+  [Parameter(Mandatory = $true)][string[]]$Paths,
+  [switch]$Move
+)
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms
 
 $data = New-Object System.Windows.Forms.DataObject
 $data.SetData([System.Windows.Forms.DataFormats]::FileDrop, [string[]]$Paths)
+
+if ($Move) {
+  # CFSTR_PREFERREDDROPEFFECT, which is how a cut is told apart from a copy on
+  # the clipboard. DROPEFFECT_MOVE is 2.
+  $stream = New-Object System.IO.MemoryStream
+  $writer = New-Object System.IO.BinaryWriter($stream)
+  $writer.Write([uint32]2)
+  $writer.Flush()
+  $stream.Position = 0
+  $data.SetData("Preferred DropEffect", $stream)
+}
 
 $attempts = 4
 for ($i = 1; $i -le $attempts; $i++) {
