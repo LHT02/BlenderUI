@@ -533,7 +533,7 @@ static void shell_menu_log(const char *fmt, ...)
  * generous for loading extensions (measured at 16 ms for `GetUIObjectOf`) while
  * still being short enough that a person does not conclude the app has died.
  */
-constexpr DWORD kBuildTimeoutMs = 5000;
+constexpr DWORD kBuildTimeoutMs = 30000;
 
 /** What the worker thread produces, and how it says it is finished. */
 struct ShellMenuBuildJob {
@@ -578,6 +578,63 @@ static DWORD WINAPI shell_menu_build_thread(void *param)
   SetEvent(job->done);
   return 0;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Warm-up
+ *
+ * The first context menu built in a fresh process costs over thirty seconds on
+ * a machine with a handful of shell extensions installed - measured, not
+ * guessed: the same call takes about 600 ms once the process has done it once.
+ * The cost is loading each registered extension's DLL and letting it
+ * initialise, plus whatever the installed anti-virus does to each one on the
+ * way in.
+ *
+ * Thirty seconds is far too long to make a person wait after a click, and
+ * shortening the timeout only throws away a call that was working. So the
+ * process pays that cost once, in the background, at startup instead.
+ * \{ */
+
+/** A path that exists on every Windows install and is a folder, so the folder
+ * handlers - the slow ones - are the ones that get loaded. */
+static DWORD WINAPI shell_menu_warmup_thread_proc(void * /*param*/)
+{
+  const HRESULT ole = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+  char profile[MAX_PATH] = {0};
+  const DWORD len = GetEnvironmentVariableA("USERPROFILE", profile, MAX_PATH);
+  const char *path = (len > 0 && len < MAX_PATH) ? profile : "C:\\";
+
+  const ULONGLONG started = GetTickCount64();
+  {
+    const char *paths[1] = {path};
+    ShellMenu menu;
+    const bool ok = menu.build(paths, 1);
+    shell_menu_log("warm-up on %s: %s in %llu ms",
+                   path,
+                   ok ? "ok" : "failed",
+                   GetTickCount64() - started);
+  }
+
+  if (SUCCEEDED(ole)) {
+    CoUninitialize();
+  }
+  return 0;
+}
+
+void GHOST_ShellMenuWin32_WarmUp(void)
+{
+  /* Detached and never waited on: it exists only to get the extensions loaded,
+   * and nothing depends on its result. Closing the handle is enough - the
+   * thread runs to completion on its own. */
+  HANDLE thread = CreateThread(nullptr, 0, shell_menu_warmup_thread_proc, nullptr, 0, nullptr);
+  if (thread != nullptr) {
+    CloseHandle(thread);
+  }
+}
+
+/** \} */
 
 bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                 const char *const *utf8_paths,

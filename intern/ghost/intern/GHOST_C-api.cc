@@ -209,6 +209,13 @@ GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle,
 #endif
 }
 
+void GHOST_WarmUpShellMenu(void)
+{
+#ifdef WIN32
+  GHOST_ShellMenuWin32_WarmUp();
+#endif
+}
+
 GHOST_TSuccess GHOST_GetCursorScreenPosition(int *r_x, int *r_y)
 {
 #ifdef WIN32

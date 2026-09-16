@@ -84,6 +84,20 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
                                 int screen_y);
 
 /**
+ * Load the shell's context menu extensions now, on a background thread, so that
+ * the first real menu is not the one that pays for it.
+ *
+ * The first `QueryContextMenu` in a fresh process costs over thirty seconds on a
+ * machine with several extensions installed - it loads and initialises each
+ * one's DLL, with the anti-virus inspecting every load. The same call takes
+ * about 600 ms afterwards. Call this once at startup instead of making a person
+ * wait for it after a click.
+ *
+ * Returns immediately. Safe to call more than once; safe to never call.
+ */
+void GHOST_ShellMenuWin32_WarmUp(void);
+
+/**
  * Ask the shell for the icon it shows for \a utf8_path, as RGBA pixels.
  *
  * This is how a shortcut gets its own icon: a `.lnk` displays the icon of what

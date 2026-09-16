@@ -21,6 +21,13 @@ import sys
 
 import bpy
 
+_argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+# How long to let the process settle before invoking. The shell's first
+# QueryContextMenu can stall indefinitely on a machine with several extensions
+# installed, which is what the startup warm-up exists to absorb, so a test of
+# the warm-up has to wait for it rather than click over the top of it.
+_DELAY = float(_argv[0]) if _argv else 2.0
+
 _state = {"step": 0}
 
 
@@ -92,4 +99,4 @@ def _wrapper():
         return None
 
 
-bpy.app.timers.register(_wrapper, first_interval=2.0)
+bpy.app.timers.register(_wrapper, first_interval=_DELAY)

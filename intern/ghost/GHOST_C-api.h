@@ -144,6 +144,17 @@ extern GHOST_TSuccess GHOST_ShowShellContextMenu(GHOST_WindowHandle windowhandle
                                                  int screen_y);
 
 /**
+ * Load the shell's context menu extensions in the background, so that the first
+ * real menu does not have to.
+ *
+ * The first `QueryContextMenu` in a fresh process costs over thirty seconds on a
+ * machine with several shell extensions installed; the same call costs about
+ * 600 ms afterwards. Returns immediately and does nothing on platforms without a
+ * shell menu.
+ */
+extern void GHOST_WarmUpShellMenu(void);
+
+/**
  * Put files on the system clipboard, so they can be pasted into another
  * application and so another application's copy can be pasted into BLUI.
  *
