@@ -790,28 +790,13 @@ static void file_ui_region_listener(const wmRegionListenerParams *listener_param
   }
 }
 
-static bool filepath_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
-{
-  if (drag->type == WM_DRAG_PATH) {
-    SpaceFile *sfile = CTX_wm_space_file(C);
-    if (sfile) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static void filepath_drop_copy(bContext *UNUSED(C), wmDrag *drag, wmDropBox *drop)
-{
-  RNA_string_set(drop->ptr, "filepath", WM_drag_get_path(drag));
-}
-
 /* region dropbox definition */
 static void file_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Window", SPACE_EMPTY, RGN_TYPE_WINDOW);
 
-  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy, NULL, NULL);
+  WM_dropbox_add(lb, "FILE_OT_filepath_drop", file_blui_drop_poll, file_blui_drop_copy,
+                 NULL, file_blui_drop_tooltip);
 }
 
 static int file_space_subtype_get(ScrArea *area)

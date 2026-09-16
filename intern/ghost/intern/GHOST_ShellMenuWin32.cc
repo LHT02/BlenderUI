@@ -873,6 +873,11 @@ bool GHOST_ShellMenuWin32_LoadFileIconRgba(const char *utf8_path,
                                            int *r_width,
                                            int *r_height)
 {
+  /* This path also runs on Blender's background preview worker. */
+  struct Apartment {
+    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ~Apartment() { if (SUCCEEDED(result)) { CoUninitialize(); } }
+  } apartment;
   if (utf8_path == nullptr || r_pixels == nullptr || r_width == nullptr || r_height == nullptr) {
     return false;
   }

@@ -229,6 +229,11 @@ void file_tools_region_panels_register(struct ARegionType *art);
 
 /* file_utils.c */
 
+bool file_blui_drop_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
+void file_blui_drop_copy(struct bContext *C, struct wmDrag *drag, struct wmDropBox *drop);
+char *file_blui_drop_tooltip(struct bContext *C, struct wmDrag *drag,
+                            const int xy[2], struct wmDropBox *drop);
+
 void file_tile_boundbox(const ARegion *region, FileLayout *layout, int file, rcti *r_bounds);
 
 /**

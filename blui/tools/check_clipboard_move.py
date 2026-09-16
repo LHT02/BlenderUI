@@ -15,6 +15,8 @@ import os
 import sys
 
 import bpy
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from explorer_test_wait import when_idle
 
 DST = os.environ.get("BLUI_PASTE_DST", "")
 NAME = os.environ.get("BLUI_PASTE_NAME", "")
@@ -77,6 +79,12 @@ def run():
         result = bpy.ops.file.clipboard_paste()
 
     report(result == {"FINISHED"}, "clipboard_paste returned FINISHED (got %r)" % (result,))
+    when_idle(lambda: verify(area), report, finish)
+    return True
+
+
+def verify(area):
+    target = os.path.join(DST, NAME)
     report(os.path.exists(target), "the file arrived (%s)" % target)
     if os.path.exists(target):
         with open(target, "r", encoding="utf-8") as handle:
@@ -101,7 +109,8 @@ def run():
 
 def guarded_run():
     try:
-        run()
+        if run():
+            return
     except Exception as exc:  # noqa: BLE001
         report(False, "the check ran without raising (%s: %s)" % (type(exc).__name__, exc))
     finish()

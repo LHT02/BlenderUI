@@ -114,40 +114,10 @@ bool ui_but_drag_is_draggable(const uiBut *but)
 
 void ui_but_drag_start(bContext *C, uiBut *but)
 {
-  /* BLUI: file drags are handed to the operating system's own drag-and-drop.
-   *
-   * Blender's internal drag can only drop inside Blender, so dragging a file
-   * out of the file browser and into Explorer, an image editor or a chat client
-   * did nothing at all. OLE is what makes a file browser usable as a file
-   * browser.
-   *
-   * Dropping back onto a BLUI window still works: the window is already an OLE
-   * drop target (#GHOST_DropTargetWin32), and that path builds the same
-   * WM_DRAG_PATH drag that the drop boxes were written against.
-   *
-   * The gesture is spent either way. DoDragDrop owns the mouse until the user
-   * drops or cancels, so no button release is left over for an internal drag to
-   * consume - starting one here would leave it waiting for an event that never
-   * arrives.
-   */
+  /* Keep Blender's drag image, tooltip and drop-box hit testing. The window
+   * manager hands this to OLE only when the pointer leaves BLUI windows. */
   if (but->dragtype == WM_DRAG_PATH && but->dragpoin != nullptr) {
-    wmWindow *win = CTX_wm_window(C);
-    if (win != nullptr && win->ghostwin != nullptr) {
-      const wmDragPath *path_data = static_cast<const wmDragPath *>(but->dragpoin);
-      if (path_data->path != nullptr && path_data->path[0] != '\0') {
-        const char *paths[1] = {path_data->path};
-        bool started = false;
-        GHOST_StartDragFiles((GHOST_WindowHandle)win->ghostwin, paths, 1, &started);
-        if (started) {
-          WM_drag_data_free(but->dragtype, but->dragpoin);
-          but->dragpoin = nullptr;
-          but->dragflag &= ~UI_BUT_DRAGPOIN_FREE;
-          return;
-        }
-        /* `started` is false only where no platform drag exists; fall through
-         * to Blender's internal drag so those platforms keep working. */
-      }
-    }
+    static_cast<wmDragPath *>(but->dragpoin)->is_internal = true;
   }
 
   wmDrag *drag = WM_drag_data_create(C,

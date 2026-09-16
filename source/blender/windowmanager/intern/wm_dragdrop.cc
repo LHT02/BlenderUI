@@ -191,6 +191,36 @@ wmDrag *WM_drag_data_create(bContext *C, int icon, int type, void *poin, double 
     case WM_DRAG_PATH:
       drag->poin = poin;
       drag->flags |= WM_DRAG_FREE_DATA;
+      if (poin && static_cast<wmDragPath *>(poin)->is_internal) {
+        wmDragPath *data = static_cast<wmDragPath *>(poin);
+        SpaceFile *space = CTX_wm_space_file(C);
+        if (space && space->params && !space->op) {
+          ListBase selected = CTX_data_collection_get(C, "selected_files");
+          const int capacity = BLI_listbase_count(&selected);
+          data->paths = static_cast<char **>(MEM_callocN(sizeof(char *) * (capacity + 1), __func__));
+          bool dragged_is_selected = false;
+          LISTBASE_FOREACH (CollectionPointerLink *, link, &selected) {
+            char relative[FILE_MAX], full[FILE_MAX];
+            RNA_string_get(&link->ptr, "relative_path", relative);
+            if (FILENAME_IS_CURRPAR(relative)) {
+              continue;
+            }
+            BLI_path_join(full, sizeof(full), space->params->dir, relative);
+            data->paths[data->paths_len++] = BLI_strdup(full);
+            dragged_is_selected |= BLI_path_cmp(full, data->path) == 0;
+          }
+          BLI_freelistN(&selected);
+          if (!dragged_is_selected) {
+            for (int i = 0; i < data->paths_len; i++) {
+              MEM_freeN(data->paths[i]);
+            }
+            data->paths_len = 0;
+          }
+          if (data->paths_len == 0) {
+            data->paths[data->paths_len++] = BLI_strdup(data->path);
+          }
+        }
+      }
       break;
     case WM_DRAG_ID:
       if (poin) {
@@ -769,7 +799,7 @@ const ListBase *WM_drag_asset_list_get(const wmDrag *drag)
 
 wmDragPath *WM_drag_create_path_data(const char *path)
 {
-  wmDragPath *path_data = MEM_new<wmDragPath>("wmDragPath");
+  wmDragPath *path_data = MEM_cnew<wmDragPath>("wmDragPath");
   path_data->path = BLI_strdup(path);
   path_data->file_type = ED_path_extension_type(path);
   return path_data;
@@ -777,6 +807,10 @@ wmDragPath *WM_drag_create_path_data(const char *path)
 
 static void wm_drag_free_path_data(wmDragPath **path_data)
 {
+  for (int i = 0; i < (*path_data)->paths_len; i++) {
+    MEM_freeN((*path_data)->paths[i]);
+  }
+  MEM_SAFE_FREE((*path_data)->paths);
   MEM_freeN((*path_data)->path);
   MEM_delete(*path_data);
   *path_data = nullptr;

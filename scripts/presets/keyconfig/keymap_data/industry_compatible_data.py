@@ -541,6 +541,13 @@ def km_file_browser(params):
         ("file.directory_new", {"type": 'I', "value": 'PRESS'},
          {"properties": [("confirm", False)]}),
         ("file.rename", {"type": 'F2', "value": 'PRESS'}, None),
+        ("file.refresh", {"type": 'F5', "value": 'PRESS'}, None),
+        ("file.directory_new", {"type": 'N', "value": 'PRESS', "ctrl": True, "shift": True},
+         {"properties": [("confirm", False)]}),
+        ("file.clipboard_copy", {"type": 'C', "value": 'PRESS', "ctrl": True}, None),
+        ("file.clipboard_cut", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
+        ("file.clipboard_paste", {"type": 'V', "value": 'PRESS', "ctrl": True}, None),
+        ("file.edit_directory_path", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("file.delete", {"type": 'DEL', "value": 'PRESS'}, None),
         ("file.smoothscroll", {"type": 'TIMER1', "value": 'ANY', "any": True}, None),
         ("wm.context_toggle", {"type": 'T', "value": 'PRESS'},
@@ -561,7 +568,8 @@ def km_file_browser(params):
 
         # Select file under cursor before spawning the context menu.
         ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
-         {"properties": [("open", False), ("only_activate_if_selected", True), ("pass_through", True)]}),
+         {"properties": [("open", False), ("only_activate_if_selected", True),
+                         ("deselect_all", True), ("pass_through", True)]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
     ])
 

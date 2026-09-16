@@ -3727,6 +3727,29 @@ static eHandlerActionFlag wm_event_drag_and_drop_test(wmWindowManager *wm,
     return WM_HANDLER_CONTINUE;
   }
 
+#ifdef WIN32
+  if (event->type == MOUSEMOVE) {
+    int local_xy[2];
+    wmDrag *drag = static_cast<wmDrag *>(wm->drags.first);
+    if (drag->type == WM_DRAG_PATH && !WM_window_find_under_cursor(win, event->xy, local_xy)) {
+      wmDragPath *data = static_cast<wmDragPath *>(drag->poin);
+      if (data->is_internal) {
+        const char *single[] = {data->path};
+        const char *const *paths = data->paths_len ? data->paths : single;
+        bool started = false;
+        GHOST_StartDragFiles(static_cast<GHOST_WindowHandle>(win->ghostwin),
+                             paths, data->paths_len ? data->paths_len : 1, &started);
+        if (started) {
+          wm_drags_exit(wm, win);
+          WM_drag_free_list(&wm->drags);
+          screen->do_draw_drag = true;
+          return WM_HANDLER_BREAK;
+        }
+      }
+    }
+  }
+#endif
+
   if (event->type == MOUSEMOVE || ISKEYMODIFIER(event->type)) {
     screen->do_draw_drag = true;
   }

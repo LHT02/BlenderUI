@@ -31,6 +31,7 @@ set(INC_SYS
 
 set(SRC
   asset_catalog_tree_view.cc
+  file_blui_drop.c
   file_draw.cc
   file_indexer.cc
   file_ops.c

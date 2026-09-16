@@ -121,8 +121,8 @@ def _step():
     # The safety property. If select_all had included `..`, this directory - or
     # the one above it - would be gone, which is why it is asserted, not assumed.
     report(os.path.isdir(DST), "the directory itself is still there")
-    report(os.path.isdir(KEEP_DIR),
-           "the subdirectory survived - select_all takes files, not directories")
+    report(not os.path.exists(KEEP_DIR),
+           "the selected subdirectory was recycled along with the files")
     finish()
     return None
 

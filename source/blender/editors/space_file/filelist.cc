@@ -1211,7 +1211,7 @@ static int filelist_geticon_ex(const FileList *filelist,
    * generic file. Guarded on the extension so that files which carry a real
    * preview (`preview_icon_id` is also set from `local_data.preview_image`) are
    * left exactly as they were. */
-  if (file->preview_icon_id != 0 && BLI_path_extension_check(file->name, ".lnk")) {
+  if (file->preview_icon_id != 0 && BLI_path_extension_check(file->relpath, ".lnk")) {
     return file->preview_icon_id;
   }
 
@@ -1495,6 +1495,29 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
       taskdata);
   FileListEntryPreview *preview = preview_taskdata->preview;
 
+#ifdef WIN32
+  /* Shortcut icons belong to the preview worker, never the UI's entry-cache
+   * population. Use the link itself, preserving its custom icon and arguments. */
+  if (BLI_path_extension_check(preview->filepath, ".lnk")) {
+    unsigned char *pixels = nullptr;
+    int width = 0, height = 0;
+    if (GHOST_LoadFileIconRgba(preview->filepath, &pixels, &width, &height) == GHOST_kSuccess) {
+      ImBuf *image = IMB_allocImBuf(width, height, 32, IB_rect);
+      if (image) {
+        memcpy(image->rect, pixels, size_t(width) * size_t(height) * 4);
+        /* Win32's top-down DIB has its first row at the top; ImBuf/OpenGL
+         * store the bottom row first. Convert once at this boundary. */
+        IMB_flipy(image);
+        preview->icon_id = BKE_icon_imbuf_create(image);
+      }
+      GHOST_FreeFileIconRgba(pixels);
+    }
+    preview_taskdata->preview = nullptr;
+    BLI_thread_queue_push(cache->previews_done, preview);
+    return;
+  }
+#endif
+
   /* XXX #THB_SOURCE_IMAGE for "historic" reasons. The case of an undefined source should be
    * handled better. */
   ThumbSource source = THB_SOURCE_IMAGE;
@@ -1621,7 +1644,8 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
   }
 
   if (!(entry->typeflag & (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_FTFONT |
-                           FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB)))
+                           FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB)) &&
+      !BLI_path_extension_check(entry->relpath, ".lnk"))
   {
     return;
   }
@@ -1661,7 +1685,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
     BLI_thread_queue_push(cache->previews_done, preview);
   }
   else {
-    if (entry->redirection_path) {
+    if (entry->redirection_path && !BLI_path_extension_check(entry->relpath, ".lnk")) {
       BLI_strncpy(preview->filepath, entry->redirection_path, FILE_MAXDIR);
     }
     else {
@@ -2118,43 +2142,6 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   if (entry->blenderlib_has_no_preview) {
     ret->flags |= FILE_ENTRY_BLENDERLIB_NO_PREVIEW;
   }
-#ifdef WIN32
-  /* BLUI: a shortcut carries its own icon.
-   *
-   * A `.lnk` shows the icon of whatever it points at, which is what makes it
-   * recognisable in a file manager. Blender's file browser has no notion of
-   * that - it picks an icon from the extension - so every shortcut came out
-   * looking like a generic file. Resolving the real one is the shell's job.
-   *
-   * Asked only for `.lnk`: a shell round trip per entry would be paid for every
-   * file in the directory, and a shortcut is the one case where the icon says
-   * something the extension does not.
-   *
-   * The extraction itself lives in GHOST's SDK-only translation unit, which is
-   * the only place it compiles - it needs `IImageList`, a COM interface - and
-   * the only place it can be tested without a window. See
-   * `blui/tools/shellmenu_selftest.cc`. */
-  if (ret->preview_icon_id == 0 && !(ret->typeflag & FILE_TYPE_DIR) &&
-      BLI_path_extension_check(ret->name, ".lnk"))
-  {
-    char fullpath[FILE_MAX_LIBEXTRA];
-    filelist_file_get_full_path(filelist, ret, fullpath);
-
-    unsigned char *pixels = NULL;
-    int icon_w = 0;
-    int icon_h = 0;
-    if (GHOST_LoadFileIconRgba(fullpath, &pixels, &icon_w, &icon_h) == GHOST_kSuccess) {
-      ImBuf *ibuf = IMB_allocImBuf(icon_w, icon_h, 32, IB_rect);
-      if (ibuf != NULL) {
-        memcpy(ibuf->rect, pixels, size_t(icon_w) * size_t(icon_h) * 4);
-        /* Takes ownership of `ibuf`; it is released with the icon by
-         * `BKE_icon_delete()` when the entry goes away. */
-        ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
-      }
-      GHOST_FreeFileIconRgba(pixels);
-    }
-  }
-#endif
   BLI_addtail(&cache->cached_entries, ret);
   return ret;
 }
@@ -3125,15 +3112,13 @@ static int filelist_readjob_list_dir(FileListReadJob *job_params,
             entry->typeflag = (eFileSel_File_Types)ED_path_extension_type(entry->redirection_path);
           }
           target = entry->redirection_path;
-#ifdef WIN32
-          /* On Windows don't show `.lnk` extension for valid shortcuts. */
-          BLI_path_extension_strip(entry->relpath);
-#endif
+          /* Keep the real .lnk path. Copy/rename/delete must act on the shortcut,
+           * not a fabricated extensionless path or the target it points to. */
         }
         else {
           MEM_freeN(entry->redirection_path);
           entry->redirection_path = nullptr;
-          entry->attributes |= FILE_ATTR_HIDDEN;
+          /* A broken link remains visible and can be renamed or removed. */
         }
       }
 

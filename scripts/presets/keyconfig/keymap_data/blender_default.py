@@ -1139,6 +1139,11 @@ def km_file_browser(params):
         ("file.directory_new", {"type": 'I', "value": 'PRESS'},
          {"properties": [("confirm", False)]}),
         ("file.rename", {"type": 'F2', "value": 'PRESS'}, None),
+        ("file.refresh", {"type": 'F5', "value": 'PRESS'}, None),
+        ("file.directory_new", {"type": 'N', "value": 'PRESS', "ctrl": True, "shift": True},
+         {"properties": [("confirm", False)]}),
+        ("file.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True},
+         {"properties": [("action", 'SELECT')]}),
         # BLUI: file clipboard, on the system clipboard rather than Blender's
         # interface one, so these interoperate with Explorer.
         ("file.clipboard_copy", {"type": 'C', "value": 'PRESS', "ctrl": True}, None),
@@ -1165,18 +1170,12 @@ def km_file_browser(params):
         op_menu_pie("FILEBROWSER_MT_view_pie", {"type": 'ACCENT_GRAVE', "value": 'PRESS'}),
 
         # Select file under cursor before spawning the context menu.
-        # BLUI: this activates unconditionally, where Blender only activated a
-        # file that was already selected. A menu entry cannot see where the
-        # cursor was - it is invoked through
-        # `WM_operator_name_call_ptr_with_depends_on_cursor()`, so it receives
-        # the menu's event - which means the active file is the only record of
-        # what was right-clicked. Without this, right-clicking an unselected
-        # file left the previous selection, and the shell menu entry acted on
-        # the wrong file or on nothing at all.
+        # Preserve an existing multi-selection when right-clicking one of its
+        # members; select a new target, and clear selection on empty space.
         ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
          {"properties": [
              ("open", False),
-             ("only_activate_if_selected", False), ("pass_through", True),
+             ("only_activate_if_selected", True), ("deselect_all", True), ("pass_through", True),
          ]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", params.context_menu_event),
     ])

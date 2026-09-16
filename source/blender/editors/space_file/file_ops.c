@@ -8,6 +8,7 @@
 #include "BLI_utildefines.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_dynstr.h"
 #include "BLI_linklist.h"
 #include "BLI_math.h"
 
@@ -988,7 +989,8 @@ static int file_select_all_exec(bContext *C, wmOperator *op)
   switch (action) {
     case SEL_SELECT:
     case SEL_INVERT: {
-      check_type = (params->flag & FILE_DIRSEL_ONLY) ? CHECK_DIRS : CHECK_FILES;
+      check_type = sfile->op == NULL ? CHECK_ALL :
+                                          ((params->flag & FILE_DIRSEL_ONLY) ? CHECK_DIRS : CHECK_FILES);
       filesel_type = (action == SEL_INVERT) ? FILE_SEL_TOGGLE : FILE_SEL_ADD;
       break;
     }
@@ -1005,6 +1007,8 @@ static int file_select_all_exec(bContext *C, wmOperator *op)
 
   filelist_entries_select_index_range_set(
       sfile->files, &sel, filesel_type, FILE_SEL_SELECTED, check_type);
+  /* Explorer's Select All includes folders, but never the synthetic parent entry. */
+  filelist_entry_parent_select_set(sfile->files, FILE_SEL_REMOVE, FILE_SEL_SELECTED, CHECK_ALL);
 
   params->active_file = -1;
   if (action != SEL_DESELECT) {
@@ -2073,100 +2077,14 @@ static bool file_shell_context_menu_poll(bContext *C)
 
 static bool file_ensure_hovered_is_active(bContext *C, const wmEvent *event);
 
-static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int file_shell_context_menu_invoke(bContext *C,
+                                          wmOperator *UNUSED(op),
+                                          const wmEvent *UNUSED(event))
 {
-  SpaceFile *sfile = CTX_wm_space_file(C);
-  wmWindow *win = CTX_wm_window(C);
-
-  fprintf(stderr,
-          "BLUI shell invoke: enter sfile=%p files=%p win=%p ghostwin=%p\n",
-          (void *)sfile,
-          (sfile != NULL) ? (void *)sfile->files : NULL,
-          (void *)win,
-          (win != NULL) ? (void *)win->ghostwin : NULL);
-
-  if (sfile == NULL || sfile->files == NULL || win == NULL || win->ghostwin == NULL) {
-    return OPERATOR_CANCELLED;
-  }
-
-  /* The item under the cursor cannot be found from `event` here.
-   *
-   * A menu entry is invoked through
-   * `WM_operator_name_call_ptr_with_depends_on_cursor()`, so the event this
-   * receives is the menu's own, not one positioned over the file list - an
-   * earlier attempt to re-select the hovered item from it silently found
-   * nothing. The browser's right-press handler has already made the item under
-   * the cursor active (see the RIGHTMOUSE `file.select` entry in the keymap,
-   * which must activate unconditionally for this to hold), so the active file
-   * is what to fall back to. */
-  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
-
-  const int num_files = filelist_files_ensure(sfile->files);
-  fprintf(stderr, "BLUI shell invoke: filelist_files_ensure -> %d\n", num_files);
-  if (num_files <= 0) {
-    fprintf(stderr, "BLUI shell menu: no files in list\n");
-    return OPERATOR_CANCELLED;
-  }
-
-  char **paths = MEM_callocN(sizeof(char *) * (size_t)num_files, __func__);
-  int path_count = 0;
-
-  for (int i = 0; i < num_files; i++) {
-    if (!filelist_entry_select_index_get(sfile->files, i, CHECK_ALL)) {
-      continue;
-    }
-    FileDirEntry *file = filelist_file(sfile->files, i);
-    if (file == NULL) {
-      continue;
-    }
-    char path[FILE_MAX_LIBEXTRA];
-    filelist_file_get_full_path(sfile->files, file, path);
-    paths[path_count++] = BLI_strdup(path);
-  }
-
-  /* Nothing selected: act on the active file, which the right-press handler has
-   * already pointed at the item under the cursor. Acting on the selection only
-   * is what made this look like a dead menu entry - right-clicking an unselected
-   * file found nothing, and the "No file selected" report goes to the info bar,
-   * which BLUI does not have. */
-  if (path_count == 0 && params != NULL && params->active_file >= 0 &&
-      params->active_file < num_files)
-  {
-    FileDirEntry *file = filelist_file(sfile->files, params->active_file);
-    if (file != NULL) {
-      char path[FILE_MAX_LIBEXTRA];
-      filelist_file_get_full_path(sfile->files, file, path);
-      paths[path_count++] = BLI_strdup(path);
-    }
-  }
-
-  if (path_count == 0) {
-    MEM_freeN(paths);
-    fprintf(stderr,
-            "BLUI shell menu: nothing to act on (num_files=%d active_file=%d)\n",
-            num_files,
-            params != NULL ? params->active_file : -999);
-    BKE_report(op->reports, RPT_ERROR, "No file selected");
-    return OPERATOR_CANCELLED;
-  }
-
-  fprintf(stderr, "BLUI shell menu: showing menu for %d path(s), first=%s\n", path_count, paths[0]);
-
-  int screen_x = 0;
-  int screen_y = 0;
-  GHOST_GetCursorScreenPosition(&screen_x, &screen_y);
-
-  /* Blocks until the user picks an entry or dismisses the menu, which is what
-   * TrackPopupMenu does. */
-  const GHOST_TSuccess result = GHOST_ShowShellContextMenu(
-      win->ghostwin, (const char *const *)paths, path_count, screen_x, screen_y);
-
-  for (int i = 0; i < path_count; i++) {
-    MEM_freeN(paths[i]);
-  }
-  MEM_freeN(paths);
-
-  return (result == GHOST_kSuccess) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+  /* Compatibility entry point: every menu, including file-picker callers,
+   * uses the isolated helper. Never load extension DLLs in BLUI's UI process. */
+  WM_menu_name_call(C, "FILEBROWSER_MT_explorer_more", WM_OP_INVOKE_REGION_WIN);
+  return OPERATOR_FINISHED;
 }
 
 void FILE_OT_shell_context_menu(wmOperatorType *ot)
@@ -2196,7 +2114,8 @@ void FILE_OT_shell_context_menu(wmOperatorType *ot)
 
 static bool file_clipboard_poll(bContext *C)
 {
-  return ED_operator_file_browsing_active(C) && CTX_wm_space_file(C) != NULL;
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  return ED_operator_file_browsing_active(C) && sfile && sfile->files;
 }
 
 /**
@@ -2220,7 +2139,7 @@ static char **file_clipboard_selected_paths(SpaceFile *sfile, int *r_count)
       continue;
     }
     FileDirEntry *file = filelist_file(sfile->files, i);
-    if (file == NULL) {
+    if (file == NULL || FILENAME_IS_CURRPAR(file->relpath)) {
       continue;
     }
     char path[FILE_MAX_LIBEXTRA];
@@ -2237,7 +2156,7 @@ static void file_clipboard_free_paths(char **paths, const int count)
   for (int i = 0; i < count; i++) {
     MEM_freeN(paths[i]);
   }
-  MEM_freeN(paths);
+  MEM_SAFE_FREE(paths);
 }
 
 /** Shared by copy and cut; they differ only in the recorded drop effect. */
@@ -2275,41 +2194,6 @@ static int file_clipboard_cut_exec(bContext *C, wmOperator *op)
   return file_clipboard_put_exec(C, op, true);
 }
 
-/* Copy a file, or a whole directory.
- *
- * `BLI_copy` is `CopyFileW` on Windows and `copy_file` elsewhere - it copies a
- * FILE. Handing it a directory fails, and the file browser pastes directories
- * like any other item, so every folder paste did nothing at all. Nothing in
- * blenlib walks a tree for this, so this does.
- *
- * Returns 0 on success, matching `BLI_copy`. */
-static int file_ops_copy_recursive(const char *src, const char *dst)
-{
-  if (!BLI_is_dir(src)) {
-    return BLI_copy(src, dst);
-  }
-
-  BLI_dir_create_recursive(dst);
-
-  struct direntry *entries = NULL;
-  const int count = BLI_filelist_dir_contents(src, &entries);
-  int result = 0;
-  for (int i = 0; i < count; i++) {
-    const char *name = entries[i].relname;
-    if (STREQ(name, ".") || STREQ(name, "..")) {
-      continue;
-    }
-    char child_src[FILE_MAX_LIBEXTRA];
-    char child_dst[FILE_MAX_LIBEXTRA];
-    BLI_path_join(child_src, sizeof(child_src), src, name);
-    BLI_path_join(child_dst, sizeof(child_dst), dst, name);
-    if (file_ops_copy_recursive(child_src, child_dst) != 0) {
-      result = 1;
-    }
-  }
-  BLI_filelist_free(entries, (unsigned int)count);
-  return result;
-}
 /* BLUI has no info bar and no top bar, so `BKE_report()` on its own goes into a
  * list nothing draws: a paste that skipped every file, or a delete that failed,
  * looks exactly like one that worked. Anything that did not fully succeed is
@@ -2335,89 +2219,29 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  int done = 0;
-  int skipped = 0;
-  int failed = 0;
-
-  /* A copy of a large file takes as long as it takes, and with no feedback the
-   * window simply stops responding - which for a file manager is the moment a
-   * person starts clicking again. The cursor is the least that can be done
-   * while the operation is synchronous. */
-  WM_cursor_wait(true);
+  /* Snapshot the clipboard, then use the same asynchronous, collision-safe
+   * worker as drag/drop. No filesystem traversal on the UI thread. */
+  PointerRNA props;
+  WM_operator_properties_create(&props, "FILE_OT_explorer_drop");
+  RNA_string_set(&props, "directory", params->dir);
+  DynStr *sources = BLI_dynstr_new();
   for (int i = 0; i < count; i++) {
-    char dest[FILE_MAX_LIBEXTRA];
-    BLI_path_join(dest, sizeof(dest), params->dir, BLI_path_basename(paths[i]));
-
-    /* Never overwrite. A file manager asks before replacing a file, and there
-     * is no prompt in this path, so skipping is the safe half of that. */
-    if (BLI_exists(dest)) {
-      skipped++;
-      continue;
+    if (i) {
+      BLI_dynstr_append(sources, "\n");
     }
-
-    /* A cut across volumes cannot be a rename.
-     *
-     * `BLI_rename` is `rename()`, which fails with EXDEV when the destination is
-     * on another filesystem - so cutting a file from D: and pasting it into C:
-     * did nothing at all, silently. Every file manager falls back to
-     * copy-then-delete, and this now does too. */
-    int result;
-    if (move) {
-      result = BLI_rename(paths[i], dest);
-      if (result != 0) {
-        result = file_ops_copy_recursive(paths[i], dest);
-        if (result == 0) {
-          const bool dest_is_dir = BLI_is_dir(dest);
-          if (BLI_delete(paths[i], dest_is_dir, dest_is_dir) != 0) {
-            /* Copied, but the original is still there: the cut did not happen,
-             * and saying so matters more than the copy that worked. */
-            failed++;
-          }
-        }
-      }
-    }
-    else {
-      result = file_ops_copy_recursive(paths[i], dest);
-    }
-
-    if (result == 0) {
-      done++;
-    }
-    else {
-      failed++;
-    }
+    BLI_dynstr_append(sources, paths[i]);
   }
-
+  char *source_paths = BLI_dynstr_get_cstring(sources);
+  RNA_string_set(&props, "sources", source_paths);
+  MEM_freeN(source_paths);
+  BLI_dynstr_free(sources);
   GHOST_FreeClipboardFiles(paths, count);
-
-  WM_cursor_wait(false);
-
-  if (skipped > 0 || failed > 0 || done == 0) {
-    char message[384];
-    BLI_snprintf(message,
-                 sizeof(message),
-                 "%d file(s) %s. %d skipped because the name already exists. %d failed.%s",
-                 done,
-                 move ? "moved" : "copied",
-                 skipped,
-                 failed,
-                 done == 0 ? " Nothing was pasted." : "");
-    BKE_reportf(op->reports, (done == 0) ? RPT_ERROR : RPT_WARNING, "%s", message);
-    file_ops_message("BLUI - Paste", message);
-  }
-  else {
-    BKE_reportf(op->reports, RPT_INFO, "%d file(s) %s", done, move ? "moved" : "copied");
-  }
-
-  if (move) {
-    /* Those paths no longer exist, so the clipboard must not keep offering
-     * them. Clearing it is what a file manager does after a cut and paste. */
-    GHOST_SetClipboardFiles(NULL, 0, false);
-  }
-
-  ED_file_change_dir(C);
-
-  return done > 0 ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+  RNA_boolean_set(&props, "move", move);
+  RNA_boolean_set(&props, "from_clipboard", true);
+  const int result = WM_operator_name_call(
+      C, "FILE_OT_explorer_drop", WM_OP_EXEC_DEFAULT, &props, NULL);
+  WM_operator_properties_free(&props);
+  return result;
 }
 
 void FILE_OT_clipboard_copy(wmOperatorType *ot)
@@ -2467,18 +2291,12 @@ static bool file_execute(bContext *C, SpaceFile *sfile)
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
   FileDirEntry *file = filelist_file(sfile->files, params->active_file);
 
-  if (file && file->redirection_path) {
+  if (file && file->redirection_path && (file->typeflag & FILE_TYPE_DIR)) {
     /* redirection_path is an absolute path that takes precedence
      * over using params->dir + params->file. */
-    BLI_path_split_dir_file(file->redirection_path,
-                            params->dir,
-                            sizeof(params->dir),
-                            params->file,
-                            sizeof(params->file));
-    /* Update relpath with redirected filename as well so that the alternative
-     * combination of params->dir + relpath remains valid as well. */
-    MEM_freeN(file->relpath);
-    file->relpath = BLI_strdup(params->file);
+    STRNCPY(params->dir, file->redirection_path);
+    ED_file_change_dir(C);
+    return true;
   }
 
   /* directory change */
@@ -2985,6 +2803,28 @@ static int filepath_drop_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   SpaceFile *sfile = CTX_wm_space_file(C);
 
+  if (sfile && !sfile->op && sfile->browse_mode == FILE_BROWSE_MODE_FILES) {
+    PointerRNA props;
+    WM_operator_properties_create(&props, "FILE_OT_explorer_drop");
+    char path[FILE_MAX];
+    RNA_string_get(op->ptr, "directory", path);
+    RNA_string_set(&props, "directory", path[0] ? path : sfile->params->dir);
+    char *sources = RNA_string_get_alloc(op->ptr, "sources", NULL, 0, NULL);
+    if (!sources[0]) {
+      RNA_string_get(op->ptr, "filepath", path);
+      RNA_string_set(&props, "sources", path);
+    }
+    else {
+      RNA_string_set(&props, "sources", sources);
+    }
+    MEM_freeN(sources);
+    RNA_boolean_set(&props, "move", RNA_boolean_get(op->ptr, "move"));
+    const int result = WM_operator_name_call(C, "FILE_OT_explorer_drop", WM_OP_EXEC_DEFAULT,
+                                              &props, NULL);
+    WM_operator_properties_free(&props);
+    return result;
+  }
+
   if (sfile) {
     char filepath[FILE_MAX];
 
@@ -2994,37 +2834,6 @@ static int filepath_drop_exec(bContext *C, wmOperator *op)
       return OPERATOR_CANCELLED;
     }
 
-    /* BLUI: browsing, so a dropped file is copied into the folder on screen.
-     *
-     * Blender only ever set the filepath here, which is right in a save dialog
-     * and useless in a file manager: dragging a file in from Explorer did
-     * nothing at all. Copying is what the gesture means, and it is the other
-     * half of the drag support the file browser is supposed to have - dragging
-     * out already worked. A name that is already taken is left alone rather
-     * than replaced, matching paste. */
-    if (sfile->browse_mode == FILE_BROWSE_MODE_FILES) {
-      FileSelectParams *params = ED_fileselect_get_active_params(sfile);
-      if (params != NULL && params->dir[0] != '\0') {
-        char dest[FILE_MAX_LIBEXTRA];
-        BLI_path_join(dest, sizeof(dest), params->dir, BLI_path_basename(filepath));
-        if (BLI_exists(dest)) {
-          BKE_reportf(op->reports, RPT_WARNING, "'%s' is already here", BLI_path_basename(dest));
-        }
-        else if (file_ops_copy_recursive(filepath, dest) == 0) {
-          ED_fileselect_clear(CTX_wm_manager(C), sfile);
-          WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
-        }
-        else {
-          char message[512];
-          BLI_snprintf(message,
-                       sizeof(message),
-                       "Could not copy the dropped item into this folder: %s",
-                       BLI_path_basename(filepath));
-          BKE_report(op->reports, RPT_ERROR, message);
-          file_ops_message("BLUI - Drop", message);
-        }
-      }
-    }
 
     file_sfile_filepath_set(sfile, filepath);
 
@@ -3050,6 +2859,9 @@ void FILE_OT_filepath_drop(wmOperatorType *ot)
   ot->poll = ED_operator_file_browsing_active;
 
   RNA_def_string_file_path(ot->srna, "filepath", "Path", FILE_MAX, "", "");
+  RNA_def_string_dir_path(ot->srna, "directory", NULL, FILE_MAX, "Destination", "");
+  RNA_def_string(ot->srna, "sources", NULL, 0, "Sources", "Selected paths at drag start");
+  RNA_def_boolean(ot->srna, "move", false, "Move", "Move instead of copy");
 }
 
 /** \} */
@@ -3591,7 +3403,7 @@ static bool file_delete_poll(bContext *C)
 
   SpaceFile *sfile = CTX_wm_space_file(C);
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
-  if (!sfile || !params) {
+  if (!sfile || !params || !sfile->files) {
     return false;
   }
 
@@ -3603,8 +3415,10 @@ static bool file_delete_poll(bContext *C)
   int numfiles = filelist_files_ensure(sfile->files);
   for (int i = 0; i < numfiles; i++) {
     if (filelist_entry_select_index_get(sfile->files, i, CHECK_ALL)) {
-      /* Has a selected file -> the operator can run. */
-      return true;
+      FileDirEntry *file = filelist_file(sfile->files, i);
+      if (file && !FILENAME_IS_CURRPAR(file->relpath)) {
+        return true;
+      }
     }
   }
 
@@ -3615,6 +3429,9 @@ static bool file_delete_single(const struct FileList *files,
                                FileDirEntry *file,
                                const char **r_error_message)
 {
+  if (!file || FILENAME_IS_CURRPAR(file->relpath)) {
+    return true; /* Synthetic parent entries must never be recycled. */
+  }
   char str[FILE_MAX_LIBEXTRA];
   filelist_file_get_full_path(files, file, str);
   if (BLI_delete_soft(str, r_error_message) != 0 || BLI_exists(str)) {

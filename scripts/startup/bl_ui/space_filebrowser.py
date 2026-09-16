@@ -69,6 +69,9 @@ class FILEBROWSER_HT_header(Header):
             self.draw_asset_browser_buttons(context)
         else:
             FILEBROWSER_MT_editor_menus.draw_collapsible(context, layout)
+            if space_data.active_operator is None:
+                from bl_ui.space_filebrowser_explorer import draw_toolbar
+                draw_toolbar(layout, context)
             layout.separator_spacer()
 
         if not context.screen.show_statusbar:
@@ -533,6 +536,11 @@ class FILEBROWSER_MT_context_menu(FileBrowserMenu, Menu):
         layout = self.layout
         st = context.space_data
         params = st.params
+
+        if st.active_operator is None:
+            from bl_ui.space_filebrowser_explorer import draw_context_menu
+            draw_context_menu(layout, context)
+            return
 
         # BLUI: the real shell menu. Explorer-like file management (Open with,
         # archive, version control, cloud upload, Properties) lives in the

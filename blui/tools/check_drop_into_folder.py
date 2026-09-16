@@ -16,6 +16,8 @@ import os
 import sys
 
 import bpy
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from explorer_test_wait import when_idle
 
 SRC = os.environ.get("BLUI_DROP_SRC", "")
 DST = os.environ.get("BLUI_DROP_DST", "")
@@ -71,6 +73,12 @@ def run():
         result = bpy.ops.file.filepath_drop(filepath=SRC)
 
     report(result == {"FINISHED"}, "filepath_drop returned FINISHED (got %r)" % (result,))
+    when_idle(lambda: verify(area), report, finish)
+    return True
+
+
+def verify(area):
+    target = os.path.join(DST, NAME)
     report(os.path.exists(target), "the dropped file was copied here (%s)" % target)
     if os.path.exists(target):
         with open(target, "r", encoding="utf-8") as handle:
@@ -80,14 +88,17 @@ def run():
             handle.write("already here\n")
         with bpy.context.temp_override(area=area, space_data=area.spaces.active):
             bpy.ops.file.filepath_drop(filepath=SRC)
-        with open(target, "r", encoding="utf-8") as handle:
-            report("already here" in handle.read(),
-                   "a second drop of the same name did not overwrite it")
+        def duplicate_check():
+            with open(target, "r", encoding="utf-8") as handle:
+                report("already here" in handle.read(), "a second drop did not overwrite it")
+        when_idle(duplicate_check, report, finish)
+        return True
 
 
 def guarded_run():
     try:
-        run()
+        if run():
+            return
     except Exception as exc:  # noqa: BLE001
         report(False, "the check ran without raising (%s: %s)" % (type(exc).__name__, exc))
     finish()

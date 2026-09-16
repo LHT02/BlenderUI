@@ -53,6 +53,7 @@ _modules = [
 
     "space_console",
     "space_filebrowser",
+    "space_filebrowser_explorer",
     "space_image",
     "space_info",
     "space_sequencer",

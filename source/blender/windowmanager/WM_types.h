@@ -1135,6 +1135,10 @@ typedef struct wmDragAssetListItem {
 
 typedef struct wmDragPath {
   char *path;
+  /** BLUI: snapshot selection at drag start; external drops leave this empty. */
+  char **paths;
+  int paths_len;
+  bool is_internal;
   /* Note that even though the enum type uses bit-flags, this should never have multiple type-bits
    * set, so `ELEM()` like comparison is possible. */
   int file_type; /* eFileSel_File_Types */

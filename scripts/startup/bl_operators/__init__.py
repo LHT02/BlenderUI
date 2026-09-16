@@ -15,6 +15,7 @@ _modules = [
     "console",
     "constraint",
     "file",
+    "blui_file",
     "geometry_nodes",
     "image",
     "mesh",
