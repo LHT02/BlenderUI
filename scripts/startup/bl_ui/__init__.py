@@ -18,10 +18,27 @@ if "bpy" in locals():
 # left to fail quietly at startup.
 #
 # The helper modules that remain are the ones the surviving editors actually
-# import: `utils` (shared panel mixins), `properties_paint_common` and
-# `properties_grease_pencil_common` (used by the image editor and the
-# sequencer), `properties_mask_common` (mixin bases the image editor subclasses
-# for its mask panels), and the tool-system pair.
+# import: `properties_paint_common` (the image editor's and the toolbar's paint
+# panels), `properties_mask_common` (the mixin bases the image editor subclasses
+# for its mask panels), and `space_toolsystem_common` (the tool-system helper the
+# image editor, the sequencer and the header all reach for).
+#
+# Two entries are loaded without anything importing them, and that is recorded
+# rather than accidental:
+#
+#   * `generic_ui_list` is the public list helper for add-ons and templates -
+#     `scripts/templates_py/ui_list_generic.py` imports `draw_ui_list` from it,
+#     and so would any add-on that wants Add/Remove/Move buttons on a UIList.
+#   * `properties_grease_pencil_common` is registered for its `GPENCIL_UL_*`
+#     lists. Nothing under `bl_ui/` imports it; it is here because it is in this
+#     list, and it goes only when the Grease Pencil decision does.
+#
+# `utils.py` was removed on 2026-09-16. It held one mixin, `PresetPanel`, for a
+# panel in the **Properties** editor - which BLUI does not register, and which
+# the paragraph above says would raise. Nothing imported the module and nothing
+# referenced `PresetPanel`. An earlier revision of this comment listed `utils`
+# as "shared panel mixins", which was wrong; this was verified by a reachability
+# walk over `bl_ui/` plus a tree-wide grep, not by reading the list.
 _modules = [
     "generic_ui_list",
     "properties_grease_pencil_common",
