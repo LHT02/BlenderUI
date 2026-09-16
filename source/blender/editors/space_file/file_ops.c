@@ -2067,7 +2067,7 @@ static bool file_shell_context_menu_poll(bContext *C)
 
 static bool file_ensure_hovered_is_active(bContext *C, const wmEvent *event);
 
-static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
   SpaceFile *sfile = CTX_wm_space_file(C);
   wmWindow *win = CTX_wm_window(C);
@@ -2076,23 +2076,17 @@ static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmE
     return OPERATOR_CANCELLED;
   }
 
-  /* Right-clicking does not select in Blender's file browser - selection happens
-   * on left press - so right-clicking a file that is not already selected left
-   * the previous selection alone. The operator then found no selected paths,
-   * reported "No file selected" and cancelled, which from the outside is
-   * indistinguishable from a menu entry that does nothing at all.
+  /* The item under the cursor cannot be found from `event` here.
    *
-   * So: if the item under the cursor is not part of the current selection, make
-   * it the selection first, exactly as FILE_OT_mouse_execute does before acting
-   * on the hovered file. When it *is* part of the selection the selection is
-   * left alone, so right-clicking inside a multi-selection still acts on all of
-   * it rather than collapsing to one file. */
+   * A menu entry is invoked through
+   * `WM_operator_name_call_ptr_with_depends_on_cursor()`, so the event this
+   * receives is the menu's own, not one positioned over the file list - an
+   * earlier attempt to re-select the hovered item from it silently found
+   * nothing. The browser's right-press handler has already made the item under
+   * the cursor active (see the RIGHTMOUSE `file.select` entry in the keymap,
+   * which must activate unconditionally for this to hold), so the active file
+   * is what to fall back to. */
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
-  if (params != NULL &&
-      !filelist_entry_select_index_get(sfile->files, params->active_file, CHECK_ALL))
-  {
-    file_ensure_hovered_is_active(C, event);
-  }
 
   const int num_files = filelist_files_ensure(sfile->files);
   if (num_files <= 0) {
@@ -2113,6 +2107,22 @@ static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmE
     char path[FILE_MAX_LIBEXTRA];
     filelist_file_get_full_path(sfile->files, file, path);
     paths[path_count++] = BLI_strdup(path);
+  }
+
+  /* Nothing selected: act on the active file, which the right-press handler has
+   * already pointed at the item under the cursor. Acting on the selection only
+   * is what made this look like a dead menu entry - right-clicking an unselected
+   * file found nothing, and the "No file selected" report goes to the info bar,
+   * which BLUI does not have. */
+  if (path_count == 0 && params != NULL && params->active_file >= 0 &&
+      params->active_file < num_files)
+  {
+    FileDirEntry *file = filelist_file(sfile->files, params->active_file);
+    if (file != NULL) {
+      char path[FILE_MAX_LIBEXTRA];
+      filelist_file_get_full_path(sfile->files, file, path);
+      paths[path_count++] = BLI_strdup(path);
+    }
   }
 
   if (path_count == 0) {

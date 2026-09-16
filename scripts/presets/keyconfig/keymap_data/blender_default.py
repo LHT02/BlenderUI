@@ -1165,10 +1165,18 @@ def km_file_browser(params):
         op_menu_pie("FILEBROWSER_MT_view_pie", {"type": 'ACCENT_GRAVE', "value": 'PRESS'}),
 
         # Select file under cursor before spawning the context menu.
+        # BLUI: this activates unconditionally, where Blender only activated a
+        # file that was already selected. A menu entry cannot see where the
+        # cursor was - it is invoked through
+        # `WM_operator_name_call_ptr_with_depends_on_cursor()`, so it receives
+        # the menu's event - which means the active file is the only record of
+        # what was right-clicked. Without this, right-clicking an unselected
+        # file left the previous selection, and the shell menu entry acted on
+        # the wrong file or on nothing at all.
         ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
          {"properties": [
              ("open", False),
-             ("only_activate_if_selected", params.select_mouse == 'LEFTMOUSE'), ("pass_through", True),
+             ("only_activate_if_selected", False), ("pass_through", True),
          ]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", params.context_menu_event),
     ])
