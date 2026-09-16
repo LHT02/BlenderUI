@@ -577,30 +577,15 @@ static MenuSearch_Data *menu_items_from_ui_create(
     ARegion *region = nullptr;
     MenuSearch_Context *wm_context = nullptr;
 
-    if (include_all_areas) {
-      if (space_type_ui_index == -1) {
-        /* First run without any context, to populate the top-bar without. */
-        wm_context = nullptr;
-        area = nullptr;
-        region = nullptr;
-      }
-      else {
-        wm_context = &wm_contexts[space_type_ui_index];
-        if (wm_context->space_type_ui_index == -1) {
-          continue;
-        }
-
-        area = wm_context->area;
-        region = wm_context->region;
-
-        CTX_wm_area_set(C, area);
-        CTX_wm_region_set(C, region);
-      }
-    }
-    else {
-      area = area_init;
-      region = region_init;
-    }
+    /* The context is always the one the search was started from.
+     *
+     * This was the `else` of an `include_all_areas` test whose `if` walked
+     * every area of the window and set up `CTX_wm_area`/`CTX_wm_region` per
+     * iteration. That branch went dead when the top bar space was deleted - it
+     * was the top bar's menu search that scanned everything - so only this path
+     * was ever taken. */
+    area = area_init;
+    region = region_init;
 
     /* Populate menus from the editors,
      * note that we could create a fake header, draw the header and extract the menus
