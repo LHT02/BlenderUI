@@ -130,10 +130,16 @@ SAVE_OPERATOR = "wm.save_active_file"
 # ever print 0 is indistinguishable from a check that is not running, and
 # because these are the numbers a future round has to drive to zero. See the
 # coverage-boundaries section of `blui/README.md` for the root cause of each.
+#
+# Was 16 / 13 / 5. Groups 1 (ndof), 2 (text.uncomment) and 5 (unreachable
+# view3d.*) were cleaned up, leaving only 3 (object.duplicate_move*) and
+# 4 (collection.*). Tightened to match, so that a regression in any of the
+# cleaned-up groups is caught: the assertion is "not worse than", and a stale
+# value of 16 would let nine deleted-with-difficulty bindings come back unseen.
 MEASURED_DANGLING_BINDINGS = {
-    "Blender": 16,
-    "Blender_27x": 13,
-    "Industry_Compatible": 5,
+    "Blender": 7,
+    "Blender_27x": 7,
+    "Industry_Compatible": 2,
 }
 
 failures = []

@@ -710,8 +710,69 @@ plain binding is a key that does nothing, which no count, no load check, and no
 crash-detector can see.
 
 The `DANGLING_ALLOWED` allowlist in the script is intentionally **empty**, so
-the check can fail. It currently fails, which is the honest state: **the
-dangling bindings have not been cleaned up yet.**
+the check can fail. It currently fails, which is the honest state: **groups 3
+and 4 have not been cleaned up yet.**
+
+**Update 2026-09-16: groups 1, 2 and 5 are fixed; 34 dangling bindings are down
+to 16.** Measured with the same harness, so it is directly comparable:
+
+| Preset | Before | After |
+| --- | --- | --- |
+| `Blender` | 16 | **7** |
+| `Blender_27x` | 13 | **7** |
+| `Industry_Compatible` | 5 | **2** |
+| **Total** | **34** | **16** |
+
+Keymap counts are unchanged at **112 / 103 / 103**, which is the check that the
+deletions removed bindings and not keymaps. All seven scripts were re-run; see
+`## Verification suite coverage boundaries` for the per-script results.
+
+What was changed, all in `keymap_data/*.py`:
+
+- **Group 1** - deleted `view2d.ndof` and `image.view_ndof` from both preset
+  files (four entries). The operators are genuinely absent from the binary, so
+  there is nothing to bind.
+- **Group 2** - renamed `text.uncomment` to `text.comment_toggle` with
+  `{"properties": [("type", 'UNCOMMENT')]}`. The key intent was always correct;
+  only the name was stale.
+- **Group 5** - deleted the six unreachable `view3d.*` bindings and the two
+  `if params.select_mouse == 'LEFTMOUSE':` blocks that existed solely to hold
+  them. Two of those deletions emptied their block, so the block went too.
+
+**One group-5 binding was re-pointed rather than deleted, and this is a
+judgement call worth recording.** It is the only place in this cleanup where
+"delete the dangling item" produced a wrong result, so it is worth knowing why:
+
+`km_object_non_modal` has three branches. In the shipped default preset
+`use_pie_click_drag` and `use_v3d_tab_menu` are both `False`, so the `else`
+branch is the only one that ever runs - and it held exactly two items,
+`object.mode_set` on Tab and the dangling `view3d.object_mode_pie_or_toggle` on
+Ctrl+Tab. Deleting the dangling item would have left that branch with one item
+and the `Object Non-modal` keymap with three, which is a visible behaviour
+change to a keymap BLUI ships, not the removal of a dead binding. The slot was
+instead re-pointed at `object.transfer_mode` (upstream already binds it in this
+same keymap on Alt+Q; verified registered at `editors/object/object_ops.c:52`,
+verified to resolve via `get_rna_type()`).
+
+**This is a replacement, not a restoration, and it does not restore the old
+behaviour.** `object.transfer_mode` copies the mode of the active object, so it
+does nothing useful when the active editor is not an object context - in a text
+editor or image editor Ctrl+Tab now has a binding that silently does nothing,
+where before it had a binding that silently did nothing. Ctrl+Tab is a
+3D-viewport gesture (`VIEW3D_MT_object_mode_pie`); with the 3D view gone there
+is no faithful target for it. If a future reviewer would rather have the slot
+removed and accept the one-item branch, that is a defensible alternative - it
+was not taken here because shrinking a shipped keymap is the larger change.
+
+The re-pointing checks cleanly: `object.transfer_mode` is now bound on both
+`Alt+Q` and `Ctrl+Tab`, and the two do not collide as events.
+
+One further correction, since this section previously implied otherwise:
+`VIEW3D_MT_object_mode_pie` is **not** referenced anywhere in `bl_ui` (grep of
+`source/scripts/`). Both remaining references are in
+`keymap_data/blender_default.py` itself, and in the two branches that never
+execute in the default preset. The mode pie is unreachable from the Python UI
+regardless of this change.
 
 The tempting shortcut is to park the `view3d.*` group in that allowlist - BLUI
 has no 3D viewport, so those bindings are unreachable by construction. That is
@@ -741,21 +802,35 @@ operator should go. Ordered by how live the code path is:
    Shift+D / Alt+D in Object Mode and reachable. Either re-register
    `ED_operatormacros_object()` or remove the bindings. This is the one that needs
    a **product decision**, not a mechanical fix: bringing the macro family back
-   re-opens the abort risk documented above.
-4. `collection.*` (**9 items**) - bound to Ctrl+G and friends in Object Mode and
-   reachable. Same choice as 3, same decision.
+   re-opens the abort risk documented above. **Still open.**
+4. `collection.*` (**9 items, but only 7 are dangling after dedup**) - bound to
+   Ctrl+G and friends in Object Mode and reachable. Same choice as 3, same
+   decision. **Still open.** Note `collection.objects_add_active` and
+   `objects_remove_active` are counted per-preset, so the 9 name-occurrences in
+   the table above are 7 distinct bindings in `Blender` and the same 7 in
+   `Blender_27x` minus `collection.create`, which the 27x preset does not bind.
 5. `view3d.*` (**7 items across `Blender`/`Blender_27x`) - unreachable: there is no
    3D viewport to enter paint or object mode from. Pure cleanup, no decision
-   needed.
+   needed. **Done 2026-09-16.**
+
+**Remaining after this round: 16, all of them groups 3 and 4.** They are the
+same seven bindings in `Blender` and `Blender_27x`, plus one in
+`Industry_Compatible`: `object.duplicate_move`, `object.duplicate_move_linked`
+(not bound in `Industry_Compatible`), and the five `collection.*` entries. Every
+one of them sits in the **`Object Mode`** keymap, which is a live keymap in
+verifying BLUI workspaces - so unlike the group-5 entries these are real bugs,
+and they are waiting on a decision rather than on effort.
 
 Also worth doing while in these files: **the assertion is not yet exact.**
 `MEASURED_KEYMAP_COUNTS` and `MEASURED_DANGLING_BINDINGS` in the script record the
 counts but only assert "not worse than", so that the check fails for the right
 reason (`has no dangling operator bindings`) without also failing on a
-known-and-accepted number. Once groups 1, 2 and 5 are cleaned up, tighten
-`MEASURED_DANGLING_BINDINGS` down to whatever groups 3 and 4 leave behind - and
-when those are decided too, the allowlist can stay empty and the check goes
-green on its own.
+known-and-accepted number. Groups 1, 2 and 5 are now cleaned up, so
+`MEASURED_DANGLING_BINDINGS` is still 16/13/5 and is now loose by 9/6/3. Tighten
+it to **7 / 7 / 2** so the check catches a regression in the cleaned groups too -
+otherwise a future edit that reintroduces `view2d.ndof` would still pass. When
+groups 3 and 4 are decided, tighten it again and the allowlist can stay empty and
+the check goes green on its own.
 
 
 ## Roadmap

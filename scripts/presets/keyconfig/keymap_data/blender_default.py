@@ -3450,11 +3450,15 @@ def km_object_non_modal(params):
             items.extend([
                 ("object.mode_set", {"type": 'TAB', "value": 'PRESS'},
                  {"properties": [("mode", 'EDIT'), ("toggle", True)]}),
-                # Was `view3d.object_mode_pie_or_toggle` (ctrl-tab), which went
-                # with `space_view3d`.  Keep the slot: re-pointed at the operator
-                # upstream already uses for ctrl-tab in the keyboard-driven UI
-                # (`space_topbar.py` and `space_sequencer.py` register it under
-                # the same keys), so the key name and action both stay correct.
+                # Ctrl-Tab was `view3d.object_mode_pie_or_toggle`, which went with
+                # `space_view3d`.  The slot is kept rather than dropped: with
+                # pie-click-drag and v3d-tab-menu both off this is the only branch
+                # that runs, so dropping it would leave one item.  `transfer_mode`
+                # is the mode-switch operator upstream already binds in this keymap
+                # (alt-Q), so the key still does something mode-related.  Note this
+                # is a *replacement*, not a restoration: it copies the mode of the
+                # active object and so has no effect on a non-object selection (a
+                # text or image editor), where ctrl-tab is now simply unbound.
                 ("object.transfer_mode", {"type": 'TAB', "value": 'PRESS', "ctrl": True}, None),
             ])
 
