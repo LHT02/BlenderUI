@@ -519,13 +519,59 @@ points at, and `filelist_file_create_entry()` turns it into a preview icon for
 `.lnk` entries. It builds, and it fails closed - a failed load leaves the entry
 with its ordinary icon - but **it has not been observed working**.
 
-The reason is that there is no instrument for it yet. The file list is not
-reachable from Python (`SpaceFile` exposes `params`, not the entries), and
-driving the browser to a folder from a `--python` script did not rebuild the
-list, so a trace added to the load path never fired. The right instrument is the
-one the shell menu already has: move the extraction out of BLI into the GHOST
-SDK-only pattern and give it a self test, which needs no window and no CMake.
+The reason is that there is no instrument for it yet, and three attempts to
+build one have now been ruled out. Recorded so the next attempt does not repeat
+them:
+
+- The file list is **not reachable from Python**. `SpaceFile` exposes `params`
+  and a handful of operators, not the entries, so `preview_icon_id` cannot be
+  read from a script.
+- Driving the browser to a folder **does not rebuild the list**. Setting
+  `params.directory` updates the property - a later read shows the new path -
+  but the entries stay those of the old directory. `file.refresh()` returns
+  `{'FINISHED'}` and changes nothing, and `file.select_all()` returns
+  `{'FINISHED'}` too.
+- That last one is worth spelling out, because it looks like it should work:
+  `select_all` *does* force entries to be created. Tracing
+  `filelist_file_create_entry()` unconditionally shows the whole directory
+  arriving, one line per entry - all of them from the directory the browser
+  started in. So the load path runs and the `.lnk` branch is simply never
+  reached, because no `.lnk` is ever in the list.
+
+The right instrument is the one the shell menu already has: move the extraction
+out of BLI into the GHOST SDK-only pattern and give it a self test, which needs
+no window, no CMake and no file browser. `shellmenu_selftest.cc` and
+`dragsource_selftest.cc` are the templates, and both were written for exactly
+this reason - a native path that the UI cannot exercise.
+
 Until then this is code that compiles, not a feature.
+
+### A sibling project worth reading
+
+`C:\Users\LHT02\Documents\Codex\2026-06-27\electron-mui-explore-exe-tab-material`
+is an Electron + MUI file explorer aimed at the same problem, and its
+`PROJECT.md` is a running record of the same fights. Three things in it are
+directly applicable:
+
+- **Isolating the shell menu.** It moved the native shell-menu call out of
+  `worker_threads` into a **separate child process**, with a per-request
+  timeout, pending-request cleanup, and a **15-second cooldown after a crash**
+  so a bad provider cannot cause a spawn storm. Its stated lesson is the
+  important part: do not *block* cloud drives, network paths or virtual files to
+  avoid crashes - isolate the third-party shell extensions, thumbnail providers
+  and icon providers instead. A hung COM call cannot be killed in a thread, only
+  in a process, which is what BLUI would need too.
+- **Getting a real icon.** Its `GetSystemImageListBitmap()` uses
+  `SHGetFileInfoW(SHGFI_SYSICONINDEX)` plus `SHGetImageList()` and
+  `IImageList::GetIcon()`, walking Jumbo/ExtraLarge/Large/Small so the icon
+  matches the requested size, and retrying with `SHGFI_USEFILEATTRIBUTES` when
+  the path does not resolve. BLUI asks for `SHGFI_ICON | SHGFI_LARGEICON`, which
+  is always the small system icon. Its conversion step is the same top-down
+  32-bit DIB and `DrawIconEx()` BLUI uses, which is reassuring rather than
+  instructive.
+- **Never show an empty menu.** Its fix list includes "不选中文件时不再只显示空
+  菜单" - the same symptom as BLUI's External menu, with the same conclusion.
+
 
 ## Verified state
 
