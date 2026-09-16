@@ -58,8 +58,8 @@ void ED_undo_operator_repeat_cb_evt(struct bContext *C, void *arg_op, int arg_un
  *
  * It kept that idname when it moved out of the deleted top bar space, because
  * `bl_ui/space_topbar.py` opens it by name and `interface_template_search_menu.cc`
- * lists it. Called once from `wm_init_operatortypes()`'s companions - see
- * `ed_operatortypes_init()` in `editors/interface/interface_ops.c`'s caller.
+ * lists it. Called once from `ED_spacetypes_init()` in
+ * `editors/space_api/spacetypes.c`.
  */
 void ED_undo_history_menu_register(void);
 

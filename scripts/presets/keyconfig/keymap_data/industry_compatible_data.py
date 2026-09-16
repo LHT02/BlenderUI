@@ -113,7 +113,6 @@ def _template_items_basic_tools(*, connected=False):
         op_tool_cycle("builtin.rotate", {"type": 'E', "value": 'PRESS'}),
         op_tool_cycle("builtin.scale", {"type": 'R', "value": 'PRESS'}),
         op_tool_cycle("builtin.transform", {"type": 'T', "value": 'PRESS'}),
-        op_tool_cycle("builtin.annotate", {"type": 'D', "value": 'PRESS'}),
         op_tool_cycle("builtin.measure", {"type": 'M', "value": 'PRESS'}),
         op_tool_cycle("builtin.cursor", {"type": 'C', "value": 'PRESS'}),
     ]
@@ -537,7 +536,6 @@ def km_image(params):
         op_tool_cycle("builtin.transform", {"type": 'E', "value": 'PRESS'}),
         op_tool_cycle("builtin.transform", {"type": 'R', "value": 'PRESS'}),
         op_tool_cycle("builtin.cursor", {"type": 'C', "value": 'PRESS'}),
-        op_tool_cycle("builtin.annotate", {"type": 'D', "value": 'PRESS'}),
         op_tool_cycle("builtin.sample", {"type": 'I', "value": 'PRESS'}),
 
     ])
