@@ -112,6 +112,16 @@ def reopen():
         report(window.scene is not None, "the new window has a scene")
         report(window.workspace is not None and window.workspace.name == "Settings",
                "the new window is on the component that was asked for")
+
+        # A screen with no areas is a blank window, which looks just as broken as
+        # no window at all - and the layout it was given is re-used from a
+        # workspace whose own window has closed, which is exactly when that could
+        # go wrong.
+        areas = list(window.screen.areas) if window.screen is not None else []
+        report(len(areas) > 0, "the new window's screen has areas (%d)" % len(areas))
+        report(any(area.type == "PREFERENCES" for area in areas),
+               "the areas are the component that was asked for (%s)"
+               % [area.type for area in areas])
     return None
 
 
