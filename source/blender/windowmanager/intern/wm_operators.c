@@ -530,14 +530,6 @@ static const char *wm_context_member_from_ptr(const bContext *C,
           TEST_PTR_DATA_TYPE("space_data", RNA_Space, ptr, space_data);
 
           switch (space_data->spacetype) {
-            case SPACE_VIEW3D: {
-              const View3D *v3d = (View3D *)space_data;
-              const View3DShading *shading = &v3d->shading;
-
-              TEST_PTR_DATA_TYPE("space_data.overlay", RNA_View3DOverlay, ptr, v3d);
-              TEST_PTR_DATA_TYPE("space_data.shading", RNA_View3DShading, ptr, shading);
-              break;
-            }
             case SPACE_GRAPH: {
               const SpaceGraph *sipo = (SpaceGraph *)space_data;
               const bDopeSheet *ads = sipo->ads;

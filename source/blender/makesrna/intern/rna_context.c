@@ -102,20 +102,6 @@ static PointerRNA rna_Context_region_get(PointerRNA *ptr)
   return newptr;
 }
 
-static PointerRNA rna_Context_region_data_get(PointerRNA *ptr)
-{
-  bContext *C = (bContext *)ptr->data;
-
-  /* only exists for one space still, no generic system yet */
-  if (CTX_wm_view3d(C)) {
-    PointerRNA newptr;
-    RNA_pointer_create((ID *)CTX_wm_screen(C), &RNA_RegionView3D, CTX_wm_region_data(C), &newptr);
-    return newptr;
-  }
-
-  return PointerRNA_NULL;
-}
-
 static PointerRNA rna_Context_gizmo_group_get(PointerRNA *ptr)
 {
   bContext *C = (bContext *)ptr->data;
@@ -276,11 +262,6 @@ void RNA_def_context(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_struct_type(prop, "Region");
   RNA_def_property_pointer_funcs(prop, "rna_Context_region_get", NULL, NULL, NULL);
-
-  prop = RNA_def_property(srna, "region_data", PROP_POINTER, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_struct_type(prop, "RegionView3D");
-  RNA_def_property_pointer_funcs(prop, "rna_Context_region_data_get", NULL, NULL, NULL);
 
   prop = RNA_def_property(srna, "gizmo_group", PROP_POINTER, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

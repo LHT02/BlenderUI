@@ -421,6 +421,15 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
 {
   ShellMenu shell_menu;
   if (!shell_menu.build(utf8_paths, count)) {
+    /* BLUI has no info bar, so a failed build is indistinguishable from a menu
+     * entry that does nothing - which is exactly how this was reported. Say so
+     * out loud instead. */
+    MessageBoxW(static_cast<HWND>(hwnd),
+                L"The Windows shell menu could not be built for the selected file(s).\n\n"
+                L"This normally means the shell extension that owns the file type did not "
+                L"respond to the shell's IContextMenu request.",
+                L"BLUI - Shell Menu",
+                MB_OK | MB_ICONWARNING);
     return false;
   }
 

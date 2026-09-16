@@ -544,6 +544,17 @@ class FILEBROWSER_MT_context_menu(FileBrowserMenu, Menu):
                             text="Windows Shell Menu...", icon='FILEBROWSER')
             layout.separator()
 
+        # BLUI: file clipboard. These are on Ctrl+C/X/V as well, but the
+        # shortcuts are only reachable while the pointer is over the file list,
+        # so the menu has to offer them too - a shortcut nobody can find is not
+        # a feature.
+        col = layout.column(align=True)
+        col.operator("file.clipboard_cut", text="Cut", icon='CUT')
+        col.operator("file.clipboard_copy", text="Copy", icon='COPYDOWN')
+        col.operator("file.clipboard_paste", text="Paste", icon='PASTEDOWN')
+
+        layout.separator()
+
         layout.operator("file.previous", text="Back")
         layout.operator("file.next", text="Forward")
         layout.operator("file.parent", text="Go to Parent")

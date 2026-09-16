@@ -1215,21 +1215,11 @@ void gizmo_xform_message_subscribe(wmGizmoGroup *gzgroup,
     }
   }
 
-  PointerRNA view3d_ptr;
-  RNA_pointer_create(&screen->id, &RNA_SpaceView3D, area->spacedata.first, &view3d_ptr);
-
+  /* BLUI has no `SpaceView3D` RNA, so the 3D transform gizmo's subscription to
+   * `SpaceView3D.show_gizmo_object_*` has nothing to bind to. The gizmo itself
+   * is unreachable without a 3D viewport and goes with the rest of the block. */
   if (type_fn == VIEW3D_GGT_xform_gizmo) {
-    GizmoGroup *ggd = static_cast<GizmoGroup *>(gzgroup->customdata);
-    if (ggd->use_twtype_refresh) {
-      const PropertyRNA *props[] = {
-          &rna_SpaceView3D_show_gizmo_object_translate,
-          &rna_SpaceView3D_show_gizmo_object_rotate,
-          &rna_SpaceView3D_show_gizmo_object_scale,
-      };
-      for (int i = 0; i < ARRAY_SIZE(props); i++) {
-        WM_msg_subscribe_rna(mbus, &view3d_ptr, props[i], &msg_sub_value_gz_tag_refresh, __func__);
-      }
-    }
+    /* pass */
   }
   else if (type_fn == VIEW3D_GGT_xform_cage) {
     /* pass */

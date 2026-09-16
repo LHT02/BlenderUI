@@ -197,9 +197,6 @@ PyObject *pyrna_callback_remove(BPy_StructRNA *self, PyObject *args)
 /* reverse of rna_Space_refine() */
 static eSpace_Type rna_Space_refine_reverse(StructRNA *srna)
 {
-  if (srna == &RNA_SpaceView3D) {
-    return SPACE_VIEW3D;
-  }
   if (srna == &RNA_SpaceGraphEditor) {
     return SPACE_GRAPH;
   }

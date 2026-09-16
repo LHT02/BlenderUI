@@ -2096,6 +2096,7 @@ static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmE
 
   const int num_files = filelist_files_ensure(sfile->files);
   if (num_files <= 0) {
+    fprintf(stderr, "BLUI shell menu: no files in list\n");
     return OPERATOR_CANCELLED;
   }
 
@@ -2133,9 +2134,15 @@ static int file_shell_context_menu_invoke(bContext *C, wmOperator *op, const wmE
 
   if (path_count == 0) {
     MEM_freeN(paths);
+    fprintf(stderr,
+            "BLUI shell menu: nothing to act on (num_files=%d active_file=%d)\n",
+            num_files,
+            params != NULL ? params->active_file : -999);
     BKE_report(op->reports, RPT_ERROR, "No file selected");
     return OPERATOR_CANCELLED;
   }
+
+  fprintf(stderr, "BLUI shell menu: showing menu for %d path(s), first=%s\n", path_count, paths[0]);
 
   int screen_x = 0;
   int screen_y = 0;

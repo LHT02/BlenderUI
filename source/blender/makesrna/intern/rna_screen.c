@@ -266,25 +266,12 @@ static void rna_Area_ui_type_update(bContext *C, PointerRNA *ptr)
   ED_area_tag_refresh(area);
 }
 
-static PointerRNA rna_Region_data_get(PointerRNA *ptr)
+static PointerRNA rna_Region_data_get(PointerRNA *UNUSED(ptr))
 {
-  bScreen *screen = (bScreen *)ptr->owner_id;
-  ARegion *region = ptr->data;
-
-  if (region->regiondata != NULL) {
-    if (region->regiontype == RGN_TYPE_WINDOW) {
-      /* We could make this static, it won't change at run-time. */
-      SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
-      /* BLUI does not register the 3D viewport, so `st` is normally NULL and
-       * `Region.data` is simply None. The lookup stays so that a region which
-       * is *not* a 3D view window never gets its data handed out as one. */
-      if (st != NULL && region->type == BKE_regiontype_from_id(st, region->regiontype)) {
-        PointerRNA newptr;
-        RNA_pointer_create(&screen->id, &RNA_RegionView3D, region->regiondata, &newptr);
-        return newptr;
-      }
-    }
-  }
+  /* `Region.data` exists only to hand out a `RegionView3D`, which BLUI has no
+   * RNA for because it has no 3D viewport that could create one. The property
+   * stays so that `region.data` is None rather than an AttributeError; it is
+   * always None now. */
   return PointerRNA_NULL;
 }
 

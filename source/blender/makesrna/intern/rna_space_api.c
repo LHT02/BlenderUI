@@ -34,34 +34,6 @@ int rna_object_type_visibility_icon_get_common(int object_type_exclude_viewport,
   return view_value ? ICON_HIDE_ON : ICON_HIDE_OFF;
 }
 
-static void rna_RegionView3D_update(ID *id, RegionView3D *rv3d, bContext *C)
-{
-  bScreen *screen = (bScreen *)id;
-
-  ScrArea *area;
-  ARegion *region;
-
-  area_region_from_regiondata(screen, rv3d, &area, &region);
-
-  if (area && region && area->spacetype == SPACE_VIEW3D) {
-    Main *bmain = CTX_data_main(C);
-    View3D *v3d = area->spacedata.first;
-    wmWindowManager *wm = CTX_wm_manager(C);
-    wmWindow *win;
-
-    for (win = wm->windows.first; win; win = win->next) {
-      if (WM_window_get_active_screen(win) == screen) {
-        Scene *scene = WM_window_get_active_scene(win);
-        ViewLayer *view_layer = WM_window_get_active_view_layer(win);
-        Depsgraph *depsgraph = BKE_scene_ensure_depsgraph(bmain, scene, view_layer);
-
-        ED_view3d_update_viewmat(depsgraph, scene, v3d, region, NULL, NULL, NULL, false);
-        break;
-      }
-    }
-  }
-}
-
 static void rna_SpaceTextEditor_region_location_from_cursor(
     ID *id, SpaceText *st, int line, int column, int r_pixel_pos[2])
 {
@@ -75,15 +47,6 @@ static void rna_SpaceTextEditor_region_location_from_cursor(
 }
 
 #else
-
-void RNA_api_region_view3d(StructRNA *srna)
-{
-  FunctionRNA *func;
-
-  func = RNA_def_function(srna, "update", "rna_RegionView3D_update");
-  RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_CONTEXT);
-  RNA_def_function_ui_description(func, "Recalculate the view matrices");
-}
 
 void RNA_api_space_node(StructRNA *srna)
 {

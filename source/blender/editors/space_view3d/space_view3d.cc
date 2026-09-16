@@ -1445,8 +1445,6 @@ static void view3d_main_region_message_subscribe(const wmRegionMessageSubscribeP
       &RNA_UnitSettings, /* grid-floor */
 
       &RNA_View3DCursor,
-      &RNA_View3DOverlay,
-      &RNA_View3DShading,
       &RNA_World,
   };
 
@@ -1619,27 +1617,11 @@ static void view3d_header_region_listener(const wmRegionListenerParams *params)
 #endif
 }
 
-static void view3d_header_region_message_subscribe(const wmRegionMessageSubscribeParams *params)
+static void view3d_header_region_message_subscribe(
+    const wmRegionMessageSubscribeParams * /*params*/)
 {
-  struct wmMsgBus *mbus = params->message_bus;
-  ARegion *region = params->region;
-
-  wmMsgParams_RNA msg_key_params{};
-
-  /* Only subscribe to types. */
-  StructRNA *type_array[] = {
-      &RNA_View3DShading,
-  };
-
-  wmMsgSubscribeValue msg_sub_value_region_tag_redraw{};
-  msg_sub_value_region_tag_redraw.owner = region;
-  msg_sub_value_region_tag_redraw.user_data = region;
-  msg_sub_value_region_tag_redraw.notify = ED_region_do_msg_notify_tag_redraw;
-
-  for (int i = 0; i < ARRAY_SIZE(type_array); i++) {
-    msg_key_params.ptr.type = type_array[i];
-    WM_msg_subscribe_rna_params(mbus, &msg_key_params, &msg_sub_value_region_tag_redraw, __func__);
-  }
+  /* The only thing this subscribed to was `View3DShading`, whose RNA went with
+   * the rest of the 3D viewport. The 3D header has no subscribers left. */
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
