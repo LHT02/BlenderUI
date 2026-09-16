@@ -69,13 +69,28 @@ def _step():
         return 0.5
 
     if step == 2:
-        print("POPUP: invoking file.shell_context_menu (blocks until dismissed)")
+        print("POPUP: invoke #1 (blocks until dismissed)")
         sys.stdout.flush()
         try:
             with bpy.context.temp_override(area=area, region=region, window=window):
                 # INVOKE_DEFAULT is what a menu entry uses; a bare call is
                 # EXEC_DEFAULT, and this operator has no exec callback at all,
                 # so a bare call never reaches the code under test.
+                result = bpy.ops.file.shell_context_menu('INVOKE_DEFAULT')
+            print("POPUP: operator returned %r" % (result,))
+        except Exception as exc:  # noqa: BLE001
+            print("POPUP: operator raised %r" % (exc,))
+        sys.stdout.flush()
+        return 0.3
+
+    if step == 3:
+        # Second invoke in the same process. If the first one stalled, this is
+        # the case that used to behave worse than the first - the shell work it
+        # starts runs alongside the build that is still stuck.
+        print("POPUP: invoke #2 (same process)")
+        sys.stdout.flush()
+        try:
+            with bpy.context.temp_override(area=area, region=region, window=window):
                 result = bpy.ops.file.shell_context_menu('INVOKE_DEFAULT')
             print("POPUP: operator returned %r" % (result,))
         except Exception as exc:  # noqa: BLE001

@@ -523,17 +523,18 @@ static void shell_menu_log(const char *fmt, ...)
 /**
  * How long `build()` gets before it is abandoned.
  *
- * This is the only defence against an installed shell extension that hangs
- * inside `QueryContextMenu`, which is exactly what happens on the machine this
- * was written on: BLUI called it on the main thread and the whole UI stopped
- * responding, which is how "the shell menu entry does nothing" was reported.
+ * Eight seconds, not thirty. Measured working builds on the machine that
+ * reported the stall: 672 ms, 641 ms, 875 ms, 1312 ms - five times the slowest
+ * of those is a generous bound, and a stall that costs eight seconds is a
+ * nuisance where thirty is an outage.
  *
- * The thread cannot be killed - it is inside third-party code holding unknown
- * locks - so a timeout leaves it running and never answers. Five seconds is
- * generous for loading extensions (measured at 16 ms for `GetUIObjectOf`) while
- * still being short enough that a person does not conclude the app has died.
+ * A stalled build cannot be killed: it is inside the shell holding unknown
+ * locks, and `TerminateThread` would be worse. What can be done is to refuse to
+ * start a second one while the first is still stuck - measured on that machine,
+ * running shell work alongside a stalled build made *other* checks hang, which
+ * is why a second click behaved worse than the first.
  */
-constexpr DWORD kBuildTimeoutMs = 30000;
+constexpr DWORD kBuildTimeoutMs = 8000;
 
 /** What the worker thread produces, and how it says it is finished. */
 struct ShellMenuBuildJob {
@@ -543,6 +544,40 @@ struct ShellMenuBuildJob {
   IStream *stream = nullptr;
   HMENU menu = nullptr;
 };
+
+/** The build that timed out and is still running inside the shell, if any. */
+static ShellMenuBuildJob *g_abandoned_job = nullptr;
+static HANDLE g_abandoned_thread = nullptr;
+
+/**
+ * Let go of an abandoned build if it has since finished on its own.
+ *
+ * Its thread may still be inside the shell, in which case it is left alone -
+ * closing its event or freeing its job would be a use-after-free if it ever
+ * wakes up. If it *has* finished, everything it produced is released here,
+ * which turns a permanent leak into a temporary one.
+ */
+static void shell_menu_reap_abandoned()
+{
+  if (g_abandoned_job == nullptr) {
+    return;
+  }
+  if (WaitForSingleObject(g_abandoned_job->done, 0) != WAIT_OBJECT_0) {
+    return;
+  }
+
+  shell_menu_log("the abandoned build finished after all; releasing it");
+  if (g_abandoned_job->menu != nullptr) {
+    DestroyMenu(g_abandoned_job->menu);
+  }
+  CloseHandle(g_abandoned_job->done);
+  if (g_abandoned_thread != nullptr) {
+    CloseHandle(g_abandoned_thread);
+  }
+  delete g_abandoned_job;
+  g_abandoned_job = nullptr;
+  g_abandoned_thread = nullptr;
+}
 
 static DWORD WINAPI shell_menu_build_thread(void *param)
 {
@@ -646,6 +681,13 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
     return false;
   }
 
+  /* Let go of an earlier abandoned build if it has since finished. It is NOT
+   * used to refuse the next one: the session log from the machine that stalls
+   * shows attempts two through thirteen succeeding in about 600 ms each, so
+   * refusing would deny a menu that works. Only one abandoned build is kept,
+   * because only the most recent one's handles are still needed. */
+  shell_menu_reap_abandoned();
+
   /* The paths belong to the caller and are freed as soon as this returns, so
    * the worker needs its own copy. */
   ShellMenuBuildJob *job = new ShellMenuBuildJob();
@@ -665,20 +707,23 @@ bool GHOST_ShellMenuWin32_Popup(void *hwnd,
   }
 
   if (WaitForSingleObject(job->done, kBuildTimeoutMs) != WAIT_OBJECT_0) {
-    shell_menu_log("build abandoned after %lu ms - a shell extension is hung in "
-                   "QueryContextMenu. The worker thread is left running; it cannot be "
-                   "killed safely.",
+    shell_menu_log("build abandoned after %lu ms - the shell is stuck in QueryContextMenu. "
+                   "The worker is left running; it cannot be killed safely.",
                    (unsigned long)kBuildTimeoutMs);
-    /* `job`, its event and the thread handle are deliberately leaked. The thread
-     * is alive inside third-party code and will call SetEvent() if it ever
-     * wakes, so closing the handles now would be a use-after-free, and freeing
-     * `job` would hand it a dangling pointer. One leaked thread per hung attempt
-     * is the price of not killing the application instead. */
-    CloseHandle(thread);
+    /* `job` and its event are deliberately NOT freed and the thread is not
+     * closed: the worker is alive inside the shell and will use both if it ever
+     * wakes. `shell_menu_reap_abandoned()` releases them if it does. */
+    if (g_abandoned_job != nullptr) {
+      /* Only the newest one is tracked; an older one is already unreachable and
+       * leaking it is the same as leaking this one. */
+      shell_menu_log("note: an earlier abandoned build is no longer tracked");
+    }
+    g_abandoned_job = job;
+    g_abandoned_thread = thread;
     MessageBoxW(static_cast<HWND>(hwnd),
                 L"The Windows shell menu did not respond in time and was cancelled.\n\n"
-                L"An installed shell extension is hung while building the menu for this "
-                L"file. BLUI is still usable; the extension should be updated or removed.",
+                L"The shell is stuck building the menu for this item. BLUI is still usable; "
+                L"try another item, or use the file browser's own menu entries.",
                 L"BLUI - Shell Menu",
                 MB_OK | MB_ICONWARNING);
     return false;
