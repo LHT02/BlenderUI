@@ -200,9 +200,104 @@ static void test_clipboard()
         "an empty file list is rejected");
 }
 
-int main()
+/* ---------------------------------------------------------------------------
+ * Two-process clipboard lifetime probe.
+ *
+ * Whether clipboard data survives the process that published it decides
+ * whether the OLE publish path in `GHOST_DragSourceWin32_ClipboardSetFiles` is
+ * load-bearing or merely tidy. It is cheap to measure instead of argue about:
+ * one process sets the clipboard and exits, a second process - by then the only
+ * one alive - reads it back.
+ *
+ *   dragsource_selftest.exe --set       publish via the shipping code path
+ *   dragsource_selftest.exe --set-raw   publish with plain SetClipboardData
+ *   dragsource_selftest.exe --check     read it back
+ *
+ * The path deliberately does not exist: nothing in this path stats the files,
+ * and using a real one would invite the reader to think it did.
+ */
+
+static const char *const g_probe_path = "C:\\blui-clipboard-lifetime-probe\\survives.txt";
+
+static void probe_set_ole()
 {
+  const char *paths[1] = {g_probe_path};
+  GHOST_DragSourceWin32_ClipboardSetFiles(paths, 1, false);
+}
+
+/** The pre-OLE implementation, kept so the two can be compared measurement for
+ * measurement rather than by recollection of what the API promises. */
+static void probe_set_raw()
+{
+  const char *paths[1] = {g_probe_path};
+  HGLOBAL hdrop = static_cast<HGLOBAL>(GHOST_DragSourceWin32_CreateHDrop(paths, 1));
+  if (hdrop == nullptr) {
+    return;
+  }
+  if (!OpenClipboard(nullptr)) {
+    GlobalFree(hdrop);
+    return;
+  }
+  EmptyClipboard();
+  if (SetClipboardData(CF_HDROP, hdrop) == nullptr) {
+    GlobalFree(hdrop);
+  }
+  CloseClipboard();
+}
+
+static int probe_check()
+{
+  char **paths = nullptr;
+  bool move = true;
+  const int count = GHOST_DragSourceWin32_ClipboardGetFiles(&paths, &move);
+  const bool ok = count == 1 && paths != nullptr && paths[0] != nullptr &&
+                  strcmp(paths[0], g_probe_path) == 0;
+
+  printf("%s the clipboard outlived the publishing process (%d path%s)\n",
+         ok ? "  ok  " : " FAIL ",
+         count,
+         count == 1 ? "" : "s");
+  if (count > 0 && !ok) {
+    for (int i = 0; i < count; i++) {
+      printf("        [%d] %s\n", i, paths[i] ? paths[i] : "(null)");
+    }
+  }
+  GHOST_DragSourceWin32_FreePaths(paths, count);
+  return ok ? 0 : 1;
+}
+
+int main(int argc, char **argv)
+{
+  const bool set_ole = argc > 1 && strcmp(argv[1], "--set") == 0;
+  const bool set_raw = argc > 1 && strcmp(argv[1], "--set-raw") == 0;
+  const bool check_only = argc > 1 && strcmp(argv[1], "--check") == 0;
+
   const HRESULT ole = OleInitialize(nullptr);
+
+  if (set_ole || set_raw) {
+    /* Mirror how BLUI leaves: it tears OLE down on shutdown, so a probe that
+     * skipped that would be testing a kinder exit than the real one. */
+    if (set_ole) {
+      probe_set_ole();
+    }
+    else {
+      probe_set_raw();
+    }
+    printf("  set  %s via %s\n", g_probe_path, set_ole ? "OLE" : "SetClipboardData");
+    if (SUCCEEDED(ole)) {
+      OleUninitialize();
+    }
+    return 0;
+  }
+
+  if (check_only) {
+    const int result = probe_check();
+    if (SUCCEEDED(ole)) {
+      OleUninitialize();
+    }
+    return result;
+  }
+
   printf("OleInitialize -> 0x%08lX\n", (unsigned long)ole);
 
   test_payload();

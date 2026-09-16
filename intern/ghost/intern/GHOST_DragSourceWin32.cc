@@ -293,7 +293,10 @@ namespace {
 
 class DropSource : public IDataObject, public IDropSource {
  public:
-  DropSource(const char *const *utf8_paths, int count) : m_ref_count(1)
+  DropSource(const char *const *utf8_paths,
+             int count,
+             DWORD preferred_effect = DROPEFFECT_COPY)
+      : m_preferred_effect(preferred_effect), m_ref_count(1)
   {
     m_paths.reserve(size_t(count));
     for (int i = 0; i < count; i++) {
@@ -375,10 +378,12 @@ class DropSource : public IDataObject, public IDropSource {
         GlobalFree(hglobal);
         return STG_E_MEDIUMFULL;
       }
-      /* Copy is the safe default: never let a drag silently move a user's
-       * files out of the folder they were browsing. Holding Shift in Explorer
-       * still turns it into a move. */
-      *effect = DROPEFFECT_COPY;
+      /* Copy is the safe default for a drag: never let it silently move a
+       * user's files out of the folder they were browsing. Holding Shift in
+       * Explorer still turns it into a move. A clipboard cut passes
+       * `DROPEFFECT_MOVE` explicitly, which is what makes Explorer delete the
+       * originals on paste. */
+      *effect = m_preferred_effect;
       GlobalUnlock(hglobal);
 
       medium->tymed = TYMED_HGLOBAL;
@@ -496,6 +501,7 @@ class DropSource : public IDataObject, public IDropSource {
 
   std::vector<std::string> m_paths;
   CLIPFORMAT m_preferred_effect_format;
+  DWORD m_preferred_effect;
   LONG m_ref_count;
 };
 
@@ -544,6 +550,24 @@ GHOST_TSuccess GHOST_DragSourceWin32_ClipboardSetFiles(const char *const *utf8_p
     return GHOST_kFailure;
   }
 
+  /* Publish through OLE first. Files put on the clipboard by the raw
+   * `SetClipboardData` path below belong to this process and are discarded the
+   * moment it exits, which silently empties the clipboard when BLUI closes -
+   * "copy a file, quit, paste in Explorer" would paste nothing.
+   * `OleFlushClipboard` renders the payload into a shared block that outlives
+   * us, so the copy survives. */
+  DropSource *source = new DropSource(utf8_paths, count, move ? DROPEFFECT_MOVE : DROPEFFECT_COPY);
+  if (OleSetClipboard(static_cast<IDataObject *>(source)) == S_OK) {
+    /* `OleSetClipboard` took its own reference, so ours is dropped either way.
+     * A failed flush leaves a usable in-session clipboard, so it is not treated
+     * as a failed copy - it only means the data still dies with the process. */
+    OleFlushClipboard();
+    source->Release();
+    return GHOST_kSuccess;
+  }
+  source->Release();
+
+  /* Fallback for a thread where OLE was never initialised. */
   HGLOBAL hdrop = static_cast<HGLOBAL>(GHOST_DragSourceWin32_CreateHDrop(utf8_paths, count));
   if (hdrop == nullptr) {
     return GHOST_kFailure;
