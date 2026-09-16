@@ -4108,14 +4108,6 @@ static int region_toggle_exec(bContext *C, wmOperator *op)
 
 static bool region_toggle_poll(bContext *C)
 {
-  ScrArea *area = CTX_wm_area(C);
-
-  /* Don't flip anything around in top-bar. */
-  if (area && area->spacetype == SPACE_TOPBAR) {
-    CTX_wm_operator_poll_msg_set(C, "Toggling regions in the Top-bar is not allowed");
-    return false;
-  }
-
   return ED_operator_areaactive(C);
 }
 
@@ -4176,14 +4168,6 @@ static int region_flip_exec(bContext *C, wmOperator *UNUSED(op))
 
 static bool region_flip_poll(bContext *C)
 {
-  ScrArea *area = CTX_wm_area(C);
-
-  /* Don't flip anything around in top-bar. */
-  if (area && area->spacetype == SPACE_TOPBAR) {
-    CTX_wm_operator_poll_msg_set(C, "Flipping regions in the Top-bar is not allowed");
-    return 0;
-  }
-
   return ED_operator_areaactive(C);
 }
 
@@ -4311,9 +4295,7 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
   {
     PointerRNA ptr;
     RNA_pointer_create((ID *)CTX_wm_screen(C), &RNA_Space, area->spacedata.first, &ptr);
-    if (!ELEM(area->spacetype, SPACE_TOPBAR)) {
-      uiItemR(layout, &ptr, "show_region_header", 0, IFACE_("Show Header"), ICON_NONE);
-    }
+    uiItemR(layout, &ptr, "show_region_header", 0, IFACE_("Show Header"), ICON_NONE);
 
     ARegion *region_header = BKE_area_find_region_type(area, RGN_TYPE_HEADER);
     uiLayout *col = uiLayoutColumn(layout, 0);
@@ -4332,7 +4314,7 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
   /* default is WM_OP_INVOKE_REGION_WIN, which we don't want here. */
   uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
 
-  if (!ELEM(area->spacetype, SPACE_TOPBAR)) {
+  if (!ELEM(area->spacetype, SPACE_EMPTY)) {
     uiItemS(layout);
     uiItemO(layout, but_flip_str, ICON_NONE, "SCREEN_OT_region_flip");
     uiItemS(layout);
@@ -5493,7 +5475,7 @@ static void SCREEN_OT_region_blend(wmOperatorType *ot)
 static bool space_type_set_or_cycle_poll(bContext *C)
 {
   ScrArea *area = CTX_wm_area(C);
-  return (area && area->spacetype != SPACE_TOPBAR);
+  return (area && area->spacetype != SPACE_EMPTY);
 }
 
 static int space_type_set_or_cycle_exec(bContext *C, wmOperator *op)

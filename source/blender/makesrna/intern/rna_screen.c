@@ -109,13 +109,6 @@ static int rna_Area_type_get(PointerRNA *ptr)
 
 static void rna_Area_type_set(PointerRNA *ptr, int value)
 {
-  if (value == SPACE_TOPBAR) {
-    /* Special case: An area can not be set to show the top-bar editor (or
-     * other global areas). However it should still be possible to identify
-     * its type from Python. */
-    return;
-  }
-
   ScrArea *area = (ScrArea *)ptr->data;
   /* Empty areas are locked. */
   if ((value == SPACE_EMPTY) || (area->spacetype == SPACE_EMPTY)) {
@@ -182,10 +175,10 @@ static const EnumPropertyItem *rna_Area_ui_type_itemf(bContext *C,
   }
 
   for (; item_from->identifier; item_from++) {
-    /* Global areas and the Info space are machinery rather than editors: they
-     * are named in `rna_enum_space_type_items` so that `Area.type` can identify
-     * them, but they are never offered as a type to switch an area to. */
-    if (ELEM(item_from->value, SPACE_TOPBAR, SPACE_INFO)) {
+    /* The Info space is machinery rather than an editor: it is named in
+     * `rna_enum_space_type_items` so that `Area.type` can identify it, but it
+     * is never offered as a type to switch an area to. */
+    if (item_from->value == SPACE_INFO) {
       continue;
     }
 

@@ -31,7 +31,6 @@ set(LIB
   bf_editor_space_outliner
   bf_editor_space_sequencer
   bf_editor_space_text
-  bf_editor_space_topbar
   bf_editor_space_userpref
   bf_editor_space_view3d
 )

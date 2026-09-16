@@ -91,7 +91,6 @@ bGPdata **ED_gpencil_data_get_pointers_direct(ScrArea *area, Object *ob, Pointer
     switch (area->spacetype) {
       case SPACE_PROPERTIES: /* properties */
       case SPACE_INFO:       /* header info */
-      case SPACE_TOPBAR:     /* Top-bar */
       case SPACE_VIEW3D:     /* 3D-View */
       {
         if (ob && (ob->type == OB_GPENCIL_LEGACY)) {
@@ -128,7 +127,6 @@ bGPdata **ED_annotation_data_get_pointers_direct(ID *screen_id,
         return NULL;
       }
 
-      case SPACE_TOPBAR: /* Top-bar */
       case SPACE_VIEW3D: /* 3D-View */
       {
         if (r_ptr) {

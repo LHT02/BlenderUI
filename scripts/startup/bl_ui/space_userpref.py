@@ -1654,7 +1654,12 @@ class USERPREF_PT_navigation_fly_walk_gravity(NavigationPanel, CenterAlignMixIn,
 # Special case, this is only exposed as a popover.
 class USERPREF_PT_ndof_settings(Panel):
     bl_label = "3D Mouse Settings"
-    bl_space_type = 'TOPBAR'  # dummy.
+    # Was 'TOPBAR' as a dummy. BLUI deleted the top bar space, so the string no
+    # longer resolves and `register_class` would raise - which aborts the rest
+    # of bl_ui's registration and takes the preferences panels with it. 'INFO'
+    # is a space BLUI keeps, and any registered space type works here: the
+    # panel is only ever reached as a popover, never by its bl_space_type.
+    bl_space_type = 'INFO'  # dummy.
     bl_region_type = 'HEADER'
     bl_ui_units_x = 12
 

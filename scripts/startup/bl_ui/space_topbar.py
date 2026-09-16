@@ -1,69 +1,34 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+"""
+BLUI: this module is named after the top bar space, and the space is gone.
+
+`editors/space_topbar/` was deleted along with `SPACE_TOPBAR`, so nothing here
+is a top-bar area any more. What stays is the *menu bar* - `TOPBAR_MT_editor_menus`
+and everything it opens - which `bl_ui/space_blui.py` draws into a window
+header. Menus carry no `bl_space_type`, so they survive the space's deletion
+untouched.
+
+Two things did have to change:
+
+- `TOPBAR_HT_upper_bar` (the `Header` subclass) was removed. It declared
+  `bl_space_type = 'TOPBAR'`, which no longer resolves, and `register_class`
+  would raise - silently aborting the rest of `bl_ui`'s registration loop and
+  taking the preferences panels with it. This is the same failure the status bar
+  caused; see the README.
+- The remaining panels that used `'TOPBAR'` as a *dummy* space type were
+  repointed to `'INFO'`. They are only ever reached as popovers, by name, so any
+  registered space type works.
+
+The file name is kept so the `TOPBAR_MT_*` idnames and this module stay
+findable together.
+"""
 import bpy
-from bpy.types import Header, Menu, Panel
+from bpy.types import Menu, Panel
 
 from bpy.app.translations import (
     pgettext_iface as iface_,
     contexts as i18n_contexts,
 )
-
-
-class TOPBAR_HT_upper_bar(Header):
-    bl_space_type = 'TOPBAR'
-
-    def draw(self, context):
-        region = context.region
-
-        if region.alignment == 'RIGHT':
-            self.draw_right(context)
-        else:
-            self.draw_left(context)
-
-    def draw_left(self, context):
-        layout = self.layout
-
-        window = context.window
-        screen = context.screen
-
-        TOPBAR_MT_editor_menus.draw_collapsible(context, layout)
-
-        layout.separator()
-
-        if not screen.show_fullscreen:
-            layout.template_ID_tabs(
-                window, "workspace",
-                new="workspace.add",
-                menu="TOPBAR_MT_workspace_menu",
-            )
-        else:
-            layout.operator(
-                "screen.back_to_previous",
-                icon='SCREEN_BACK',
-                text="Back to Previous",
-            )
-
-    def draw_right(self, context):
-        layout = self.layout
-
-        window = context.window
-        screen = context.screen
-        scene = window.scene
-
-        # If statusbar is hidden, still show messages at the top
-        if not screen.show_statusbar:
-            layout.template_reports_banner()
-            layout.template_running_jobs()
-
-        # Active workspace view-layer is retrieved through window, not through workspace.
-        layout.template_ID(window, "scene", new="scene.new",
-                           unlink="scene.delete")
-
-        row = layout.row(align=True)
-        row.template_search(
-            window, "view_layer",
-            scene, "view_layers",
-            new="scene.view_layer_add",
-            unlink="scene.view_layer_remove")
 
 
 class TOPBAR_PT_tool_settings_extra(Panel):
@@ -72,7 +37,7 @@ class TOPBAR_PT_tool_settings_extra(Panel):
     """
     bl_idname = "TOPBAR_PT_tool_settings_extra"
     bl_region_type = 'HEADER'
-    bl_space_type = 'TOPBAR'
+    bl_space_type = 'INFO'  # dummy - was 'TOPBAR', which no longer resolves
     bl_label = "Extra Options"
 
     def draw(self, context):
@@ -679,7 +644,7 @@ class TOPBAR_MT_workspace_menu(Menu):
 
 # Only a popover
 class TOPBAR_PT_name(Panel):
-    bl_space_type = 'TOPBAR'  # dummy
+    bl_space_type = 'INFO'  # dummy - was 'TOPBAR', which no longer resolves
     bl_region_type = 'HEADER'
     bl_label = "Rename Active Item"
     bl_ui_units_x = 14
@@ -749,7 +714,7 @@ class TOPBAR_PT_name(Panel):
 
 
 class TOPBAR_PT_name_marker(Panel):
-    bl_space_type = 'TOPBAR'  # dummy
+    bl_space_type = 'INFO'  # dummy - was 'TOPBAR', which no longer resolves
     bl_region_type = 'HEADER'
     bl_label = "Rename Marker"
     bl_ui_units_x = 14
@@ -807,7 +772,6 @@ class TOPBAR_PT_name_marker(Panel):
 
 
 classes = (
-    TOPBAR_HT_upper_bar,
     TOPBAR_MT_file_context_menu,
     TOPBAR_MT_workspace_menu,
     TOPBAR_MT_editor_menus,

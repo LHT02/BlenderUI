@@ -54,6 +54,16 @@ void ED_undo_operator_repeat_cb(struct bContext *C, void *arg_op, void *arg_unus
 void ED_undo_operator_repeat_cb_evt(struct bContext *C, void *arg_op, int arg_unused);
 
 /**
+ * Register the `TOPBAR_MT_undo_history` menu type.
+ *
+ * It kept that idname when it moved out of the deleted top bar space, because
+ * `bl_ui/space_topbar.py` opens it by name and `interface_template_search_menu.cc`
+ * lists it. Called once from `wm_init_operatortypes()`'s companions - see
+ * `ed_operatortypes_init()` in `editors/interface/interface_ops.c`'s caller.
+ */
+void ED_undo_history_menu_register(void);
+
+/**
  * Name optionally, function used to check for operator redo panel.
  */
 bool ED_undo_is_valid(const struct bContext *C, const char *undoname);

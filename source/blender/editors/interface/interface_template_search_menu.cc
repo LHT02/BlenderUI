@@ -512,7 +512,7 @@ static MenuSearch_Data *menu_items_from_ui_create(
       ScrArea area_dummy = {nullptr};
       /* Anything besides #SPACE_EMPTY is fine,
        * as this value is only included in the enum when set. */
-      area_dummy.spacetype = SPACE_TOPBAR;
+      area_dummy.spacetype = SPACE_INFO;
       PointerRNA ptr;
       RNA_pointer_create(&screen->id, &RNA_Area, &area_dummy, &ptr);
       prop_ui_type = RNA_struct_find_property(&ptr, "ui_type");
@@ -641,7 +641,6 @@ static MenuSearch_Data *menu_items_from_ui_create(
                              "CLIP_MT_tracking_editor_menus" :
                              "CLIP_MT_masking_editor_menus");
           SPACE_MENU_NOP(SPACE_EMPTY);
-          SPACE_MENU_NOP(SPACE_TOPBAR);
           SPACE_MENU_NOP(SPACE_SPREADSHEET);
         }
       }
@@ -1138,8 +1137,9 @@ void UI_but_func_menu_search(uiBut *but)
   wmWindow *win = CTX_wm_window(C);
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
-  /* When run from top-bar scan all areas in the current window. */
-  const bool include_all_areas = (area && (area->spacetype == SPACE_TOPBAR));
+  /* The top bar space is gone, so there is no longer a context in which the
+   * search scans every area of the window: it always scans the current area. */
+  const bool include_all_areas = false;
   MenuSearch_Data *data = menu_items_from_ui_create(C, win, area, region, include_all_areas);
   UI_but_func_search_set(but,
                          /* Generic callback. */

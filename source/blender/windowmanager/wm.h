@@ -66,6 +66,14 @@ void wm_operatortype_init(void);
  */
 void wm_window_keymap(wmKeyConfig *keyconf);
 void wm_operatortypes_register(void);
+/**
+ * Register `TOPBAR_MT_file_open_recent`, the menu for `WM_OT_open_mainfile`.
+ *
+ * Moved out of the deleted `editors/space_topbar`; the idname is kept because
+ * `keymap_data/industry_compatible_data.py` and
+ * `interface_template_search_menu.cc` reference it by name.
+ */
+void wm_open_recent_menutype_register(void);
 
 /* wm_gesture.c */
 

@@ -3333,10 +3333,11 @@ void ED_region_header_layout(const bContext *C, ARegion *region)
   int maxco = xco;
 
   /* XXX workaround for 1 px alignment issue. Not sure what causes it...
-   * Would prefer a proper fix - Julian */
-  if (CTX_wm_area(C)->spacetype != SPACE_TOPBAR) {
-    yco -= 1;
-  }
+   * Would prefer a proper fix - Julian
+   *
+   * This used to be skipped for the (now deleted) top bar space. The top bar's
+   * header is gone with it, so the offset is now unconditional. */
+  yco -= 1;
 
   /* set view2d view matrix for scrolling (without scrollers) */
   UI_view2d_view_ortho(&region->v2d);

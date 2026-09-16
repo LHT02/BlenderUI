@@ -913,15 +913,6 @@ SpaceClip *CTX_wm_space_clip(const bContext *C)
   return nullptr;
 }
 
-SpaceTopBar *CTX_wm_space_topbar(const bContext *C)
-{
-  ScrArea *area = CTX_wm_area(C);
-  if (area && area->spacetype == SPACE_TOPBAR) {
-    return static_cast<SpaceTopBar *>(area->spacedata.first);
-  }
-  return nullptr;
-}
-
 SpaceSpreadsheet *CTX_wm_space_spreadsheet(const bContext *C)
 {
   ScrArea *area = CTX_wm_area(C);

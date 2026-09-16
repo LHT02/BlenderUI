@@ -505,7 +505,7 @@ The work is staged so the build stays green at every step.
 
       | | Count |
       | --- | --- |
-      | Editor modules deleted | 10 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons`, `space_statusbar`, `physics` (1,456 KB) |
+      | Editor modules deleted | 12 — `space_spreadsheet`, `space_nla`, `space_action`, `space_graph`, `space_script`, `lattice`, `metaball`, `space_buttons`, `space_statusbar`, `physics`, `space_topbar`, + their headers and registrations (1,461 KB) |
       | Legacy versioning files deleted | 8 (~788 KB) |
       | `bl_ui` UI-script modules deleted | 53 (1.2 MB) |
       | `ED_operatormacros_*` calls | 16 → 3 (file, sequencer, gpencil - all kept components) |
@@ -1445,6 +1445,168 @@ The work is staged so the build stays green at every step.
       is already dead: it is true only when the *top bar* runs the menu search,
       and no top-bar area can exist in BLUI. The dummy `ScrArea` at line 515 only
       needs a different non-`SPACE_EMPTY` spacetype, and `SPACE_INFO` will do.
+
+      ### `editors/space_topbar/` is deleted, and the scope above held exactly
+
+      The module (330-line `space_topbar.c`, 10,327 B) is gone, and the two
+      paragraphs above were accurate in every particular: two C menu types moved
+      out, the Python file stayed, `SPACE_INFO` took over the dummy spacetype,
+      and the `include_all_areas` sentinel was already dead. Eleven C files were
+      touched, plus three Python modules.
+
+      The move, first, because the module cannot be deleted until it is done:
+
+      | Menu type | Moved to | Who needed it |
+      | --- | --- | --- |
+      | `TOPBAR_MT_undo_history` | `editors/undo/ed_undo.cc` (+ `ED_undo.h`) | `ed_undo.cc`'s own `undo_history_invoke()` via `WM_menu_name_call` |
+      | `TOPBAR_MT_file_open_recent` | `windowmanager/intern/wm_operators.c` (+ `wm.h`) | `keymap_data/industry_compatible_data.py:187` `op_menu()` |
+
+      Both are registered from new functions - `ED_undo_history_menu_register()`
+      called from `ED_spacetypes_init()`, `wm_open_recent_menutype_register()`
+      called from `wm_init_exit.cc` after `WM_menutype_init()`. **The idnames are
+      deliberately unchanged**: `interface_template_search_menu.cc` names both by
+      string, and renaming them would take those search entries with it. The
+      module that *defines* a menu and the string that *names* it are independent.
+
+      `ED_undo_history_menu_register()` lives in `ed_undo.cc` rather than in
+      `space_api/spacetypes.c` on purpose - the menu's only caller is
+      `undo_history_invoke()` three functions above it, so operator and menu stay
+      together. That is the same "put the thing with the thing it serves"
+      judgement as the particle-cache draw code in the `physics` round.
+
+      #### The enum-first method, and the one site it does not reach
+
+      Removing `SPACE_TOPBAR = 21` from `eSpace_Type` first, then building, is
+      again the cheap way to enumerate the call sites - it named about a dozen
+      files in one build. The list matches the one written down above, with two
+      additions the earlier survey had missed:
+
+      - `blenloader/intern/readfile.cc:2656` and `windowmanager/intern/wm_draw.c:575`
+        (a `SPACE_NAME(SPACE_TOPBAR)` in the debug space-name switch).
+      - `editors/gpencil_legacy/gpencil_utils.c:94,131` and
+        `editors/interface/resources.cc:134` - both plain `case SPACE_TOPBAR:`
+        arms that become `default` traffic once the space is gone.
+
+      Three sites needed a **decision** rather than a deletion, exactly as the
+      earlier survey predicted. Each got the same treatment: the test is
+      *unconditionally true* now, so the guard comes off and the body stays.
+
+      | Site | Was | Now |
+      | --- | --- | --- |
+      | `screen_ops.c:4114` `region_toggle_poll` | refuses top-bar | refuses nothing; whole `if` removed |
+      | `screen_ops.c:4182` `region_flip_poll` | refuses top-bar | same |
+      | `screen_ops.c:4298,4319` header-tools menu | hides "Show Header" and the flip/tools block | both shown unconditionally |
+      | `screen_ops.c:5480` `space_type_set_or_cycle_poll` | `!= SPACE_TOPBAR` | `!= SPACE_EMPTY` - the remaining true statement, since an empty area is the one that must not be switched |
+      | `area.cc:3337` header layout | skips a 1 px offset for top-bar | offset is unconditional |
+      | `wm_event_system.cc:6142` region-to-window fallback | keeps top-bar regions as-is | whole `if` removed |
+      | `screen_user_menu.c:73-74` | global user-menu slot | `um_array[1] = NULL` - the slot only ever resolved for the top bar |
+      | `interface_template_search_menu.cc:1142` | `include_all_areas` from the top bar | `const bool include_all_areas = false` |
+
+      The `space_type_set_or_cycle_poll` line is the one worth marking: deleting
+      the top-bar half leaves `area && area->spacetype != SPACE_TOPBAR`, which is
+      *not* a tautology - `area` can still be null - so the naive "it is always
+      true, simplify it away" reading would have made a null area acceptable.
+      It became `SPACE_EMPTY` instead. Check what a predicate is *for* before
+      collapsing it.
+
+      #### The Python half, and the trap a fourth time
+
+      This is the failed build's cause, and the earlier section called it
+      correctly: **`space_topbar.py` must stay and only its `Header` class goes.**
+      The menus - `TOPBAR_MT_editor_menus`, `_blender`, `_file`, `_edit`,
+      `_window`, `_help`, `_blui_components` - are BLUI's entire main menu bar and
+      are drawn from a *window header*, via `bl_ui/space_blui.py`. A menu carries
+      no `bl_space_type`, so menus survive the space's deletion untouched; only
+      the `Header` subclass had one.
+
+      The trap then fired anyway, from three panels that were supposed to have
+      been repointed and were not:
+
+      ```
+      TypeError: validating class: enum "TOPBAR" not found in
+      ('EMPTY', 'FILE_BROWSER', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR',
+       'TEXT_EDITOR', 'CONSOLE', 'PREFERENCES', 'INFO')
+      ```
+
+      `TOPBAR_PT_tool_settings_extra` (line 40), `TOPBAR_PT_name` (647) and
+      `TOPBAR_PT_name_marker` (717) still had `bl_space_type = 'TOPBAR'`. **This
+      is the identical failure to the status bar's, and it lands in the identical
+      place**: the raise happens inside `bl_ui/__init__.py`'s registration loop
+      and aborts the rest of it, so the symptom is three *preferences* panels
+      missing and the cause is a deleted *top bar*. `check_preferences.py` again
+      caught it and no other check did.
+
+      The four panels keep `bl_space_type = 'INFO'` as a **dummy** - they are
+      only ever opened as popovers, by name, so any registered space type works.
+      `INFO` is chosen because it is the only BLUI space that is never offered in
+      the editor-type menu, so a dummy can never be mistaken for a real editor.
+
+      A fourth Python site, `properties_grease_pencil_common.py:369`, had
+      `context.space_data.type not in {'VIEW_3D', 'TOPBAR', 'SEQUENCE_EDITOR'}`.
+      That is a *set membership* test rather than a class attribute, so it cannot
+      raise - it was checked and `'TOPBAR'` removed on correctness, not on
+      necessity. Worth separating the two: only the class attribute aborts
+      registration.
+
+      #### Two build-iteration lessons, both about stale state
+
+      **`Edit` can silently not persist.** Four separate `Edit` calls in this
+      round returned `EBUSY: resource busy or locked` on the first try; the
+      retries reported success, and then the file on disk still had the *old*
+      text. It happened to `ed_undo.cc` (a `static_cast`), `rna_space.c` (an enum
+      array entry) and twice to `space_topbar.py`. **After a retry, re-read the
+      region - do not trust the success message.** The build and
+      `check_preferences.py` both caught these, but only after a full cycle each.
+
+      **The binary does not read `source/scripts/`.** It reads
+      `build/bin/1.0/scripts/`, which the install step populates - and that
+      directory was last written by a *full* install. The incremental ninja build
+      re-links `BLUI.exe` and does **not** re-copy `scripts/`. So a Python-only
+      fix changes nothing until
+
+      ```
+      cp -r source/scripts/startup/bl_ui/. build/bin/1.0/scripts/startup/bl_ui/
+      ```
+
+      is run by hand. This is the second time this has cost a cycle - the status
+      bar round recorded the same thing one section down - so it is worth stating
+      as a rule: **after any edit under `source/scripts/`, sync it into
+      `build/bin/1.0/scripts/` before running a check, or the check is testing
+      the previous revision.**
+
+      #### Verification, all seven scripts, after the build went green
+
+      | Check | Result |
+      | --- | --- |
+      | `check_editor_set.py` | PASS - 6 startup areas, all BLUI components |
+      | `check_preferences.py` | PASS - all 10 kept sections, 5 dropped sections empty |
+      | `check_keymap_config.py` | PASS - **116 keymaps**, unchanged |
+      | `check_window_isolation.py` | PASS - `RESULT_PASS`, 3 windows, 3 distinct screens |
+      | `check_component_window.py` | PASS - `RESULT_SETTINGS_WINDOW PASS` |
+      | `check_save_isolation.py` | PASS - text editor wrote the real file on disk |
+      | `click_sweep.py` | PASS - 144 clicks, no crash |
+
+      `check_workspace_geometry.py` also run (not part of the seven): all six
+      component areas `2560x1377`, full-window, as before.
+
+      The keymap count is **116 for the third module running**. `space_topbar`
+      had no keymap of its own, and `TOPBAR_MT_file_open_recent` is a *menu*
+      binding rather than an operator registration, so the macro
+      `property_unset()` trap could not have applied here - the count confirms it
+      rather than merely asserting it.
+
+      Also gone with the module: `SpaceTopBar` in `DNA_space_types.h`,
+      `CTX_wm_space_topbar()` (`blenkernel/context.cc` + `BKE_context.h`),
+      `ED_spacetype_topbar()` (`ED_space_api.h`), `bf_editor_space_topbar` from
+      `editors/space_api/CMakeLists.txt`, and `add_subdirectory(space_topbar)`.
+      `bTheme.space_topbar` was **kept as a shell**, the same decision as
+      `space_statusbar` and `SpaceProperties`: it is user-preference colour data
+      for a space that cannot exist, and removing it reaches into the verified
+      preferences panels.
+
+      `SPACE_TOPBAR = 21` is retired rather than reused, matching slot 22
+      (`SPACE_STATUSBAR`) and slot 14 (`SPACE_SCRIPT`). Three dead slots now, and
+      every enumerator in that enum is explicit, so no renumbering pass is needed.
 
       ### `editors/space_statusbar/` is deleted, and the Python half is not optional
 

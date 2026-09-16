@@ -366,7 +366,9 @@ class AnnotationDataPanel:
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
-        if context.space_data.type not in {'VIEW_3D', 'TOPBAR', 'SEQUENCE_EDITOR'}:
+        # 'TOPBAR' was dropped here with the top bar space. This mixin is only
+        # instantiated for spaces BLUI still keeps, so the guard is effective.
+        if context.space_data.type not in {'VIEW_3D', 'SEQUENCE_EDITOR'}:
             self.layout.prop(context.space_data, "show_annotation", text="")
 
     def draw(self, context):

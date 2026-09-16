@@ -38,6 +38,7 @@
 #include "ED_sound.h"
 #include "ED_space_api.h"
 #include "ED_transform.h"
+#include "ED_undo.h"
 #include "ED_userpref.h"
 #include "ED_util.h"
 
@@ -65,7 +66,16 @@ void ED_spacetypes_init(void)
   ED_spacetype_sequencer();
   ED_spacetype_console();
   ED_spacetype_userpref();
-  ED_spacetype_topbar();
+
+  /* Menu types that live in kept modules but kept their `TOPBAR_*` idnames,
+   * because Python and the menu-search template open them by name:
+   * `bl_ui/space_topbar.py` draws BLUI's main menu bar and calls
+   * `TOPBAR_MT_undo_history`; `keymap_data/industry_compatible_data.py` binds
+   * `TOPBAR_MT_file_open_recent`. Both were defined in `editors/space_topbar`,
+   * which is deleted - so they are registered from their new homes here.
+   * `TOPBAR_MT_file_open_recent` is registered from `WM_menutypes_init()` in
+   * `windowmanager/intern/wm_operators.c`, next to `WM_OT_open_mainfile`. */
+  ED_undo_history_menu_register();
 
   /* Register operator types for screen and all spaces. */
   ED_operatortypes_userpref();

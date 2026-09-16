@@ -40,10 +40,12 @@
 #include "BLI_dial_2d.h"
 #include "BLI_dynstr.h" /* For #WM_operator_pystring. */
 #include "BLI_math.h"
+#include "BLI_path_util.h"
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_anim_data.h"
+#include "BKE_blendfile.h"
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -3848,6 +3850,50 @@ void wm_operatortypes_register(void)
   WM_operatortype_append(GIZMOGROUP_OT_gizmo_select);
   WM_operatortype_append(GIZMOGROUP_OT_gizmo_tweak);
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Open Recent Menu
+ *
+ * Moved here from `editors/space_topbar/space_topbar.c` when the top bar space
+ * was deleted. It keeps the `TOPBAR_MT_file_open_recent` idname because two
+ * things reference it by name: `keymap_data/industry_compatible_data.py` binds
+ * it with `op_menu()`, and `interface/interface_template_search_menu.cc` lists
+ * it. It belongs in this file because it is the menu for `WM_OT_open_mainfile`,
+ * registered just above.
+ * \{ */
+
+static void recent_files_menu_draw(const bContext *UNUSED(C), Menu *menu)
+{
+  struct RecentFile *recent;
+  uiLayout *layout = menu->layout;
+  uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
+  if (!BLI_listbase_is_empty(&G.recent_files)) {
+    for (recent = G.recent_files.first; (recent); recent = recent->next) {
+      const char *file = BLI_path_basename(recent->filepath);
+      const int icon = BKE_blendfile_extension_check(file) ? ICON_FILE_BLEND : ICON_FILE_BACKUP;
+      PointerRNA ptr;
+      uiItemFullO(layout, "WM_OT_open_mainfile", file, icon, NULL, WM_OP_INVOKE_DEFAULT, 0, &ptr);
+      RNA_string_set(&ptr, "filepath", recent->filepath);
+      RNA_boolean_set(&ptr, "display_file_selector", false);
+    }
+  }
+  else {
+    uiItemL(layout, IFACE_("No Recent Files"), ICON_NONE);
+  }
+}
+
+void wm_open_recent_menutype_register(void)
+{
+  MenuType *mt = MEM_callocN(sizeof(MenuType), "wm open recent menu");
+
+  STRNCPY(mt->idname, "TOPBAR_MT_file_open_recent");
+  STRNCPY(mt->label, N_("Open Recent"));
+  STRNCPY(mt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  mt->draw = recent_files_menu_draw;
+  WM_menutype_add(mt);
+}
+
+/** \} */
 
 /* circleselect-like modal operators */
 static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)

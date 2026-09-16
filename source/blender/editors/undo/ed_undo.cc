@@ -796,6 +796,75 @@ void ED_OT_undo_history(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Undo History Menu
+ *
+ * Moved here from `editors/space_topbar/space_topbar.c` when the top bar space
+ * was deleted. `undo_history_invoke()` below is the only caller, and the menu
+ * needs nothing from the top bar, so it belongs with the operator it serves.
+ * \{ */
+
+static void undo_history_draw_menu(const bContext *C, Menu *menu)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (wm->undo_stack == nullptr) {
+    return;
+  }
+
+  int undo_step_count = 0;
+  int undo_step_count_all = 0;
+  for (UndoStep *us = static_cast<UndoStep *>(wm->undo_stack->steps.last); us;
+       us = us->prev) {
+    undo_step_count_all += 1;
+    if (us->skip) {
+      continue;
+    }
+    undo_step_count += 1;
+  }
+
+  uiLayout *split = uiLayoutSplit(menu->layout, 0.0f, false);
+  uiLayout *column = nullptr;
+
+  const int col_size = 20 + (undo_step_count / 12);
+
+  undo_step_count = 0;
+
+  /* Reverse the order so the most recent state is first in the menu. */
+  int i = undo_step_count_all - 1;
+  for (UndoStep *us = static_cast<UndoStep *>(wm->undo_stack->steps.last); us;
+       us = us->prev, i--) {
+    if (us->skip) {
+      continue;
+    }
+    if (!(undo_step_count % col_size)) {
+      column = uiLayoutColumn(split, false);
+    }
+    const bool is_active = (us == wm->undo_stack->step_active);
+    uiLayout *row = uiLayoutRow(column, false);
+    uiLayoutSetEnabled(row, !is_active);
+    uiItemIntO(row,
+               IFACE_(us->name),
+               is_active ? ICON_LAYER_ACTIVE : ICON_NONE,
+               "ED_OT_undo_history",
+               "item",
+               i);
+    undo_step_count += 1;
+  }
+}
+
+void ED_undo_history_menu_register(void)
+{
+  MenuType *mt = static_cast<MenuType *>(MEM_callocN(sizeof(MenuType), "ED undo history menu"));
+
+  STRNCPY(mt->idname, "TOPBAR_MT_undo_history");
+  STRNCPY(mt->label, N_("Undo History"));
+  STRNCPY(mt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  mt->draw = undo_history_draw_menu;
+  WM_menutype_add(mt);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Undo Helper Functions
  * \{ */
 

@@ -1835,17 +1835,12 @@ enum {
 
 /* -------------------------------------------------------------------- */
 /** \name Top Bar
+ *
+ * `SpaceTopBar` was deleted with the top bar space. It held only the
+ * `SpaceLink` header and no fields of its own, so nothing was lost. Slot
+ * `SPACE_TOPBAR = 21` in `eSpace_Type` is retired rather than reused, the same
+ * as slot 22 for the status bar.
  * \{ */
-
-typedef struct SpaceTopBar {
-  SpaceLink *next, *prev;
-  /** Storage of regions for inactive spaces. */
-  ListBase regionbase;
-  char spacetype;
-  char link_flag;
-  char _pad0[6];
-  /* End 'SpaceLink' header. */
-} SpaceTopBar;
 
 /** \} */
 
@@ -2037,7 +2032,9 @@ typedef enum eSpace_Type {
   SPACE_CONSOLE = 18,
   SPACE_USERPREF = 19,
   SPACE_CLIP = 20,
-  SPACE_TOPBAR = 21,
+  /* 21 was `SPACE_TOPBAR`. BLUI deleted the top bar space, its module and its
+   * DNA struct; the slot stays unused so the explicit values around it keep
+   * their meaning. This is the same treatment slot 22 got for the status bar. */
   /* 22 was `SPACE_STATUSBAR`. BLUI deleted the space, its module and its DNA
    * struct; the slot stays unused so the explicit values around it keep their
    * meaning. */

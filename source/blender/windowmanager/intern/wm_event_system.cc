@@ -6139,9 +6139,6 @@ void WM_window_cursor_keymap_status_refresh(bContext *C, wmWindow *win)
   }
 
   /* Keep as-is. */
-  if (area->spacetype == SPACE_TOPBAR) {
-    return;
-  }
   if (ELEM(region->regiontype,
            RGN_TYPE_HEADER,
            RGN_TYPE_TOOL_HEADER,

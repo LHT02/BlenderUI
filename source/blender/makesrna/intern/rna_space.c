@@ -128,12 +128,6 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      * this array so that `Area.type` can still name them from Python, which is
      * how the .blend reader and the global-area code identify an area. */
     {SPACE_INFO, "INFO", ICON_INFO, "Info", "Log of operations, warnings and error messages"},
-    {SPACE_TOPBAR,
-     "TOPBAR",
-     ICON_NONE,
-     "Top Bar",
-     "Global bar at the top of the screen for "
-     "global per-window settings"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -576,7 +570,6 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
 
       /* Currently no type info. */
     case SPACE_EMPTY:
-    case SPACE_TOPBAR:
       break;
   }
 

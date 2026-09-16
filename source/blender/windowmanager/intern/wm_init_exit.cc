@@ -229,6 +229,10 @@ void WM_init(bContext *C, int argc, const char **argv)
 
   WM_paneltype_init(); /* Lookup table only. */
   WM_menutype_init();
+  /* `TOPBAR_MT_file_open_recent` used to be registered by the top bar space
+   * type. That space is deleted, so it is registered here as a plain menu
+   * type - it needs nothing from a space. */
+  wm_open_recent_menutype_register();
   WM_uilisttype_init();
   wm_gizmotype_init();
   wm_gizmogrouptype_init();
