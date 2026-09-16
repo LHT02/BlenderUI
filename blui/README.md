@@ -62,6 +62,23 @@
 >   success. Redirect to a file and read the file, and check the exit code on
 >   its own line.
 
+### A script can finally drive the file browser
+
+`file.select_bookmark(dir=...)` navigates the browser to any directory. That was
+the single biggest hole in testing this component: setting `params.directory`
+updates the path but does **not** rebuild the file list, so until now a check
+could not put the browser somewhere it controlled, and every selection-dependent
+operation - delete, rename, and the whole list itself - was unreachable.
+
+```
+ENTER: select_bookmark -> {'FINISHED'}
+ENTER: now in b'C:\\Users\\LHT02\\AppData\\Local\\Temp\\blui_enter_probe\\'
+```
+
+The property is called `dir`, not `filepath`; guessing `filepath` is what made
+the first attempt raise. Anything that needs a known directory should use this
+from now on.
+
 ### Double-click cannot be tested, and that is why it never was
 
 Worth knowing before trusting the suite's coverage of the most basic gesture in
