@@ -569,6 +569,15 @@ directly applicable:
   is always the small system icon. Its conversion step is the same top-down
   32-bit DIB and `DrawIconEx()` BLUI uses, which is reassuring rather than
   instructive.
+
+  > Attempted and reverted. `IImageList` is a COM interface and
+  > `BLI_winstuff.c` is **C**, so it needs the `lpVtbl` form
+  > (`list->lpVtbl->GetIcon(list, ...)`) rather than `list->GetIcon(...)`, and
+  > the SDK's `IID_IImageList` is a value in C where the parameter wants a
+  > pointer - the two compose differently in C and C++. Also note
+  > `commctrl.h` / `commoncontrols.h` must come **after** `windows.h` or they
+  > are a parse error, the same as `shellapi.h` earlier. The cheaper route is
+  > to do the extraction in the new C++ file rather than in `winstuff.c`.
 - **Never show an empty menu.** Its fix list includes "不选中文件时不再只显示空
   菜单" - the same symptom as BLUI's External menu, with the same conclusion.
 
