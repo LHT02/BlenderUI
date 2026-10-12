@@ -41,6 +41,7 @@ struct ScrArea;
 struct View3D;
 struct ViewLayer;
 struct bContext;
+struct bScreen;
 struct rcti;
 struct wmDrag;
 struct wmDropBox;
@@ -52,6 +53,9 @@ struct wmGesture;
 struct wmJob;
 struct wmOperator;
 struct wmOperatorType;
+bool WM_blui_document_confirm(struct bContext *C, const char *action, const char *filepath, const char *workspace);
+void WM_blui_document_clear_screen(struct bContext *C, struct bScreen *screen);
+bool WM_blui_close_moved_window(struct bContext *C, struct wmWindow *source, struct wmWindow *replacement);
 struct wmPaintCursor;
 struct wmTabletData;
 

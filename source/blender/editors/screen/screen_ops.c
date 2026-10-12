@@ -1136,6 +1136,12 @@ static int actionzone_modal(bContext *C, wmOperator *op, const wmEvent *event)
                                                                      WM_CURSOR_V_SPLIT);
             is_gesture = (delta_max > split_threshold);
           }
+          else if (!area && (event->xy[0] < 0 || event->xy[1] < 0 ||
+                             event->xy[0] > WM_window_pixels_x(win) ||
+                             event->xy[1] > WM_window_pixels_y(win))) {
+            WM_cursor_set(win, WM_CURSOR_EDIT);
+            is_gesture = false; /* Detach only on release; Escape can still cancel. */
+          }
           else if (!area || area->global) {
             /* No area or Top bar or Status bar. */
             WM_cursor_set(win, WM_CURSOR_STOP);
@@ -1184,6 +1190,14 @@ static int actionzone_modal(bContext *C, wmOperator *op, const wmEvent *event)
       actionzone_exit(op);
       return OPERATOR_CANCELLED;
     case LEFTMOUSE:
+      if (event->val == KM_RELEASE && sad->az->type == AZONE_AREA &&
+          (event->xy[0] < 0 || event->xy[1] < 0 ||
+           event->xy[0] > WM_window_pixels_x(CTX_wm_window(C)) ||
+           event->xy[1] > WM_window_pixels_y(CTX_wm_window(C)))) {
+        ScrArea *area = sad->sa1;
+        actionzone_exit(op);
+        return ED_screen_area_detach(C, area, event->xy, op->reports) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+      }
       actionzone_exit(op);
       return OPERATOR_CANCELLED;
   }
@@ -1426,7 +1440,7 @@ static int area_dupli_invoke(bContext *C, wmOperator *op, const wmEvent *event)
                                     area->totrct.ymin,
                                     area->winx,
                                     area->winy,
-                                    SPACE_EMPTY,
+                                    area->spacetype,
                                     false,
                                     false,
                                     false,
@@ -1488,10 +1502,15 @@ static int area_close_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  if (!RNA_boolean_get(op->ptr, "confirmed") && WM_blui_document_confirm(C, "AREA", NULL, NULL)) {
+    return OPERATOR_FINISHED;
+  }
+
   if (!screen_area_close(C, screen, area)) {
     BKE_report(op->reports, RPT_ERROR, "Unable to close area");
     return OPERATOR_CANCELLED;
   }
+  ED_image_document_collect(CTX_data_main(C));
 
   /* Ensure the event loop doesn't attempt to continue handling events.
    *
@@ -1536,6 +1555,8 @@ static void SCREEN_OT_area_close(wmOperatorType *ot)
   ot->idname = "SCREEN_OT_area_close";
   ot->exec = area_close_exec;
   ot->poll = area_close_poll;
+  PropertyRNA *prop = RNA_def_boolean(ot->srna, "confirmed", false, "Confirmed", "Close after document confirmation");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -2458,6 +2479,15 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
       break;
 
     case LEFTMOUSE:
+      if (!sd->previewmode && event->val == KM_RELEASE &&
+          (event->xy[0] < 0 || event->xy[1] < 0 ||
+           event->xy[0] > WM_window_pixels_x(CTX_wm_window(C)) ||
+           event->xy[1] > WM_window_pixels_y(CTX_wm_window(C)))) {
+        ScrArea *source_area = sd->sarea;
+        area_split_cancel(C, op); /* Undo the provisional split before moving the original editor. */
+        CTX_wm_area_set(C, source_area);
+        return ED_screen_area_detach(C, source_area, event->xy, op->reports) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+      }
       if (sd->previewmode) {
         area_split_apply(C, op);
         area_split_exit(C, op);
@@ -5709,6 +5739,7 @@ void ED_operatortypes_screen(void)
   WM_operatortype_append(SCREEN_OT_area_close);
   WM_operatortype_append(SCREEN_OT_area_options);
   WM_operatortype_append(SCREEN_OT_area_dupli);
+  WM_operatortype_append(SCREEN_OT_area_detach);
   WM_operatortype_append(SCREEN_OT_area_swap);
   WM_operatortype_append(SCREEN_OT_region_quadview);
   WM_operatortype_append(SCREEN_OT_region_scale);

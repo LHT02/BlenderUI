@@ -70,8 +70,8 @@ class FILEBROWSER_HT_header(Header):
         else:
             FILEBROWSER_MT_editor_menus.draw_collapsible(context, layout)
             if space_data.active_operator is None:
-                from bl_ui.space_filebrowser_explorer import draw_toolbar
-                draw_toolbar(layout, context)
+                from bl_ui.space_filebrowser_explorer import draw_status
+                draw_status(layout, context)
             layout.separator_spacer()
 
         if not context.screen.show_statusbar:

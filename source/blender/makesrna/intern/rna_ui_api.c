@@ -904,6 +904,12 @@ void RNA_api_ui_layout(StructRNA *srna)
   FunctionRNA *func;
   PropertyRNA *parm;
 
+  func = RNA_def_function(srna, "enable_popup_refresh", "UI_popup_menu_enable_refresh");
+  RNA_def_function_ui_description(func, "Allow this menu to rebuild in place when its key is refreshed");
+  parm = RNA_def_string(func, "key", NULL, 128, "Key", "Key identifying the asynchronous menu data");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  RNA_def_function_return(func, RNA_def_boolean(func, "enabled", false, "", "Whether refresh was enabled"));
+
   static const EnumPropertyItem curve_type_items[] = {
       {0, "NONE", 0, "None", ""},
       {'v', "VECTOR", 0, "Vector", ""},

@@ -83,6 +83,10 @@ def register():
             register_class(cls)
 
     space_filebrowser.register_props()
+    from blui_explorer import localization
+    localization.register()
+    from bl_ui import space_filebrowser_shell
+    space_filebrowser_shell.register()
 
     from bpy.props import (
         EnumProperty,
@@ -142,6 +146,10 @@ def register():
 
 
 def unregister():
+    from bl_ui import space_filebrowser_shell
+    space_filebrowser_shell.unregister()
+    from blui_explorer import localization
+    localization.unregister()
     from bpy.utils import unregister_class
     for mod in reversed(_modules_loaded):
         for cls in reversed(mod.classes):

@@ -16,6 +16,7 @@ _modules = [
     "constraint",
     "file",
     "blui_file",
+    "blui_documents",
     "geometry_nodes",
     "image",
     "mesh",

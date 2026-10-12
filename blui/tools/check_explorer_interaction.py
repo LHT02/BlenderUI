@@ -124,10 +124,14 @@ def step():
     elif n == 11:
         session = state['session']
         item = next((i for i in session.items.get('root', []) if i['label'] == '7-Zip'), None)
-        report(bool(item and session.items.get(item['submenu'])), 'Real 7-Zip submenu loaded in UI session')
-        if item:
+        if item and not state.get('opened_native_child'):
             with context():
                 bpy.ops.wm.call_menu(name=menus._bindings[session.token, item['submenu']])
+            state['opened_native_child'] = True
+            return 0.2
+        if item and item['submenu'] not in session.items and item['submenu'] not in session.errors:
+            return 0.2
+        report(bool(item and session.items.get(item['submenu'])), 'Real 7-Zip submenu loaded in UI session')
         delay = 0.5
     elif n == 12:
         capture('explorer-7zip')

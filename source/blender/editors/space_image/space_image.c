@@ -205,6 +205,7 @@ static void image_operatortypes(void)
 
   WM_operatortype_append(IMAGE_OT_new);
   WM_operatortype_append(IMAGE_OT_open);
+  WM_operatortype_append(IMAGE_OT_document_clear);
   WM_operatortype_append(IMAGE_OT_file_browse);
   WM_operatortype_append(IMAGE_OT_match_movie_length);
   WM_operatortype_append(IMAGE_OT_replace);
@@ -616,9 +617,6 @@ static void image_main_region_init(wmWindowManager *wm, ARegion *region)
   keymap = WM_keymap_ensure(wm->defaultconf, "Image Paint", 0, 0);
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 
-  keymap = WM_keymap_ensure(wm->defaultconf, "UV Editor", 0, 0);
-  WM_event_add_keymap_handler(&region->handlers, keymap);
-
   /* own keymaps */
   keymap = WM_keymap_ensure(wm->defaultconf, "Image Generic", SPACE_IMAGE, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);
@@ -1014,21 +1012,15 @@ static void image_id_remap(ScrArea *UNUSED(area),
 static int image_space_subtype_get(ScrArea *area)
 {
   SpaceImage *sima = area->spacedata.first;
-  return sima->mode == SI_MODE_UV ? SI_MODE_UV : SI_MODE_VIEW;
+  (void)sima;
+  return SI_MODE_VIEW;
 }
 
 static void image_space_subtype_set(ScrArea *area, int value)
 {
   SpaceImage *sima = area->spacedata.first;
-  if (value == SI_MODE_UV) {
-    if (sima->mode != SI_MODE_UV) {
-      sima->mode_prev = sima->mode;
-    }
-    sima->mode = value;
-  }
-  else {
-    sima->mode = sima->mode_prev;
-  }
+  (void)value;
+  sima->mode = (sima->mode_prev == SI_MODE_UV) ? SI_MODE_VIEW : sima->mode_prev;
 }
 
 static void image_space_subtype_item_extend(bContext *UNUSED(C),
@@ -1040,6 +1032,13 @@ static void image_space_subtype_item_extend(bContext *UNUSED(C),
 
 static void image_space_blend_read_data(BlendDataReader *UNUSED(reader), SpaceLink *sl)
 {
+  SpaceImage *image_space = (SpaceImage *)sl;
+  if (image_space->mode == SI_MODE_UV) {
+    image_space->mode = SI_MODE_VIEW;
+  }
+  if (image_space->mode_prev == SI_MODE_UV) {
+    image_space->mode_prev = SI_MODE_VIEW;
+  }
   SpaceImage *sima = (SpaceImage *)sl;
 
   sima->iuser.scene = NULL;

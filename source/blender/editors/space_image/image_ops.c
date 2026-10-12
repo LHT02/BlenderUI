@@ -1234,20 +1234,21 @@ typedef struct ImageOpenData {
   PropertyPointerRNA pprop;
   ImageUser *iuser;
   ImageFormatData im_format;
+  bool single_document;
 } ImageOpenData;
 
 static void image_open_init(bContext *C, wmOperator *op)
 {
   ImageOpenData *iod;
   op->customdata = iod = MEM_callocN(sizeof(ImageOpenData), __func__);
+  iod->single_document = CTX_wm_space_image(C) != NULL;
   iod->iuser = CTX_data_pointer_get_type(C, "image_user", &RNA_ImageUser).data;
   UI_context_active_but_prop_get_templateID(C, &iod->pprop.ptr, &iod->pprop.prop);
 }
 
 static void image_open_cancel(bContext *UNUSED(C), wmOperator *op)
 {
-  MEM_freeN(op->customdata);
-  op->customdata = NULL;
+  MEM_SAFE_FREE(op->customdata);
 }
 
 static Image *image_open_single(Main *bmain,
@@ -1255,18 +1256,18 @@ static Image *image_open_single(Main *bmain,
                                 ImageFrameRange *range,
                                 const char *relbase,
                                 bool is_relative_path,
-                                bool use_multiview)
+                                bool use_multiview,
+                                bool independent)
 {
   bool exists = false;
   Image *ima = NULL;
 
   errno = 0;
-  ima = BKE_image_load_exists_ex(bmain, range->filepath, &exists);
+  ima = independent ? BKE_image_load(bmain, range->filepath) :
+                      BKE_image_load_exists_ex(bmain, range->filepath, &exists);
 
   if (!ima) {
-    if (op->customdata) {
-      MEM_freeN(op->customdata);
-    }
+    /* The operation owns these parameters until all selected paths have been tried. */
     BKE_reportf(op->reports,
                 RPT_ERROR,
                 "Cannot read '%s': %s",
@@ -1320,12 +1321,36 @@ static int image_open_exec(bContext *C, wmOperator *op)
   Scene *scene = CTX_data_scene(C);
   ImageUser *iuser = NULL;
   Image *ima = NULL;
+  SpaceImage *document = CTX_wm_space_image(C);
   int frame_seq_len = 0;
   int frame_ofs = 1;
 
   const bool is_relative_path = RNA_boolean_get(op->ptr, "relative_path");
-  const bool use_multiview = RNA_boolean_get(op->ptr, "use_multiview");
-  const bool use_udim = RNA_boolean_get(op->ptr, "use_udim_detecting");
+  const bool use_multiview = !document && RNA_boolean_get(op->ptr, "use_multiview");
+  const bool use_udim = !document && RNA_boolean_get(op->ptr, "use_udim_detecting");
+  if (document) {
+    RNA_boolean_set(op->ptr, "use_sequence_detection", false);
+    if (!RNA_boolean_get(op->ptr, "confirmed")) {
+      char filepath[FILE_MAX];
+      RNA_string_get(op->ptr, "filepath", filepath);
+      if (!filepath[0]) {
+        char directory[FILE_MAX], name[FILE_MAXFILE];
+        RNA_string_get(op->ptr, "directory", directory);
+        RNA_BEGIN (op->ptr, item, "files") {
+          RNA_string_get(&item, "name", name);
+          BLI_path_join(filepath, sizeof(filepath), directory, name);
+          break;
+        }
+        RNA_END;
+      }
+      if (WM_blui_document_confirm(C, "OPEN_IMAGE", filepath, NULL)) {
+        if (op->customdata) {
+          image_open_cancel(C, op);
+        }
+        return OPERATOR_FINISHED;
+      }
+    }
+  }
 
   if (!op->customdata) {
     image_open_init(C, op);
@@ -1333,8 +1358,12 @@ static int image_open_exec(bContext *C, wmOperator *op)
 
   ListBase ranges = ED_image_filesel_detect_sequences(bmain, op, use_udim);
   LISTBASE_FOREACH (ImageFrameRange *, range, &ranges) {
+    if (document && ima) {
+      BLI_freelistN(&range->udim_tiles);
+      continue; /* A file editor has one current image, never an implicit sequence/library. */
+    }
     Image *ima_range = image_open_single(
-        bmain, op, range, BKE_main_blendfile_path(bmain), is_relative_path, use_multiview);
+        bmain, op, range, BKE_main_blendfile_path(bmain), is_relative_path, use_multiview, document != NULL);
 
     /* take the first image */
     if ((ima == NULL) && ima_range) {
@@ -1348,13 +1377,19 @@ static int image_open_exec(bContext *C, wmOperator *op)
   BLI_freelistN(&ranges);
 
   if (ima == NULL) {
+    MEM_SAFE_FREE(op->customdata);
     return OPERATOR_CANCELLED;
   }
 
   /* hook into UI */
   ImageOpenData *iod = op->customdata;
 
-  if (iod->pprop.prop) {
+  if (document) {
+    ED_preview_kill_jobs(CTX_wm_manager(C), bmain);
+    ED_image_document_set(bmain, document, ima);
+    iuser = &document->iuser;
+  }
+  else if (iod->pprop.prop) {
     /* when creating new ID blocks, use is already 1, but RNA
      * pointer use also increases user, so this compensates it */
     id_us_min(&ima->id);
@@ -1414,7 +1449,7 @@ static int image_open_exec(bContext *C, wmOperator *op)
   BKE_image_signal(bmain, ima, iuser, IMA_SIGNAL_RELOAD);
   WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ima);
 
-  MEM_freeN(op->customdata);
+  MEM_SAFE_FREE(op->customdata);
 
   return OPERATOR_FINISHED;
 }
@@ -1479,9 +1514,14 @@ static int image_open_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(
 
 static bool image_open_draw_check_prop(PointerRNA *UNUSED(ptr),
                                        PropertyRNA *prop,
-                                       void *UNUSED(user_data))
+                                       void *user_data)
 {
   const char *prop_id = RNA_property_identifier(prop);
+  const ImageOpenData *data = user_data;
+  if (data->single_document &&
+      STR_ELEM(prop_id, "use_sequence_detection", "use_udim_detecting", "use_multiview", "show_multiview")) {
+    return false;
+  }
 
   return !STR_ELEM(prop_id, "filepath", "directory", "filename");
 }
@@ -1495,13 +1535,13 @@ static void image_open_draw(bContext *UNUSED(C), wmOperator *op)
 
   /* main draw call */
   uiDefAutoButsRNA(
-      layout, op->ptr, image_open_draw_check_prop, NULL, NULL, UI_BUT_LABEL_ALIGN_NONE, false);
+      layout, op->ptr, image_open_draw_check_prop, iod, NULL, UI_BUT_LABEL_ALIGN_NONE, false);
 
   /* image template */
   RNA_pointer_create(NULL, &RNA_ImageFormatSettings, imf, &imf_ptr);
 
   /* multiview template */
-  if (RNA_boolean_get(op->ptr, "show_multiview")) {
+  if (!iod->single_document && RNA_boolean_get(op->ptr, "show_multiview")) {
     uiTemplateImageFormatViews(layout, &imf_ptr, op->ptr);
   }
 }
@@ -1551,6 +1591,8 @@ void IMAGE_OT_open(wmOperatorType *ot)
                   true,
                   "Detect UDIMs",
                   "Detect selected UDIM files and load all matching tiles");
+  PropertyRNA *confirmed = RNA_def_boolean(ot->srna, "confirmed", false, "Confirmed", "Continue after confirming replacement");
+  RNA_def_property_flag(confirmed, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -2578,7 +2620,7 @@ static int image_new_exec(bContext *C, wmOperator *op)
     RNA_property_update(C, &data->pprop.ptr, data->pprop.prop);
   }
   else if (sima) {
-    ED_space_image_set(bmain, sima, ima, false);
+    ED_image_document_set(bmain, sima, ima);
   }
   else {
     /* #BKE_image_add_generated creates one user by default, remove it if image is not linked to
@@ -2597,6 +2639,9 @@ static int image_new_exec(bContext *C, wmOperator *op)
 
 static int image_new_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
+  if (!RNA_boolean_get(op->ptr, "confirmed") && WM_blui_document_confirm(C, "NEW_IMAGE", NULL, NULL)) {
+    return OPERATOR_FINISHED;
+  }
   /* Get property in advance, it doesn't work after WM_operator_props_dialog_popup. */
   ImageNewData *data;
   op->customdata = data = MEM_callocN(sizeof(ImageNewData), __func__);
@@ -2688,6 +2733,8 @@ void IMAGE_OT_new(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
   prop = RNA_def_boolean(ot->srna, "tiled", 0, "Tiled", "Create a tiled image");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "confirmed", false, "Confirmed", "Continue after confirming replacement");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 #undef IMA_DEF_NAME
@@ -2882,6 +2929,9 @@ void IMAGE_OT_clipboard_copy(wmOperatorType *ot)
 
 static int image_clipboard_paste_exec(bContext *C, wmOperator *op)
 {
+  if (!RNA_boolean_get(op->ptr, "confirmed") && WM_blui_document_confirm(C, "PASTE_IMAGE", NULL, NULL)) {
+    return OPERATOR_FINISHED;
+  }
 
   WM_cursor_set(CTX_wm_window(C), WM_CURSOR_WAIT);
 
@@ -2898,7 +2948,7 @@ static int image_clipboard_paste_exec(bContext *C, wmOperator *op)
   Image *ima = BKE_image_add_from_imbuf(bmain, ibuf, "Clipboard");
   IMB_freeImBuf(ibuf);
 
-  ED_space_image_set(bmain, sima, ima, false);
+  ED_image_document_set(bmain, sima, ima);
   BKE_image_signal(bmain, ima, (sima) ? &sima->iuser : NULL, IMA_SIGNAL_USER_NEW_IMAGE);
   WM_event_add_notifier(C, NC_IMAGE | NA_ADDED, ima);
 
@@ -2936,6 +2986,8 @@ void IMAGE_OT_clipboard_paste(wmOperatorType *ot)
 
   /* flags */
   ot->flag = OPTYPE_REGISTER;
+  PropertyRNA *prop = RNA_def_boolean(ot->srna, "confirmed", false, "Confirmed", "Continue after confirming replacement");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /** \} */

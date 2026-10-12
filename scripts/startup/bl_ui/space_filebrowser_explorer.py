@@ -1,105 +1,37 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""BLUI Explorer menus. Native shell DLLs are hosted by shell_client's process."""
+"""Explorer actions plus Blender's original file-browser context commands."""
 
 import os
-import itertools
 import sys
-import time
 
 import bpy
 from bpy.props import IntProperty, StringProperty
 from bpy.types import Menu, Operator
-from bl_operators.blui_file import directory, selected_paths, refresh_all, task_status
+from bl_operators.blui_file import directory, selected_paths, task_status
 from blui_explorer import file_tasks, shell_client
+from blui_explorer.localization import iface, message
+from bl_ui import space_filebrowser_shell as shell_ui
 
-_bindings = {}
-_dynamic = []
-_regions = []
-_menu_ids = itertools.count()
-
-
-def _tick():
-    for token, session in list(shell_client.sessions.items()):
-        changed = session.poll()
-        if changed:
-            for node, items in session.items.items():
-                if not isinstance(items, list):
-                    continue
-                for item in items:
-                    child = item.get("submenu")
-                    if child and (token, child) not in _bindings:
-                        name = "FILEBROWSER_MT_shell_" + str(next(_menu_ids))
-                        cls = type(name, (Menu,), {
-                            "bl_label": item["label"] or "Windows",
-                            "draw": _draw_native_submenu,
-                            "session_token": token, "node_key": child,
-                        })
-                        bpy.utils.register_class(cls)
-                        _dynamic.append(cls)
-                        _bindings[token, child] = name
-                        # Prefetch first-level extension submenus while the user
-                        # reads the common actions. Further nesting stays lazy.
-                        if node == "root":
-                            session.request("expand", node=child)
-            if session.items.pop("invoke", False):
-                session.invoked = True
-                refresh_all()
-            if "invoke" in session.errors and not getattr(session, "error_shown", False):
-                session.error_shown = True
-                message = session.errors["invoke"]
-                def draw_error(self, _context, message=message):
-                    for start in range(0, len(message), 75):
-                        self.layout.label(text=message[start:start + 75])
-                bpy.context.window_manager.popup_menu(draw_error, title="Windows Command", icon='ERROR')
-            for region in list(_regions):
-                try:
-                    region.tag_redraw()
-                except ReferenceError:
-                    _regions.remove(region)
-            for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    if area.type == 'FILE_BROWSER':
-                        area.tag_redraw()
-        if time.monotonic() - session.last_used > 300 and not session.pending:
-            session.close()
-            del shell_client.sessions[token]
-    for cls in list(_dynamic):
-        if cls.session_token not in shell_client.sessions:
-            _bindings.pop((cls.session_token, cls.node_key), None)
-            bpy.utils.unregister_class(cls)
-            _dynamic.remove(cls)
-    return 0.1 if shell_client.sessions else None
-
-
-def _session(context, retry=False):
-    paths = selected_paths(context) or [os.path.normpath(directory(context))]
-    try:
-        session = shell_client.get_session(paths, retry=retry)
-        if not bpy.app.timers.is_registered(_tick):
-            bpy.app.timers.register(_tick, first_interval=0.05)
-        return session
-    except (OSError, RuntimeError) as exc:
-        print("BLUI Shell:", exc)
-        return None
+# Kept for scripts that inspected the previous module's session bindings.
+_bindings = shell_ui.bindings
+_session = shell_ui.session
 
 
 def _native_items(layout, context, session, node):
-    if context.region and context.region not in _regions:
-        _regions.append(context.region)
     if session is None:
         layout.label(text="Windows menu helper unavailable", icon='ERROR')
         return
+    layout.enable_popup_refresh(shell_ui.popup_key(session, node))
     error = session.errors.get(node) or session.errors.get("invoke")
     if error:
         layout.label(text="Windows menu unavailable", icon='ERROR')
-        layout.label(text=error[:80])
+        layout.label(text=message(error)[:80], translate=False)
         layout.operator("file.explorer_shell_retry", text="Retry Windows Menu", icon='FILE_REFRESH')
         return
     if node not in session.items:
         if node != "root":
             session.request("expand", node=node)
         layout.label(text="Loading Windows menu...", icon='TIME')
-        layout.label(text="Reopen this submenu when ready")
         return
     for item in session.items[node]:
         if item["separator"]:
@@ -110,14 +42,10 @@ def _native_items(layout, context, session, node):
         if item.get("submenu"):
             name = _bindings.get((session.token, item["submenu"]))
             if name:
-                row.menu(name, text=item["label"], icon='FILE_FOLDER')
+                row.menu(name, text=item["label"], icon='FILE_FOLDER', translate=False)
         else:
-            op = row.operator("file.explorer_shell_command", text=item["label"], icon='FILEBROWSER')
+            op = row.operator("file.explorer_shell_command", text=item["label"], icon='FILEBROWSER', translate=False)
             op.session_token, op.command = session.token, item["id"]
-
-
-def _draw_native_submenu(self, context):
-    _native_items(self.layout, context, shell_client.sessions.get(self.session_token), self.node_key)
 
 
 class FILE_OT_explorer_shell_command(Operator):
@@ -129,11 +57,11 @@ class FILE_OT_explorer_shell_command(Operator):
     def execute(self, context):
         session = shell_client.sessions.get(self.session_token)
         if session is None or session.process.poll() is not None:
-            self.report({'ERROR'}, "This menu session expired. Open the context menu again.")
+            self.report({'ERROR'}, iface("This menu session expired. Open the context menu again."))
             return {'CANCELLED'}
         paths = tuple(selected_paths(context) or [os.path.normpath(directory(context))])
         if paths != session.paths:
-            self.report({'ERROR'}, "Selection changed. Open the context menu again.")
+            self.report({'ERROR'}, iface("Selection changed. Open the context menu again."))
             return {'CANCELLED'}
         session.request("invoke", command=self.command)
         return {'FINISHED'}
@@ -160,10 +88,9 @@ class FILE_OT_explorer_properties(Operator):
             session = shell_client.Session(paths[:1], action="properties")
             session.invoked = True
             shell_client.sessions[session.token] = session
-            if not bpy.app.timers.is_registered(_tick):
-                bpy.app.timers.register(_tick, first_interval=0.05)
+            shell_ui.ensure_tick()
         except (OSError, RuntimeError) as exc:
-            self.report({'ERROR'}, str(exc))
+            self.report({'ERROR'}, message(str(exc)))
             return {'CANCELLED'}
         return {'FINISHED'}
 
@@ -206,9 +133,23 @@ class FILEBROWSER_MT_explorer_new(Menu):
 
 def draw_context_menu(layout, context):
     layout.operator_context = 'INVOKE_REGION_WIN'
+    layout.ui_units_x = 18
     paths = selected_paths(context)
+    params = context.space_data.params
     if sys.platform == "win32":
-        _session(context)  # Starts IPC only. Never waits for a shell extension.
+        _session(context)
+
+    # Preserve the original Blender navigation and external operations.
+    layout.operator("file.previous", text="Back")
+    layout.operator("file.next", text="Forward")
+    layout.operator("file.parent", text="Go to Parent")
+    layout.operator("file.refresh", text="Refresh")
+    layout.menu("FILEBROWSER_MT_operations_menu")
+    layout.separator()
+    layout.operator("file.filenum", text="Increase Number", icon='ADD').increment = 1
+    layout.operator("file.filenum", text="Decrease Number", icon='REMOVE').increment = -1
+    layout.separator()
+
     if paths:
         row = layout.row()
         row.enabled = len(paths) == 1
@@ -229,37 +170,31 @@ def draw_context_menu(layout, context):
         row.enabled = bool(file_tasks.seven_zip())
         row.operator("file.explorer_archive", text="Create 7Z...", icon='PACKAGE').kind = '7Z'
     else:
-        layout.menu("FILEBROWSER_MT_explorer_view", icon='RESTRICT_VIEW_OFF')
-        layout.prop_menu_enum(context.space_data.params, "sort_method", text="Sort By")
-        layout.operator("file.refresh", text="Refresh", icon='FILE_REFRESH')
-        layout.separator()
         layout.operator("file.clipboard_paste", text="Paste", icon='PASTEDOWN')
-        layout.menu("FILEBROWSER_MT_explorer_new", icon='ADD')
         layout.operator("file.explorer_copy_path", text="Copy Folder Path", icon='COPYDOWN')
-        layout.operator("file.bookmark_add", text="Add to Favorites", icon='BOOKMARKS')
+
+    layout.separator()
+    row = layout.row()
+    row.operator_context = 'EXEC_REGION_WIN'
+    row.operator("file.directory_new", text="New Folder", icon='NEWFOLDER').confirm = False
+    layout.operator("file.explorer_new_file", text="Text Document", icon='FILE_TEXT')
+    layout.operator("file.bookmark_add", text="Add Bookmark", icon='BOOKMARKS')
+    layout.separator()
+    layout.prop_menu_enum(params, "display_type")
+    if params.display_type == 'THUMBNAIL':
+        layout.prop_menu_enum(params, "display_size")
+    layout.prop_menu_enum(params, "recursion_level", text="Recursions")
+    layout.prop_menu_enum(params, "sort_method")
+
     if sys.platform == "win32":
         layout.separator()
         layout.menu("FILEBROWSER_MT_explorer_more", text="More", icon='THREE_DOTS')
 
 
-def draw_toolbar(layout, context):
-    layout.operator_context = 'INVOKE_REGION_WIN'
-    row = layout.row(align=True)
-    row.menu("FILEBROWSER_MT_explorer_new", text="New", icon='ADD')
-    selected = bool(selected_paths(context))
-    group = row.row(align=True)
-    group.enabled = selected
-    group.operator("file.clipboard_cut", text="Cut")
-    group.operator("file.clipboard_copy", text="", icon='COPYDOWN')
-    row.operator("file.clipboard_paste", text="", icon='PASTEDOWN')
-    group = row.row(align=True)
-    group.enabled = selected
-    group.operator("file.explorer_rename", text="", icon='GREASEPENCIL')
-    group.operator("file.delete", text="", icon='TRASH')
-    row.menu("FILEBROWSER_MT_explorer_view", text="View")
+def draw_status(layout, _context):
     status = task_status()
     if status:
-        layout.label(text=status, icon='INFO')
+        layout.label(text=status, icon='INFO', translate=False)
 
 
 classes = (FILE_OT_explorer_shell_command, FILE_OT_explorer_shell_retry,

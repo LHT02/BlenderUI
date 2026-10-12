@@ -8,6 +8,7 @@ interface or native pointer crosses IPC. The UI receives opaque node/command IDs
 import ctypes as c
 from ctypes import wintypes as w
 import uuid
+import os
 
 P = c.c_void_p
 HRESULT = c.c_long
@@ -104,6 +105,25 @@ def pump():
     while peek(c.byref(msg), None, 0, 0, 1):
         translate(c.byref(msg))
         dispatch(c.byref(msg))
+
+
+def has_dialogs():
+    """Only inspect this helper's visible windows; never user-app titles/content."""
+    visible = api(user, 'IsWindowVisible', w.BOOL, P)
+    window_pid = api(user, 'GetWindowThreadProcessId', w.DWORD, P, c.POINTER(w.DWORD))
+    callback_type = c.WINFUNCTYPE(w.BOOL, P, c.c_ssize_t)
+    found = False
+    def visit(window, _data):
+        nonlocal found
+        pid = w.DWORD()
+        window_pid(window, c.byref(pid))
+        if pid.value == os.getpid() and visible(window):
+            found = True
+            return False
+        return True
+    callback = callback_type(visit)
+    api(user, 'EnumWindows', w.BOOL, callback_type, c.c_ssize_t)(callback, 0)
+    return found
 
 
 class ShellMenu:

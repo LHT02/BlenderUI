@@ -36,6 +36,7 @@ set(INC
 
 set(SRC
   intern/wm.c
+  intern/wm_blui_documents.c
   intern/wm_cursors.c
   intern/wm_dragdrop.cc
   intern/wm_draw.c

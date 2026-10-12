@@ -17,6 +17,7 @@
 #include "BKE_context.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_report.h"
 #include "BKE_screen.h"
 #include "BKE_workspace.h"
 
@@ -315,9 +316,28 @@ static void WORKSPACE_OT_duplicate(wmOperatorType *ot)
   ot->exec = workspace_new_exec;
 }
 
-static int workspace_delete_exec(bContext *C, wmOperator *UNUSED(op))
+static int workspace_delete_exec(bContext *C, wmOperator *op)
 {
+  if (BLI_listbase_is_single(&CTX_data_main(C)->workspaces)) {
+    BKE_report(op->reports, RPT_ERROR, "The last workspace cannot be removed");
+    return OPERATOR_CANCELLED;
+  }
   WorkSpace *workspace = workspace_context_get(C);
+  char name[MAX_NAME];
+  RNA_string_get(op->ptr, "workspace", name);
+  if (name[0]) {
+    workspace = BLI_findstring(&CTX_data_main(C)->workspaces, name, offsetof(ID, name) + 2);
+  }
+  if (!workspace) {
+    return OPERATOR_CANCELLED;
+  }
+  if (!RNA_boolean_get(op->ptr, "confirmed") &&
+      WM_blui_document_confirm(C, "WORKSPACE", NULL, workspace->id.name + 2)) {
+    return OPERATOR_FINISHED;
+  }
+  LISTBASE_FOREACH (WorkSpaceLayout *, layout, &workspace->layouts) {
+    WM_blui_document_clear_screen(C, BKE_workspace_layout_screen_get(layout));
+  }
   WM_event_add_notifier(C, NC_SCREEN | ND_WORKSPACE_DELETE, workspace);
   WM_event_add_notifier(C, NC_WINDOW, NULL);
 
@@ -334,6 +354,10 @@ static void WORKSPACE_OT_delete(wmOperatorType *ot)
   /* api callbacks */
   ot->poll = workspace_context_poll;
   ot->exec = workspace_delete_exec;
+  PropertyRNA *prop = RNA_def_boolean(ot->srna, "confirmed", false, "Confirmed", "Delete after document confirmation");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  prop = RNA_def_string(ot->srna, "workspace", NULL, MAX_NAME, "Workspace", "Workspace to delete");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 static int workspace_append_activate_exec(bContext *C, wmOperator *op)

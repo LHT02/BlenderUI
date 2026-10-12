@@ -251,7 +251,6 @@ const EnumPropertyItem rna_enum_space_action_mode_items[] = {
 
 const EnumPropertyItem rna_enum_space_image_mode_all_items[] = {
     SI_ITEM_VIEW("VIEW", "View", ICON_FILE_IMAGE),
-    SI_ITEM_UV,
     SI_ITEM_PAINT,
     SI_ITEM_MASK,
     {0, NULL, 0, NULL, NULL},
@@ -266,7 +265,6 @@ static const EnumPropertyItem rna_enum_space_image_mode_ui_items[] = {
 
 const EnumPropertyItem rna_enum_space_image_mode_items[] = {
     SI_ITEM_VIEW("IMAGE_EDITOR", "Image Editor", ICON_IMAGE),
-    SI_ITEM_UV,
     {0, NULL, 0, NULL, NULL},
 };
 

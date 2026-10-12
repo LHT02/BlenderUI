@@ -60,6 +60,7 @@ void wm_window_free(bContext *C, wmWindowManager *wm, wmWindow *win);
  * This is event from ghost, or exit-Blender operator.
  */
 void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win);
+void wm_window_close_force(bContext *C, wmWindowManager *wm, wmWindow *win);
 
 void wm_window_title(wmWindowManager *wm, wmWindow *win);
 /**

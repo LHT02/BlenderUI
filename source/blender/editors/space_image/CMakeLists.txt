@@ -31,6 +31,7 @@ set(INC_SYS
 set(SRC
   image_buttons.c
   image_draw.c
+  image_document.c
   image_edit.c
   image_ops.c
   image_sequence.c

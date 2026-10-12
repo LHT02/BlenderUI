@@ -120,6 +120,8 @@ void area_getoffsets(ScrArea *sa_a, ScrArea *sa_b, eScreenDir dir, int *r_offset
  * Close a screen area, allowing most-aligned neighbor to take its place.
  */
 bool screen_area_close(struct bContext *C, bScreen *screen, ScrArea *area);
+bool ED_screen_area_detach(struct bContext *C, ScrArea *area, const int xy[2], struct ReportList *reports);
+void SCREEN_OT_area_detach(struct wmOperatorType *ot);
 void screen_area_spacelink_add(struct Scene *scene, ScrArea *area, eSpace_Type space_type);
 struct AZone *ED_area_actionzone_find_xy(ScrArea *area, const int xy[2]);
 

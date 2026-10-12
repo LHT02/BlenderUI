@@ -384,6 +384,42 @@ static void ui_block_free_func_POPUP(void *arg_pup)
   MEM_delete(pup);
 }
 
+bool UI_popup_menu_enable_refresh(uiLayout *layout, const char *key)
+{
+  uiBlock *block = uiLayoutGetBlock(layout);
+  if (!block->handle || !block->handle->popup_create_vars.handle_create_func) {
+    return false;
+  }
+  block->handle->can_refresh = true;
+  STRNCPY(block->handle->refresh_key, key);
+  return true;
+}
+
+int UI_popup_menu_tag_refresh(wmWindowManager *wm, const char *key)
+{
+  int count = 0;
+  if (!key[0]) {
+    return count;
+  }
+  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    bScreen *screen = WM_window_get_active_screen(win);
+    if (!screen) {
+      continue;
+    }
+    LISTBASE_FOREACH (ARegion *, region, &screen->regionbase) {
+      LISTBASE_FOREACH (uiBlock *, block, &region->uiblocks) {
+        uiPopupBlockHandle *handle = block->handle;
+        if (handle && handle->can_refresh && STREQ(handle->refresh_key, key)) {
+          ED_region_tag_refresh_ui(region);
+          count++;
+          break;
+        }
+      }
+    }
+  }
+  return count;
+}
+
 static uiPopupBlockHandle *ui_popup_menu_create(
     bContext *C,
     ARegion *butregion,

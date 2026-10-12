@@ -825,7 +825,14 @@ class IMAGE_HT_header(Header):
 
         IMAGE_HT_header.draw_xform_template(layout, context)
 
-        layout.template_ID(sima, "image", new="image.new", open="image.open")
+        image_row = layout.row(align=True)
+        if ima:
+            image_row.label(text=ima.name, icon='IMAGE_DATA', translate=False)
+        else:
+            image_row.operator("image.new", text="New", icon='ADD')
+        image_row.operator("image.open", text="", icon='FILE_FOLDER')
+        if ima:
+            image_row.operator("image.document_clear", text="", icon='X')
 
         if show_maskedit:
             row = layout.row()
@@ -1023,7 +1030,9 @@ class IMAGE_PT_image_properties(Panel):
         sima = context.space_data
         iuser = sima.image_user
 
-        layout.template_image(sima, "image", iuser, multiview=True)
+        layout.label(text=sima.image.filepath or sima.image.name, translate=False)
+        layout.prop(sima.image.colorspace_settings, "name", text="Color Space")
+        layout.prop(sima.image, "alpha_mode", text="Alpha")
 
 
 class IMAGE_PT_view_display(Panel):

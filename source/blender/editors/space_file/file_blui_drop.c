@@ -5,6 +5,7 @@
 #include "BLI_dynstr.h"
 #include "BLI_utildefines.h"
 #include "BKE_context.h"
+#include "BLT_translation.h"
 #include "ED_fileselect.h"
 #include "ED_screen.h"
 #include "MEM_guardedalloc.h"
@@ -125,7 +126,7 @@ char *file_blui_drop_tooltip(bContext *C, wmDrag *drag, const int xy[2], wmDropB
   }
   const wmDragPath *data = drag->poin;
   const bool move = move_requested(data, target, CTX_wm_window(C)->eventstate);
-  return BLI_sprintfN("%s %d item(s) to %s  (%s)", move ? "Move" : "Copy",
+  return BLI_sprintfN(IFACE_("%s %d item(s) to %s  (%s)"), move ? IFACE_("Move") : IFACE_("Copy"),
                       data->paths_len ? data->paths_len : 1, target,
-                      move ? "Ctrl: Copy" : "Shift: Move");
+                      move ? IFACE_("Ctrl: Copy") : IFACE_("Shift: Move"));
 }

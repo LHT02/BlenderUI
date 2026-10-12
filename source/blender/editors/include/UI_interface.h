@@ -672,6 +672,8 @@ struct uiLayout *UI_popup_menu_layout(uiPopupMenu *pup);
 void UI_popup_menu_reports(struct bContext *C, struct ReportList *reports) ATTR_NONNULL();
 int UI_popup_menu_invoke(struct bContext *C, const char *idname, struct ReportList *reports)
     ATTR_NONNULL(1, 2);
+bool UI_popup_menu_enable_refresh(struct uiLayout *layout, const char *key);
+int UI_popup_menu_tag_refresh(struct wmWindowManager *wm, const char *key);
 
 /**
  * Allow setting menu return value from externals.

@@ -2015,6 +2015,8 @@ static void WM_OT_window_close(wmOperatorType *ot)
 
   ot->exec = wm_window_close_exec;
   ot->poll = WM_operator_winactive;
+  PropertyRNA *prop = RNA_def_boolean(ot->srna, "force_close", false, "Force Close", "Close after document confirmation");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 static bool wm_window_new_poll(bContext *C)

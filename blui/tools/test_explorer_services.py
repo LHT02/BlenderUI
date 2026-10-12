@@ -123,6 +123,9 @@ class IsolatedShell(unittest.TestCase):
             self.assertNotIn("root", session.errors)
             items = session.items["root"]
             self.assertTrue(any(item.get("id") for item in items))
+            session.request('status')
+            self.wait(session, 'status')
+            self.assertFalse(session.items['status'], 'An idle menu host unexpectedly owns a visible dialog')
             for label in ("7-Zip", "TortoiseSVN"):
                 item = next((item for item in items if item["label"] == label), None)
                 if item is None:
@@ -137,6 +140,31 @@ class IsolatedShell(unittest.TestCase):
             self.assertIn("does not belong", session.errors["invoke"])
         finally:
             session.close()
+
+    def test_idle_host_reuse_invalidates_old_commands(self):
+        worker = Path(__file__).parent / 'fixtures/shell_worker_delayed.py'
+        helpers = [shell_client.Session(['fixture-%d' % i], worker=str(worker)) for i in range(3)]
+        try:
+            for helper in helpers:
+                shell_client.sessions[helper.token] = helper
+                self.wait(helper)
+            old = helpers[0]
+            token, pid, command = old.token, old.process.pid, old.items['root'][0]['id']
+            reused = shell_client.get_session(['new-selection'])
+            self.assertIs(reused, old)
+            self.assertEqual(reused.process.pid, pid)
+            self.assertNotEqual(reused.token, token)
+            self.assertNotIn(token, shell_client.sessions)
+            self.wait(reused)
+            self.assertNotEqual(reused.items['root'][0]['id'], command)
+            reused.request('invoke', command=command)
+            self.wait(reused, 'invoke')
+            self.assertIn('does not belong', reused.errors['invoke'])
+            reused.request('status')
+            self.wait(reused, 'status')
+            self.assertFalse(reused.invoked, 'Completed dialog-free commands left the host permanently busy')
+        finally:
+            shell_client.close_all()
 
 
 if __name__ == "__main__":

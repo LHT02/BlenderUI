@@ -10,15 +10,20 @@ import bpy
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 from bpy.types import Operator
 from blui_explorer import file_tasks, task_client
+from blui_explorer.localization import iface, message as localized_message
 
 _jobs = []
-_status = ("", 0.0)
+_status = ("", True, 0.0)
 
 
 def task_status():
     if _jobs:
-        return _jobs[0][1] + "..." + (" (%d queued)" % (len(_jobs) - 1) if len(_jobs) > 1 else "")
-    return _status[0] if time.monotonic() - _status[1] < 12 else ""
+        if len(_jobs) > 1:
+            return iface('%s... (%d queued)') % (iface(_jobs[0][1]), len(_jobs) - 1)
+        return iface('%s...') % iface(_jobs[0][1])
+    label, succeeded, updated = _status
+    return (iface('%s completed' if succeeded else '%s failed') % iface(label)
+            if time.monotonic() - updated < 12 else '')
 
 
 def _redraw():
@@ -75,15 +80,15 @@ def _finish_jobs():
             print("BLUI FILE:", message, result)
             if on_success:
                 on_success()
-            _status = (message, time.monotonic())
+            _status = (label, True, time.monotonic())
         except Exception as exc:
             message = str(exc)
             print("BLUI FILE ERROR:", message)
-            _status = (label + " failed", time.monotonic())
-            def draw(self, _context, text=message):
+            _status = (label, False, time.monotonic())
+            def draw(self, _context, text=localized_message(message)):
                 for start in range(0, len(text), 85):
-                    self.layout.label(text=text[start:start + 85])
-            bpy.context.window_manager.popup_menu(draw, title=label, icon='ERROR')
+                    self.layout.label(text=text[start:start + 85], translate=False)
+            bpy.context.window_manager.popup_menu(draw, title=iface(label), icon='ERROR')
         refresh_all()
     _redraw()
     return 0.15 if _jobs else None
@@ -144,7 +149,7 @@ class FILE_OT_explorer_rename(FileSelection, Operator):
                 os.rename(source, target)
             refresh_all()
         except (OSError, ValueError) as exc:
-            self.report({'ERROR'}, str(exc))
+            self.report({'ERROR'}, localized_message(str(exc)))
             return {'CANCELLED'}
         return {'FINISHED'}
 
@@ -168,7 +173,7 @@ class FILE_OT_explorer_new_file(Operator):
                 pass
             refresh_all()
         except (OSError, ValueError) as exc:
-            self.report({'ERROR'}, str(exc))
+            self.report({'ERROR'}, localized_message(str(exc)))
             return {'CANCELLED'}
         return {'FINISHED'}
 
@@ -212,7 +217,7 @@ class FILE_OT_explorer_archive(FileSelection, Operator):
         try:
             file_tasks.valid_name(self.name)
         except ValueError as exc:
-            self.report({'ERROR'}, str(exc))
+            self.report({'ERROR'}, localized_message(str(exc)))
             return {'CANCELLED'}
         submit("Create " + self.kind, file_tasks.archive, paths,
                str(Path(paths[0]).parent / self.name), self.kind)
@@ -258,7 +263,7 @@ class FILE_OT_explorer_drop(Operator):
     def execute(self, _context):
         paths = [p for p in self.sources.splitlines() if p]
         if not paths or not self.directory:
-            self.report({'ERROR'}, "No files or destination for this drop")
+            self.report({'ERROR'}, iface("No files or destination for this drop"))
             return {'CANCELLED'}
         on_success = None
         if self.from_clipboard and self.move:

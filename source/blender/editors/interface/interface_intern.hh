@@ -797,6 +797,8 @@ struct uiPopupBlockHandle {
   /** True if we can re-create the popup using #uiPopupBlockHandle.popup_create_vars. */
   bool can_refresh;
   bool refresh;
+  /** Opt-in key for asynchronously updated menus. Only live popup regions are inspected. */
+  char refresh_key[128];
 
   wmTimer *scrolltimer;
   float scrolloffset;

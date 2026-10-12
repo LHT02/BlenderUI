@@ -417,6 +417,17 @@ void wm_quit_with_optional_confirmation_prompt(bContext *C, wmWindow *win)
 
 void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
 {
+  wmWindow *previous = CTX_wm_window(C);
+  CTX_wm_window_set(C, win);
+  const bool confirmed_later = WM_blui_document_confirm(C, "WINDOW", NULL, NULL);
+  CTX_wm_window_set(C, previous);
+  if (!confirmed_later) {
+    wm_window_close_force(C, wm, win);
+  }
+}
+
+void wm_window_close_force(bContext *C, wmWindowManager *wm, wmWindow *win)
+{
   wmWindow *win_other;
 
   /* First check if there is another main window remaining. */
@@ -440,11 +451,12 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
   /* Close child windows */
   LISTBASE_FOREACH_MUTABLE (wmWindow *, iter_win, &wm->windows) {
     if (iter_win->parent == win) {
-      wm_window_close(C, wm, iter_win);
+      wm_window_close_force(C, wm, iter_win);
     }
   }
 
   bScreen *screen = WM_window_get_active_screen(win);
+  WM_blui_document_clear_screen(C, screen);
   WorkSpace *workspace = WM_window_get_active_workspace(win);
   WorkSpaceLayout *layout = BKE_workspace_active_layout_get(win->workspace_hook);
 
@@ -1103,11 +1115,16 @@ wmWindow *WM_window_open(bContext *C,
 /** \name Operators
  * \{ */
 
-int wm_window_close_exec(bContext *C, wmOperator *UNUSED(op))
+int wm_window_close_exec(bContext *C, wmOperator *op)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   wmWindow *win = CTX_wm_window(C);
-  wm_window_close(C, wm, win);
+  if (RNA_boolean_get(op->ptr, "force_close")) {
+    wm_window_close_force(C, wm, win);
+  }
+  else {
+    wm_window_close(C, wm, win);
+  }
   return OPERATOR_FINISHED;
 }
 

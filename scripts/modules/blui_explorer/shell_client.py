@@ -33,7 +33,9 @@ class Session:
         self.paths = tuple(os.path.normpath(p) for p in paths)
         self.action = action
         self.items, self.errors, self.pending = {}, {}, {}
+        self.updated_nodes = set()
         self.last_used = time.monotonic()
+        self.last_status = 0.0
         self.timeout, self.serial, self.invoked = timeout, 0, False
         self.directory = tempfile.mkdtemp(prefix="blui_shell_")
         try:
@@ -48,22 +50,27 @@ class Session:
             raise
 
     def request(self, op, **payload):
-        node = payload.get("node", "root") if op in {"list", "expand"} else "invoke"
+        node = payload.get("node", "root") if op in {"list", "expand"} else 'status' if op == 'status' else "invoke"
         if any(p[0] == node for p in self.pending.values()):
             return
         if self.process.poll() is not None:
             self.errors[node] = "Windows menu helper exited. Retry to load a new session."
             return
-        self.last_used = time.monotonic()
+        started = time.monotonic()
+        if op == 'status':
+            self.last_status = started
+        else:
+            self.last_used = started
         if op == 'invoke':
             self.invoked = True
         self.serial += 1
-        self.pending[self.serial] = (node, self.last_used, op)
+        self.pending[self.serial] = (node, started, op)
         mailbox.publish(self.directory, "request-%d.json" % self.serial, dict(op=op, **payload))
 
     def poll(self):
         reap()
         changed = False
+        self.updated_nodes.clear()
         for serial, (node, started, op) in list(self.pending.items()):
             reply = mailbox.take(self.directory, "reply-%d.json" % serial)
             if reply is not None:
@@ -71,17 +78,23 @@ class Session:
                 if reply.get("ok"):
                     if op in {"list", "expand"}:
                         self.items[node] = reply["items"]
+                    elif op == 'status':
+                        # Reuse the process (don't terminate it) after an extension's dialog closes.
+                        self.invoked = reply['has_dialogs']
+                        self.items['status'] = self.invoked
                     else:
                         self.items["invoke"] = True
                     self.errors.pop(node, None)
                 else:
                     self.errors[node] = reply.get("error", "Windows menu failed")
                 changed = True
+                self.updated_nodes.add(node)
                 continue
             if self.process.poll() is not None:
                 self.errors[node] = "Windows menu helper crashed or exited."
                 del self.pending[serial]
                 changed = True
+                self.updated_nodes.add(node)
                 continue
             limit = self.timeout if op in {"list", "expand"} else 120.0
             if time.monotonic() - started > limit:
@@ -90,8 +103,20 @@ class Session:
                     if op not in {"list", "expand"} else "Windows menu timed out. BLUI is still available.")
                 self.close()
                 changed = True
+                self.updated_nodes.add(node)
                 break
         return changed
+
+    def reset(self, paths):
+        """Reuse a healthy idle host, never an invoked or in-flight menu."""
+        if self.invoked or self.pending or self.errors or self.process.poll() is not None:
+            raise RuntimeError("Only an idle Windows menu helper can be reused")
+        self.token = uuid.uuid4().hex
+        self.action = 'list'
+        self.paths = tuple(os.path.normpath(p) for p in paths)
+        self.items.clear()
+        self.updated_nodes.clear()
+        self.request('list', paths=list(self.paths))
 
     def close(self):
         if self.process.poll() is None:
@@ -118,9 +143,13 @@ def get_session(paths, retry=False):
                   not any(p[2] == "invoke" for p in s.pending.values())]
     while len(disposable) >= 3:
         old = min(disposable, key=lambda s: s.last_used)
-        old.close()
         sessions.pop(old.token, None)
         disposable.remove(old)
+        if not old.pending and not old.errors and old.process.poll() is None:
+            old.reset(paths)
+            sessions[old.token] = old
+            return old
+        old.close()
     if len(sessions) >= 8:
         raise RuntimeError("Close existing Windows extension dialogs before opening another menu")
     session = Session(paths)

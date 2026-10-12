@@ -771,6 +771,12 @@ void RNA_api_wm(StructRNA *srna)
   FunctionRNA *func;
   PropertyRNA *parm;
 
+  func = RNA_def_function(srna, "tag_menu_refresh", "UI_popup_menu_tag_refresh");
+  RNA_def_function_ui_description(func, "Rebuild matching open menus without closing or reopening them");
+  parm = RNA_def_string(func, "key", NULL, 128, "Key", "Key registered by UILayout.enable_popup_refresh");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  RNA_def_function_return(func, RNA_def_int(func, "count", 0, 0, INT_MAX, "", "Number of matching menus", 0, INT_MAX));
+
   func = RNA_def_function(srna, "fileselect_add", "WM_event_add_fileselect");
   RNA_def_function_ui_description(
       func,

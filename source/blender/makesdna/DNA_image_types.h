@@ -233,6 +233,8 @@ enum {
   IMA_USE_VIEWS = (1 << 14),
   IMA_FLAG_UNUSED_15 = (1 << 15), /* cleared */
   IMA_FLAG_UNUSED_16 = (1 << 16), /* cleared */
+  /** BLUI editor-owned temporary document, released when no editor references it. */
+  IMA_BLUI_TEMPORARY = (1 << 20),
 };
 
 /** #Image.gpuflag */

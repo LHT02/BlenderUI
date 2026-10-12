@@ -8,7 +8,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mailbox import publish, take
-from shell_win32 import ShellMenu, pump, properties
+from shell_win32 import ShellMenu, pump, properties, has_dialogs
 
 
 def main():
@@ -28,7 +28,8 @@ def main():
                 op = request['op']
                 if op == 'list':
                     if menu is not None:
-                        raise ValueError('A helper owns exactly one menu session')
+                        menu.close()
+                        menu = None
                     paths = [os.path.normpath(path) for path in request['paths']]
                     if len({os.path.normcase(os.path.dirname(p.rstrip('\\/'))) for p in paths}) != 1:
                         raise ValueError('Select items in the same folder')
@@ -40,6 +41,8 @@ def main():
                     menu.invoke(int(request['command']))
                 elif op == 'properties':
                     properties(request['paths'][0])
+                elif op == 'status':
+                    reply['has_dialogs'] = has_dialogs()
                 else:
                     raise ValueError('Unknown menu request')
                 reply['ok'] = True

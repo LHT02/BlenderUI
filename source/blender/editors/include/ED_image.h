@@ -47,6 +47,9 @@ float ED_space_image_increment_snap_value(int grid_dimensions,
 /* image_edit.c, exported for transform. */
 
 struct Image *ED_space_image(const struct SpaceImage *sima);
+void ED_image_document_set(struct Main *bmain, struct SpaceImage *space, struct Image *image);
+void ED_image_document_clear(struct Main *bmain, struct SpaceImage *space);
+void ED_image_document_collect(struct Main *bmain);
 void ED_space_image_set(struct Main *bmain,
                         struct SpaceImage *sima,
                         struct Image *ima,
