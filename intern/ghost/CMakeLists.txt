@@ -468,6 +468,7 @@ elseif(WIN32)
     intern/GHOST_DragSourceWin32.cc
     intern/GHOST_DropTargetWin32.cc
     intern/GHOST_ShellMenuWin32.cc
+    intern/GHOST_FileIconWin32.cc
     intern/GHOST_SystemWin32.cc
     intern/GHOST_TrackpadWin32.cc
     intern/GHOST_TrayWin32.cc

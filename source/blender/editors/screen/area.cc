@@ -2413,23 +2413,31 @@ static void region_align_info_to_area(
 
 void ED_area_swapspace(bContext *C, ScrArea *sa1, ScrArea *sa2)
 {
-  ScrArea *tmp = MEM_cnew<ScrArea>(__func__);
   wmWindow *win = CTX_wm_window(C);
-
+  ScrArea *previous_area = CTX_wm_area(C);
+  wmWindow *win1 = WM_window_find_by_area(CTX_wm_manager(C), sa1);
+  wmWindow *win2 = WM_window_find_by_area(CTX_wm_manager(C), sa2);
+  win1 = win1 ? win1 : win;
+  win2 = win2 ? win2 : win;
+  CTX_wm_window_set(C, win1);
+  CTX_wm_area_set(C, sa1);
+  CTX_wm_region_set(C, nullptr);
   ED_area_exit(C, sa1);
+  CTX_wm_window_set(C, win2);
+  CTX_wm_area_set(C, sa2);
   ED_area_exit(C, sa2);
-
-  ED_area_data_copy(tmp, sa1, false);
-  ED_area_data_copy(sa1, sa2, true);
-  ED_area_data_copy(sa2, tmp, true);
-  ED_area_init(CTX_wm_manager(C), win, sa1);
-  ED_area_init(CTX_wm_manager(C), win, sa2);
-
-  BKE_screen_area_free(tmp);
-  MEM_delete(tmp);
+  ED_area_data_swap(sa1, sa2);
+  ED_area_init(CTX_wm_manager(C), win1, sa1);
+  ED_area_init(CTX_wm_manager(C), win2, sa2);
+  WM_window_get_active_screen(win1)->active_region = nullptr;
+  WM_window_get_active_screen(win2)->active_region = nullptr;
+  CTX_wm_window_set(C, win);
+  CTX_wm_area_set(C, previous_area);
+  CTX_wm_region_set(C, nullptr);
 
   /* tell WM to refresh, cursor types etc */
   WM_event_add_mousemove(win);
+  if (win2 != win1) { WM_event_add_mousemove(win2); }
 
   ED_area_tag_redraw(sa1);
   ED_area_tag_refresh(sa1);

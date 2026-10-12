@@ -110,7 +110,6 @@ void OVERLAY_edit_uv_init(OVERLAY_Data *vedata)
   const bool is_uv_editor = sima->mode == SI_MODE_UV;
   const bool has_edit_object = (draw_ctx->object_edit) != nullptr;
   const bool is_paint_mode = sima->mode == SI_MODE_PAINT;
-  const bool is_view_mode = sima->mode == SI_MODE_VIEW;
   const bool is_mask_mode = sima->mode == SI_MODE_MASK;
   const bool is_edit_mode = draw_ctx->object_mode == OB_MODE_EDIT;
   const bool do_uv_overlay = is_image_type && is_uv_editor && has_edit_object;
@@ -136,13 +135,9 @@ void OVERLAY_edit_uv_init(OVERLAY_Data *vedata)
   pd->edit_uv.do_faces = show_overlays && do_faces && !do_uvstretching_overlay;
   pd->edit_uv.do_face_dots = show_overlays && do_faces && do_face_dots;
   pd->edit_uv.do_uv_overlay = show_overlays && do_uv_overlay;
-  pd->edit_uv.do_uv_shadow_overlay = show_overlays && is_image_type &&
-                                     ((is_paint_mode && do_tex_paint_shadows &&
-                                       ((draw_ctx->object_mode &
-                                         (OB_MODE_TEXTURE_PAINT | OB_MODE_EDIT)) != 0)) ||
-                                      (is_uv_editor && do_tex_paint_shadows &&
-                                       ((draw_ctx->object_mode & (OB_MODE_TEXTURE_PAINT)) != 0)) ||
-                                      (is_view_mode && do_tex_paint_shadows &&
+  /* BLUI's image view/paint modes are standalone documents, not mesh UV views. */
+  pd->edit_uv.do_uv_shadow_overlay = show_overlays && is_image_type && is_uv_editor &&
+                                     ((do_tex_paint_shadows &&
                                        ((draw_ctx->object_mode & (OB_MODE_TEXTURE_PAINT)) != 0)) ||
                                       (do_uv_overlay && (show_modified_uvs)));
 

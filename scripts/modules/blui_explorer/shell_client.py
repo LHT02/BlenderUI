@@ -27,11 +27,13 @@ def python_executable():
 
 
 class Session:
-    def __init__(self, paths, *, executable=None, worker=None, timeout=8.0, action="list"):
+    kind = 'default'
+    def __init__(self, paths, *, executable=None, worker=None, timeout=8.0, action="list", scope=None):
         reap()
         self.token = uuid.uuid4().hex
         self.paths = tuple(os.path.normpath(p) for p in paths)
         self.action = action
+        self.scope = scope
         self.items, self.errors, self.pending = {}, {}, {}
         self.updated_nodes = set()
         self.last_used = time.monotonic()
@@ -44,7 +46,7 @@ class Session:
                  worker or os.path.join(os.path.dirname(__file__), "shell_worker.py"), self.directory],
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            self.request(action, paths=list(self.paths))
+            self.request(action, paths=list(self.paths), scope=scope)
         except Exception:
             shutil.rmtree(self.directory, ignore_errors=True)
             raise
@@ -116,7 +118,10 @@ class Session:
         self.paths = tuple(os.path.normpath(p) for p in paths)
         self.items.clear()
         self.updated_nodes.clear()
-        self.request('list', paths=list(self.paths))
+        self.request('list', paths=list(self.paths), scope=self.scope)
+
+    def is_alive(self):
+        return self.process.poll() is None
 
     def close(self):
         if self.process.poll() is None:
@@ -129,10 +134,12 @@ class Session:
 sessions = {}
 
 
-def get_session(paths, retry=False):
+def get_session(paths, retry=False, folders=False):
     key = tuple(os.path.normpath(p) for p in paths)
+    # The UI supplies cached entry flags; never stat a network path on the UI thread.
+    kind = 'folder' if folders and key and all(os.path.dirname(p) != p for p in key) else 'default'
     for session in list(sessions.values()):
-        if session.paths == key and session.action == "list" and not retry and not session.invoked:
+        if session.paths == key and session.kind == kind and session.action == "list" and not retry and not session.invoked:
             session.last_used = time.monotonic()
             return session
         if session.paths == key and session.action == "list" and retry and not session.invoked:
@@ -145,14 +152,18 @@ def get_session(paths, retry=False):
         old = min(disposable, key=lambda s: s.last_used)
         sessions.pop(old.token, None)
         disposable.remove(old)
-        if not old.pending and not old.errors and old.process.poll() is None:
+        if old.kind == kind and not old.pending and not old.errors and old.is_alive():
             old.reset(paths)
             sessions[old.token] = old
             return old
         old.close()
     if len(sessions) >= 8:
         raise RuntimeError("Close existing Windows extension dialogs before opening another menu")
-    session = Session(paths)
+    if kind == 'folder':
+        from .shell_folder_client import FolderSession
+        session = FolderSession(paths)
+    else:
+        session = Session(paths)
     sessions[session.token] = session
     return session
 

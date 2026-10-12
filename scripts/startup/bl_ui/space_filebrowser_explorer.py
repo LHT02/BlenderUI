@@ -39,6 +39,11 @@ def _native_items(layout, context, session, node):
             continue
         row = layout.row()
         row.enabled = item["enabled"]
+        if item.get('localize'):
+            row.label(text=message(item['label']), icon='TIME' if item.get('loading') else 'ERROR', translate=False)
+            if not item.get('loading'):
+                layout.operator("file.explorer_shell_retry", text="Retry Windows Menu", icon='FILE_REFRESH')
+            continue
         if item.get("submenu"):
             name = _bindings.get((session.token, item["submenu"]))
             if name:
@@ -56,7 +61,7 @@ class FILE_OT_explorer_shell_command(Operator):
 
     def execute(self, context):
         session = shell_client.sessions.get(self.session_token)
-        if session is None or session.process.poll() is not None:
+        if session is None or not session.is_alive():
             self.report({'ERROR'}, iface("This menu session expired. Open the context menu again."))
             return {'CANCELLED'}
         paths = tuple(selected_paths(context) or [os.path.normpath(directory(context))])

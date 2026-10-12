@@ -161,6 +161,8 @@ class GHOST_SystemWin32 : public GHOST_System {
    */
   bool processEvents(bool waitForEvent);
 
+  GHOST_IWindow *getWindowUnderCursor(int32_t x, int32_t y) override;
+
   /***************************************************************************************
    ** Cursor management functionality
    ***************************************************************************************/

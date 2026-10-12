@@ -2029,6 +2029,13 @@ static int rna_FileBrowser_FileSelectEntry_relative_path_length(PointerRNA *ptr)
   return (int)strlen(entry->relpath);
 }
 
+static bool rna_FileBrowser_FileSelectEntry_is_directory_get(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+  return (entry->typeflag & FILE_TYPE_DIR) &&
+         !(entry->redirection_path && BLI_path_extension_check(entry->relpath, ".lnk"));
+}
+
 static const EnumPropertyItem *rna_FileBrowser_FileSelectEntry_id_type_itemf(
     bContext *UNUSED(C), PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *UNUSED(r_free))
 {
@@ -4353,6 +4360,11 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
                            "Path relative to the directory currently displayed in the File "
                            "Browser (includes the file name)");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+  prop = RNA_def_property(srna, "is_directory", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop, "rna_FileBrowser_FileSelectEntry_is_directory_get", NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Directory", "Cached entry represents a folder, not a shortcut file");
 
   prop = RNA_def_property(srna, "id_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_id_type_items);

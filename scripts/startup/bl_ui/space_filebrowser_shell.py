@@ -59,7 +59,7 @@ def tick():
         if time.monotonic() - session.last_used > 120 and not session.pending and not session.invoked:
             session.close()
             del shell_client.sessions[token]
-        elif session.process.poll() is not None and not session.pending:
+        elif not session.is_alive() and not session.pending:
             session.close()
             del shell_client.sessions[token]
         elif session.invoked and not session.pending and time.monotonic() - max(session.last_used, session.last_status) > 3:
@@ -81,9 +81,12 @@ def ensure_tick():
 
 
 def session(context, retry=False):
+    entries = [entry for entry in (getattr(context, 'selected_files', None) or ())
+               if entry.relative_path not in {'', '.', '..'}]
     paths = selected_paths(context) or [os.path.normpath(directory(context))]
+    folders = not entries or all(entry.is_directory for entry in entries)
     try:
-        result = shell_client.get_session(paths, retry=retry)
+        result = shell_client.get_session(paths, retry=retry, folders=folders)
         ensure_tick()
         return result
     except (OSError, RuntimeError) as exc:

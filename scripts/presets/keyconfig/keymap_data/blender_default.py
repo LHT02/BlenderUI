@@ -725,8 +725,7 @@ def km_screen_editing(params):
         ("screen.actionzone", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True},
          {"properties": [("modifier", 2)]}),
         # Screen tools
-        ("screen.area_split", {"type": 'ACTIONZONE_AREA', "value": 'ANY'}, None),
-        ("screen.area_join", {"type": 'ACTIONZONE_AREA', "value": 'ANY'}, None),
+        ("screen.area_join", {"type": 'ACTIONZONE_AREA', "value": 'ANY', "any": True}, None),
         ("screen.area_dupli", {"type": 'ACTIONZONE_AREA', "value": 'ANY', "shift": True}, None),
         ("screen.area_swap", {"type": 'ACTIONZONE_AREA', "value": 'ANY', "ctrl": True}, None),
         ("screen.region_scale", {"type": 'ACTIONZONE_REGION', "value": 'ANY'}, None),

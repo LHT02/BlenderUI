@@ -61,8 +61,6 @@ class IMAGE_MT_view(Menu):
 
         sima = context.space_data
         uv = sima.uv_editor
-        tool_settings = context.tool_settings
-        paint = tool_settings.image_paint
 
         show_uvedit = sima.show_uvedit
         show_render = sima.show_render
@@ -76,10 +74,6 @@ class IMAGE_MT_view(Menu):
 
         layout.prop(sima, "use_realtime_update")
         layout.prop(uv, "show_metadata")
-
-        if paint.brush and (context.image_paint_object or sima.mode == 'PAINT'):
-            layout.prop(uv, "show_texpaint")
-            layout.prop(tool_settings, "show_uv_local_view", text="Show Same Material")
 
         layout.separator()
 
@@ -1631,28 +1625,6 @@ class IMAGE_PT_overlay_uv_edit_geometry(Panel):
         row.prop(uvedit, "show_faces", text="Faces")
 
 
-class IMAGE_PT_overlay_texture_paint(Panel):
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'HEADER'
-    bl_label = "Geometry"
-    bl_parent_id = 'IMAGE_PT_overlay'
-
-    @classmethod
-    def poll(cls, context):
-        sima = context.space_data
-        return (sima and (sima.show_paint))
-
-    def draw(self, context):
-        layout = self.layout
-
-        sima = context.space_data
-        uvedit = sima.uv_editor
-        overlay = sima.overlay
-
-        layout.active = overlay.show_overlays
-        layout.prop(uvedit, "show_texpaint")
-
-
 class IMAGE_PT_overlay_image(Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'HEADER'
@@ -1738,7 +1710,6 @@ classes = (
     IMAGE_PT_overlay_guides,
     IMAGE_PT_overlay_uv_edit,
     IMAGE_PT_overlay_uv_edit_geometry,
-    IMAGE_PT_overlay_texture_paint,
     IMAGE_PT_overlay_image,
 )
 

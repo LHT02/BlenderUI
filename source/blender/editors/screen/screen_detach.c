@@ -8,8 +8,8 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "WM_api.h"
-#include "wm_window.h"
 #include "screen_intern.h"
+#include "wm_window.h"
 
 bool ED_screen_area_detach(bContext *C, ScrArea *area, const int xy[2], ReportList *reports)
 {
@@ -22,28 +22,53 @@ bool ED_screen_area_detach(bContext *C, ScrArea *area, const int xy[2], ReportLi
   const int width = MAX2(area->v3->vec.x - area->v1->vec.x, 320);
   const int height = MAX2(area->v3->vec.y - area->v1->vec.y, 240);
   ARegion *region = CTX_wm_region(C);
-  wmWindow *destination = WM_window_open(C, "BLUI", xy[0], xy[1] - height, width, height,
-                                         area->spacetype, true, false, false, WIN_ALIGN_ABSOLUTE);
+  wmWindow *destination = WM_window_open(C,
+                                         "BLUI",
+                                         xy[0],
+                                         xy[1] - height,
+                                         width,
+                                         height,
+                                         area->spacetype,
+                                         true,
+                                         false,
+                                         false,
+                                         WIN_ALIGN_ABSOLUTE);
   if (!destination) {
     BKE_report(reports, RPT_ERROR, "Failed to detach editor into a new window");
     return false;
   }
   bScreen *destination_screen = WM_window_get_active_screen(destination);
   ScrArea *new_area = destination_screen->areabase.first;
-  ED_area_data_copy(new_area, area, true);
+  /* A move preserves the original SpaceLink/region identity (console namespace, history, etc.). */
+  CTX_wm_window_set(C, source);
+  CTX_wm_area_set(C, area);
+  CTX_wm_region_set(C, NULL);
+  ED_area_exit(C, area);
+  CTX_wm_window_set(C, destination);
+  CTX_wm_area_set(C, new_area);
+  CTX_wm_region_set(C, NULL);
+  ED_area_exit(C, new_area);
+  ED_area_data_swap(new_area, area);
+  source_screen->active_region = destination_screen->active_region = NULL;
+  ED_area_init(wm, destination, new_area);
+  CTX_wm_window_set(C, source);
+  CTX_wm_area_set(C, area);
+  ED_area_init(wm, source, area);
   ED_area_tag_redraw(new_area);
   CTX_wm_window_set(C, source);
   CTX_wm_area_set(C, area);
-  CTX_wm_region_set(C, region);
+  CTX_wm_region_set(C, NULL);
   WM_event_modal_handler_region_replace(source, region, NULL);
   if (BLI_listbase_is_single(&source_screen->areabase)) {
     /* Let the active corner modal handler unwind before freeing its window. */
     if (!WM_blui_close_moved_window(C, source, destination)) {
-      BKE_report(reports, RPT_WARNING, "Editor opened in a new window; source area could not be closed");
+      BKE_report(
+          reports, RPT_WARNING, "Editor opened in a new window; source area could not be closed");
     }
   }
   else if (!screen_area_close(C, source_screen, area)) {
-    BKE_report(reports, RPT_WARNING, "Editor opened in a new window; source area could not be closed");
+    BKE_report(
+        reports, RPT_WARNING, "Editor opened in a new window; source area could not be closed");
   }
   else {
     CTX_wm_area_set(C, NULL);
@@ -57,7 +82,8 @@ static int area_detach_exec(bContext *C, wmOperator *op)
 {
   int cursor[2];
   RNA_int_get_array(op->ptr, "cursor", cursor);
-  return ED_screen_area_detach(C, CTX_wm_area(C), cursor, op->reports) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+  return ED_screen_area_detach(C, CTX_wm_area(C), cursor, op->reports) ? OPERATOR_FINISHED :
+                                                                         OPERATOR_CANCELLED;
 }
 
 void SCREEN_OT_area_detach(wmOperatorType *ot)
@@ -67,5 +93,6 @@ void SCREEN_OT_area_detach(wmOperatorType *ot)
   ot->idname = "SCREEN_OT_area_detach";
   ot->exec = area_detach_exec;
   ot->poll = ED_operator_areaactive;
-  RNA_def_int_vector(ot->srna, "cursor", 2, NULL, INT_MIN, INT_MAX, "Cursor", "Drop location", INT_MIN, INT_MAX);
+  RNA_def_int_vector(
+      ot->srna, "cursor", 2, NULL, INT_MIN, INT_MAX, "Cursor", "Drop location", INT_MIN, INT_MAX);
 }

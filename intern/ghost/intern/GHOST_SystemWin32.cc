@@ -2714,3 +2714,18 @@ bool GHOST_SystemWin32::setConsoleWindowState(GHOST_TConsoleWindowState action)
 
   return m_consoleStatus;
 }
+GHOST_IWindow *GHOST_SystemWin32::getWindowUnderCursor(int32_t x, int32_t y)
+{
+  /* Match actual OS Z-order rather than the first overlapping Blender rectangle. */
+  POINT point = {x, y};
+  HWND under = GetAncestor(WindowFromPoint(point), GA_ROOT);
+  for (GHOST_IWindow *window : getWindowManager()->getWindows()) {
+    auto *native = static_cast<GHOST_WindowWin32 *>(window);
+    if (native->getHWND() == under && native->getState() != GHOST_kWindowStateMinimized) {
+      GHOST_Rect bounds;
+      native->getClientBounds(bounds);
+      return bounds.isInside(x, y) ? window : nullptr;
+    }
+  }
+  return nullptr;
+}

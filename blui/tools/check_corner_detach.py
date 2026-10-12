@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Real native corner events, including a provisional split and Escape cancellation."""
+"""Real native corner events, including an inward split preview and Escape cancellation."""
 import os
 import sys
 import time
@@ -18,6 +18,7 @@ def step():
         raise TimeoutError('Corner drag regression timed out')
     phase, corner = state['phase'], state['corner']
     if phase == 0:
+        state.pop('wait_at', None)
         space_filebrowser_shell.unregister()
         window = bpy.context.window_manager.windows[0]
         area = next(iter(window.screen.areas))
@@ -62,12 +63,18 @@ def step():
             print('check_corner_detach: PASS', flush=True)
             os._exit(0)
         new = [w for w in windows if w.as_pointer() not in state['before']]
+        if len(new) == 1 and len(windows) > 1:
+            # First GL-window creation can outlast this timer's delay. Give the
+            # newly registered deferred close its next event-loop turn.
+            state.setdefault('wait_at', time.monotonic())
+            if time.monotonic() - state['wait_at'] < 2:
+                return .05
         assert len(new) == 1, 'Corner %d did not create exactly one window' % corner
         assert len(windows) == 1, 'Source single-editor window was duplicated instead of moved'
         assert new[0].screen.areas[0].spaces.active.text == state['text']
         assert new[0].screen.areas[0].spaces.active.text.as_string() == 'unsaved buffer survives every corner drag'
         assert new[0].parent is None
-        print('PASS Native corner', corner, '(provisional split first)' if corner == 3 else '', flush=True)
+        print('PASS Native corner', corner, '(inward split preview first)' if corner == 3 else '', flush=True)
         state['corner'] += 1
         state['phase'] = 0
         return 0.2

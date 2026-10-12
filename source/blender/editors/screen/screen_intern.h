@@ -33,6 +33,14 @@ typedef enum eScreenDir {
 #define SCREEN_DIR_IS_VERTICAL(dir) (ELEM(dir, SCREEN_DIR_N, SCREEN_DIR_S))
 #define SCREEN_DIR_IS_HORIZONTAL(dir) (ELEM(dir, SCREEN_DIR_W, SCREEN_DIR_E))
 
+typedef struct sActionzoneData {
+  ScrArea *sa1, *sa2;
+  struct AZone *az;
+  int x, y;
+  eScreenDir gesture_dir;
+  int modifier;
+} sActionzoneData;
+
 typedef enum eScreenAxis {
   /** Horizontal. */
   SCREEN_AXIS_H = 'h',
@@ -122,6 +130,7 @@ void area_getoffsets(ScrArea *sa_a, ScrArea *sa_b, eScreenDir dir, int *r_offset
 bool screen_area_close(struct bContext *C, bScreen *screen, ScrArea *area);
 bool ED_screen_area_detach(struct bContext *C, ScrArea *area, const int xy[2], struct ReportList *reports);
 void SCREEN_OT_area_detach(struct wmOperatorType *ot);
+ScrEdge *screen_area_edge_from_cursor(const struct bContext *C, const int cursor[2], ScrArea **r_sa1, ScrArea **r_sa2);
 void screen_area_spacelink_add(struct Scene *scene, ScrArea *area, eSpace_Type space_type);
 struct AZone *ED_area_actionzone_find_xy(ScrArea *area, const int xy[2]);
 

@@ -6,11 +6,27 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "modules"))
-from blui_explorer import file_tasks, shell_client
+from blui_explorer import file_tasks, shell_client, mailbox
+
+
+class Messages(unittest.TestCase):
+    def test_transient_windows_file_lock(self):
+        with tempfile.TemporaryDirectory(prefix='blui_mailbox_') as directory:
+            mailbox.publish(directory, 'reply.json', {'items': [1]})
+            target = Path(directory) / 'reply.json'
+            with mock.patch.object(Path, 'read_text', side_effect=PermissionError):
+                self.assertIsNone(mailbox.take(directory, 'reply.json'))
+            self.assertTrue(target.exists())
+            with mock.patch.object(Path, 'unlink', side_effect=PermissionError):
+                self.assertIsNone(mailbox.take(directory, 'reply.json'))
+            self.assertTrue(target.exists())
+            self.assertEqual(mailbox.take(directory, 'reply.json'), {'items': [1]})
+            self.assertIsNone(mailbox.take(directory, 'reply.json'))
 
 
 class Files(unittest.TestCase):
@@ -77,6 +93,74 @@ class Files(unittest.TestCase):
 
 
 class IsolatedShell(unittest.TestCase):
+    def drain(self, session, limit=12):
+        started = time.monotonic()
+        while session.pending:
+            before = time.monotonic()
+            session.poll()
+            self.assertLess(time.monotonic() - before, .2, 'Folder polling blocked the UI')
+            self.assertLess(time.monotonic() - started, limit)
+            time.sleep(.01)
+
+    def test_folder_real_scopes_and_reuse(self):
+        from blui_explorer.shell_folder_client import FolderSession
+        with tempfile.TemporaryDirectory(prefix='blui_folder_menu_') as directory:
+            paths = [str(Path(directory) / name) for name in ('one', 'two')]
+            for path in paths:
+                Path(path).mkdir()
+            helper = FolderSession(paths[:1])
+            try:
+                self.drain(helper)
+                self.assertFalse(helper.errors, helper.errors)
+                self.assertTrue(all(not child.errors for child in helper.helpers.values()),
+                                {scope: child.errors for scope, child in helper.helpers.items()})
+                pids = [child.process.pid for child in helper.helpers.values()]
+                self.assertEqual(len(set(pids)), 2)
+                commands = [row['id'] for row in helper.items['root'] if row['id'] and not row.get('submenu')]
+                self.assertEqual(len(commands), len(set(commands)))
+                self.assertFalse(any(row.get('localize') for row in helper.items['root']))
+                for row in helper.items['root']:
+                    if row['label'] in {'7-Zip', 'TortoiseSVN'} and row.get('submenu'):
+                        helper.request('expand', node=row['submenu'])
+                        self.drain(helper)
+                        self.assertNotIn(row['submenu'], helper.errors, helper.errors)
+                        self.assertTrue(helper.items.get(row['submenu']), helper.helpers['folder'].errors)
+                token = helper.token
+                helper.reset(paths[1:])
+                self.drain(helper)
+                self.assertNotEqual(token, helper.token)
+                self.assertEqual(pids, [child.process.pid for child in helper.helpers.values()])
+                helper.request('invoke', command=commands[0])
+                helper.poll()
+                self.assertIn('does not belong', helper.errors['invoke'])
+                print('Folder menus: two scopes, distinct IDs, real delayed submenus, warm reuse OK')
+            finally:
+                helper.close()
+
+    def test_folder_scope_routing_and_partial_failure(self):
+        from blui_explorer.shell_folder_client import FolderSession
+        worker = str(Path(__file__).parent / 'fixtures/shell_worker_scopes.py')
+        helper = FolderSession(['fixture'], workers={'folder': worker, 'directory': worker})
+        try:
+            self.drain(helper)
+            commands = {row['label']: row['id'] for row in helper.items['root'] if not row.get('submenu')}
+            self.assertNotEqual(commands['folder'], commands['directory'])
+            helper.request('invoke', command=commands['directory'])
+            self.drain(helper)
+            self.assertEqual(helper.errors['invoke'], 'directory:1')
+            self.assertNotIn('invoke', helper.helpers['folder'].errors)
+        finally:
+            helper.close()
+        stalled = str(Path(__file__).parent / 'fixtures/shell_worker_stall.py')
+        helper = FolderSession(['fixture'], timeout=.5, workers={'folder': worker, 'directory': stalled})
+        try:
+            self.drain(helper)
+            self.assertNotIn('root', helper.errors, 'One slow scope hid all healthy commands')
+            self.assertTrue(any(row['enabled'] for row in helper.items['root']))
+            self.assertTrue(any(row.get('localize') and not row.get('loading') for row in helper.items['root']))
+        finally:
+            helper.close()
+
     def wait(self, session, node="root", limit=12):
         start = time.monotonic()
         while node not in session.items and node not in session.errors:

@@ -109,6 +109,22 @@ void WM_blui_document_clear_screen(bContext *C, bScreen *screen)
   }
 }
 
+bool WM_blui_document_confirm_dock(bContext *C, const char *arguments)
+{
+  if (G.background || !CTX_wm_window(C) || !CTX_wm_window(C)->ghostwin ||
+      !CTX_wm_area(C) || !area_has_document(CTX_wm_area(C)) ||
+      !WM_operatortype_find("WM_OT_blui_document_guard", true)) {
+    return false;
+  }
+  PointerRNA props;
+  WM_operator_properties_create(&props, "WM_OT_blui_document_guard");
+  RNA_string_set(&props, "action", "DOCK");
+  RNA_string_set(&props, "dock_arguments", arguments);
+  WM_operator_name_call(C, "WM_OT_blui_document_guard", WM_OP_INVOKE_DEFAULT, &props, NULL);
+  WM_operator_properties_free(&props);
+  return true;
+}
+
 bool WM_blui_close_moved_window(bContext *C, wmWindow *source, wmWindow *replacement)
 {
   if (!WM_operatortype_find("WM_OT_blui_close_moved_window", true)) {

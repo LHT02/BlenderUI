@@ -31,6 +31,10 @@ set(SRC
   screen_context.c
   screen_draw.c
   screen_detach.c
+  screen_dock_draw.c
+  screen_dock_apply.c
+  screen_dock_interaction.c
+  screen_dock_math.c
   screen_edit.c
   screen_geometry.c
   screen_ops.c
@@ -41,6 +45,7 @@ set(SRC
   workspace_listen.cc
 
   screen_intern.h
+  screen_docking.h
 )
 
 set(LIB

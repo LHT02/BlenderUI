@@ -127,8 +127,9 @@ def has_dialogs():
 
 
 class ShellMenu:
-    def __init__(self, paths):
+    def __init__(self, paths, scope=None):
         self.pidls = []
+        self.registry_keys = []
         self.folder = P()
         self.context = P()
         self.context2 = P()
@@ -152,10 +153,17 @@ class ShellMenu:
             if not children:
                 raise ValueError("No files selected")
             array = (P * len(children))(*children)
-            check(method(self.folder, 10, HRESULT, P, w.UINT, c.POINTER(P),
-                         c.POINTER(GUID), P, c.POINTER(P))(
-                             self.folder, None, len(children), array, c.byref(IID_MENU),
-                             None, c.byref(self.context)), "Get system menu")
+            if scope:
+                if __package__:
+                    from .shell_folder_native import create_context
+                else:
+                    from shell_folder_native import create_context
+                self.registry_keys = create_context(self.folder, array, self.context, scope)
+            else:
+                check(method(self.folder, 10, HRESULT, P, w.UINT, c.POINTER(P),
+                             c.POINTER(GUID), P, c.POINTER(P))(
+                                 self.folder, None, len(children), array, c.byref(IID_MENU),
+                                 None, c.byref(self.context)), "Get system menu")
             self.context3 = query(self.context, IID_MENU3)
             self.context2 = query(self.context, IID_MENU2) if not self.context3 else P()
             self.menu = create_menu()
@@ -224,3 +232,6 @@ class ShellMenu:
         for pidl in self.pidls:
             free_mem(pidl)
         self.pidls.clear()
+        for key in self.registry_keys:
+            key.Close()
+        self.registry_keys.clear()

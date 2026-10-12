@@ -33,7 +33,7 @@ def main():
                     paths = [os.path.normpath(path) for path in request['paths']]
                     if len({os.path.normcase(os.path.dirname(p.rstrip('\\/'))) for p in paths}) != 1:
                         raise ValueError('Select items in the same folder')
-                    menu = ShellMenu(paths)
+                    menu = ShellMenu(paths, scope=request.get('scope'))
                     reply['items'] = menu.items()
                 elif op == 'expand':
                     reply['items'] = menu.items(request['node'])

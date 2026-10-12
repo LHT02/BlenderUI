@@ -306,58 +306,6 @@ void screen_draw_join_highlight(ScrArea *sa1, ScrArea *sa2)
   UI_draw_roundbox_4fv(&combined, false, 7 * U.pixelsize, (float[4]){1.0f, 1.0f, 1.0f, 0.8f});
 }
 
-void screen_draw_split_preview(ScrArea *area, const eScreenAxis dir_axis, const float fac)
-{
-  uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
-  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-
-  /* Split-point. */
-  GPU_blend(GPU_BLEND_ALPHA);
-
-  immUniformColor4ub(255, 255, 255, 100);
-
-  immBegin(GPU_PRIM_LINES, 2);
-
-  if (dir_axis == SCREEN_AXIS_H) {
-    const float y = (1 - fac) * area->totrct.ymin + fac * area->totrct.ymax;
-
-    immVertex2f(pos, area->totrct.xmin, y);
-    immVertex2f(pos, area->totrct.xmax, y);
-
-    immEnd();
-
-    immUniformColor4ub(0, 0, 0, 100);
-
-    immBegin(GPU_PRIM_LINES, 2);
-
-    immVertex2f(pos, area->totrct.xmin, y + 1);
-    immVertex2f(pos, area->totrct.xmax, y + 1);
-
-    immEnd();
-  }
-  else {
-    BLI_assert(dir_axis == SCREEN_AXIS_V);
-    const float x = (1 - fac) * area->totrct.xmin + fac * area->totrct.xmax;
-
-    immVertex2f(pos, x, area->totrct.ymin);
-    immVertex2f(pos, x, area->totrct.ymax);
-
-    immEnd();
-
-    immUniformColor4ub(0, 0, 0, 100);
-
-    immBegin(GPU_PRIM_LINES, 2);
-
-    immVertex2f(pos, x + 1, area->totrct.ymin);
-    immVertex2f(pos, x + 1, area->totrct.ymax);
-
-    immEnd();
-  }
-
-  GPU_blend(GPU_BLEND_NONE);
-
-  immUnbindProgram();
-}
 
 /* -------------------------------------------------------------------- */
 /* Screen Thumbnail Preview */

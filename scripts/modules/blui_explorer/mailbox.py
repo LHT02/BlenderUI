@@ -16,7 +16,9 @@ def take(directory, name):
     target = Path(directory) / name
     try:
         value = json.loads(target.read_text(encoding='utf-8'))
-    except FileNotFoundError:
+        target.unlink()
+    except (FileNotFoundError, PermissionError):
+        # Windows indexers/antivirus can briefly lock a just-published file.
+        # Leave it queued and retry on the next UI tick, without blocking.
         return None
-    target.unlink()
     return value
