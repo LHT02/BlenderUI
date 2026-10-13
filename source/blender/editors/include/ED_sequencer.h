@@ -16,6 +16,14 @@ struct Sequence;
 struct SpaceSeq;
 struct bContext;
 
+/** Initialize once from the owning scene. Do not follow later global range changes. */
+void ED_sequencer_timeline_range_ensure(struct SpaceSeq *sseq, const struct Scene *scene);
+void ED_sequencer_timeline_range_get(const struct SpaceSeq *sseq,
+                                    const struct Scene *scene,
+                                    int *r_start,
+                                    int *r_end);
+void ED_sequencer_timeline_range_set(struct SpaceSeq *sseq, int start, int end);
+
 void ED_sequencer_select_sequence_single(struct Scene *scene,
                                          struct Sequence *seq,
                                          bool deselect_all);

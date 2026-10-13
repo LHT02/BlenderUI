@@ -94,6 +94,7 @@ class TOPBAR_MT_blui_components(Menu):
 
     def draw(self, _context):
         layout = self.layout
+        layout.operator("wm.blui_desktop_open", text="Desktop Canvas", icon='NODETREE')
         for name in ("Files", "Images", "Text", "Video", "Settings", "Console"):
             props = layout.operator("wm.window_new", text=name)
             props.workspace = name

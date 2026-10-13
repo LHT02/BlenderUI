@@ -18,16 +18,33 @@
 
 static bool live_area(wmWindowManager *manager, wmWindow *window, const ScrArea *area)
 {
-  return window && area && BLI_findindex(&manager->windows, window) != -1 &&
-         BLI_findindex(&WM_window_get_active_screen(window)->areabase, area) != -1;
+  if (!manager || !window || !area || BLI_findindex(&manager->windows, window) == -1) {
+    return false;
+  }
+  const bScreen *screen = WM_window_get_active_screen(window);
+  return screen && BLI_findindex(&screen->areabase, area) != -1;
+}
+
+static bool live_source(const ScreenDockState *state)
+{
+  return state && live_area(state->manager, state->source_window, state->source) &&
+         WM_window_get_active_screen(state->source_window) == state->source_screen &&
+         state->source_screen->state == SCREENNORMAL &&
+         state->source->spacedata.first == state->source_space;
+}
+
+static bool live_preview(const ScreenDockState *state)
+{
+  /* Either side can be removed by a workspace change or a queued window-close event. */
+  return live_source(state) &&
+         (!state->target || live_area(state->manager, state->target_window, state->target));
 }
 
 static void source_draw(const wmWindow *window, void *userdata)
 {
   const wmOperator *op = userdata;
   ScreenDockState *state = op->customdata;
-  if (state && BLI_findindex(&WM_window_get_active_screen(window)->areabase, state->source) != -1)
-  {
+  if (live_preview(state) && window == state->source_window) {
     screen_dock_draw(window, state, false);
   }
 }
@@ -36,8 +53,7 @@ static void target_draw(const wmWindow *window, void *userdata)
 {
   const wmOperator *op = userdata;
   ScreenDockState *state = op->customdata;
-  if (state && BLI_findindex(&WM_window_get_active_screen(window)->areabase, state->target) != -1)
-  {
+  if (live_preview(state) && window == state->target_window && state->target) {
     screen_dock_draw(window, state, true);
   }
 }
@@ -57,7 +73,7 @@ static void draw_window_update(bContext *C, wmOperator *op)
   }
   state->target_draw = NULL;
   state->draw_window = state->target_window;
-  if (state->draw_window) {
+  if (state->draw_window && BLI_findindex(&state->manager->windows, state->draw_window) != -1) {
     state->target_draw = WM_draw_cb_activate(state->draw_window, target_draw, op);
   }
 }
@@ -68,16 +84,18 @@ static void finish(bContext *C, wmOperator *op)
   if (!state) {
     return;
   }
-  wmWindowManager *manager = CTX_wm_manager(C);
+  wmWindowManager *manager = state->manager;
   if (BLI_findindex(&manager->windows, state->source_window) != -1) {
     if (state->source_draw) {
       WM_draw_cb_exit(state->source_window, state->source_draw);
     }
     WM_cursor_set(state->source_window, WM_CURSOR_DEFAULT);
     bScreen *screen = WM_window_get_active_screen(state->source_window);
-    BKE_screen_remove_double_scredges(screen);
-    BKE_screen_remove_unused_scredges(screen);
-    BKE_screen_remove_unused_scrverts(screen);
+    if (screen) {
+      BKE_screen_remove_double_scredges(screen);
+      BKE_screen_remove_unused_scredges(screen);
+      BKE_screen_remove_unused_scrverts(screen);
+    }
   }
   if (state->target_draw && BLI_findindex(&manager->windows, state->draw_window) != -1) {
     WM_draw_cb_exit(state->draw_window, state->target_draw);
@@ -125,13 +143,15 @@ static bool initialize(bContext *C, wmOperator *op, ScrArea *source, ScrArea *ta
       source = CTX_wm_area(C);
     }
   }
-  if (!source || ED_area_is_global(source)) {
+  wmWindow *source_window = WM_window_find_by_area(CTX_wm_manager(C), source);
+  if (!source_window || !source || ED_area_is_global(source)) {
     return false;
   }
   ScreenDockState *state = MEM_callocN(sizeof(ScreenDockState), "4.5 area docking");
+  state->manager = CTX_wm_manager(C);
   state->source = source;
   state->target = target;
-  state->source_window = WM_window_find_by_area(CTX_wm_manager(C), source);
+  state->source_window = source_window;
   state->target_window = WM_window_find_by_area(CTX_wm_manager(C), target);
   state->join_direction = SCREEN_DIR_NONE;
   state->factor = 0.5f;
@@ -139,6 +159,8 @@ static bool initialize(bContext *C, wmOperator *op, ScrArea *source, ScrArea *ta
     MEM_freeN(state);
     return false;
   }
+  state->source_screen = WM_window_get_active_screen(state->source_window);
+  state->source_space = source->spacedata.first;
   op->customdata = state;
   return true;
 }
@@ -210,7 +232,7 @@ static void join_cancel(bContext *C, wmOperator *op)
 static int join_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   ScreenDockState *state = op->customdata;
-  if (!state || !live_area(CTX_wm_manager(C), state->source_window, state->source)) {
+  if (!live_source(state)) {
     join_cancel(C, op);
     return OPERATOR_CANCELLED;
   }
@@ -274,16 +296,16 @@ static int join_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
   else if (state->dock_target != SCREEN_DOCK_NONE || state->join_direction != SCREEN_DIR_NONE) {
-    ok = screen_dock_apply(C,
-                           state->source_window,
-                           state->source,
-                           state->target_window,
-                           state->target,
-                           state->dock_target == SCREEN_DOCK_NONE ? SCREEN_DOCK_JOIN :
-                                                                    state->dock_target,
-                           state->factor,
-                           false,
-                           op->reports);
+    wmWindow *source_window = state->source_window, *target_window = state->target_window;
+    ScrArea *source = state->source, *target = state->target;
+    const ScreenDockTarget dock = state->dock_target == SCREEN_DOCK_NONE ? SCREEN_DOCK_JOIN :
+                                                                           state->dock_target;
+    const float factor = state->factor;
+    /* Document popups and editor exit/init callbacks may redraw. Stop every preview before any
+     * area data is exchanged/freed, not after the mutation. */
+    finish(C, op);
+    ok = screen_dock_apply(
+        C, source_window, source, target_window, target, dock, factor, false, op->reports);
   }
   finish(C, op);
   WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);

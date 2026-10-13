@@ -1555,6 +1555,8 @@ void RNA_api_ui_layout(StructRNA *srna)
                 1.0f,
                 100.0f);
 
+  RNA_def_string(func, "filepath", NULL, 0, "File Path", "Optional native file drag source");
+
   func = RNA_def_function(srna, "template_icon_view", "uiTemplateIconView");
   RNA_def_function_ui_description(func, "Enum. Large widget showing Icon previews");
   api_ui_item_rna_common(func);

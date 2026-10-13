@@ -8,6 +8,7 @@
  */
 
 #include "GHOST_TrayWin32.hh"
+#include "GHOST_TrayMenuWin32.hh"
 
 #ifdef _WIN32
 
@@ -26,7 +27,7 @@ const wchar_t *kWindowClass = L"BLUI_TrayWindow";
 /* Custom message the shell sends when the icon is clicked. */
 const UINT kTrayCallbackMessage = WM_APP + 1;
 
-/* Ids handed to TrackPopupMenu. Separators do not consume one. */
+/* Native menu ids are stable, one-based indices into the label/command vectors. */
 const UINT kFirstCommandId = 1;
 
 bool utf8_to_utf16(const char *src, std::wstring &r_dst)
@@ -70,15 +71,18 @@ class TrayIcon {
 
   bool ensure_window_class();
   bool ensure_window();
+  void refresh_icon();
+  bool notify_add();
 
   HWND m_hwnd = nullptr;
   NOTIFYICONDATAW m_nid = {};
   bool m_added = false;
+  HICON m_icon = nullptr;
+  GHOST_TrayMenuWin32 *m_menu = nullptr;
+  const UINT m_taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
 
   std::vector<std::wstring> m_labels;
   std::vector<std::string> m_commands;
-  /* Menu id -> index into m_commands, or -1 for a separator. */
-  std::vector<int> m_id_to_command;
 
   GHOST_TrayCommandFn m_handler = nullptr;
   void *m_user_data = nullptr;
@@ -157,14 +161,25 @@ LRESULT CALLBACK TrayIcon::window_proc(HWND hwnd, UINT message, WPARAM wparam, L
 
 LRESULT TrayIcon::handle_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
+  if (m_taskbar_created != 0 && message == m_taskbar_created) {
+    /* Explorer can restart without our windows closing. Preserve the logical active state
+     * until the shell has accepted the replacement icon. */
+    if (m_added) {
+      refresh_icon();
+      notify_add();
+    }
+    return 0;
+  }
   switch (message) {
     case kTrayCallbackMessage: {
       switch (LOWORD(lparam)) {
         case WM_LBUTTONUP:
+        case NIN_SELECT:
+        case NIN_KEYSELECT:
           /* Left click runs the first real entry, which the caller makes the
            * most useful one. */
-          for (size_t i = 0; i < m_id_to_command.size(); i++) {
-            if (m_id_to_command[i] >= 0) {
+          for (size_t i = 0; i < m_commands.size(); i++) {
+            if (!m_commands[i].empty()) {
               run_command(i);
               break;
             }
@@ -179,6 +194,28 @@ LRESULT TrayIcon::handle_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM 
       }
       return 0;
     }
+    case WM_MEASUREITEM:
+      if (m_menu && lparam && m_menu->measure(*reinterpret_cast<MEASUREITEMSTRUCT *>(lparam))) {
+        return TRUE;
+      }
+      break;
+    case WM_DRAWITEM:
+      if (m_menu && lparam && m_menu->draw(*reinterpret_cast<DRAWITEMSTRUCT *>(lparam))) {
+        return TRUE;
+      }
+      break;
+    case WM_SETTINGCHANGE:
+    case WM_THEMECHANGED:
+    case WM_SYSCOLORCHANGE:
+    case WM_DWMCOLORIZATIONCOLORCHANGED:
+    case WM_DISPLAYCHANGE:
+      if (m_menu) {
+        EndMenu();
+      }
+      if (m_added) {
+        refresh_icon();
+      }
+      return 0;
     case WM_DESTROY:
       remove();
       return 0;
@@ -190,55 +227,21 @@ LRESULT TrayIcon::handle_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM 
 
 void TrayIcon::show_menu(HWND hwnd)
 {
-  HMENU menu = CreatePopupMenu();
-  if (menu == nullptr) {
+  if (m_menu) {
     return;
   }
-
-  m_id_to_command.assign(m_labels.size(), -1);
-
-  UINT next_id = kFirstCommandId;
-  for (size_t i = 0; i < m_labels.size(); i++) {
-    if (m_labels[i].empty()) {
-      AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-      continue;
-    }
-    AppendMenuW(menu, MF_STRING, next_id, m_labels[i].c_str());
-    m_id_to_command[i] = int(next_id);
-    next_id++;
-  }
-
-  POINT cursor;
-  GetCursorPos(&cursor);
-
-  /* Both of these are required for the menu to dismiss when the user clicks
-   * elsewhere - the shell only routes the dismissal to the foreground window. */
-  SetForegroundWindow(hwnd);
-  const int chosen = int(TrackPopupMenu(menu,
-                                        TPM_RETURNCMD | TPM_RIGHTBUTTON,
-                                        cursor.x,
-                                        cursor.y,
-                                        0,
-                                        hwnd,
-                                        nullptr));
-  PostMessageW(hwnd, WM_NULL, 0, 0);
-  DestroyMenu(menu);
-
-  if (chosen < int(kFirstCommandId)) {
-    return;
-  }
-  const UINT id = UINT(chosen);
-  for (size_t i = 0; i < m_id_to_command.size(); i++) {
-    if (m_id_to_command[i] == int(id)) {
-      run_command(i);
-      return;
-    }
+  GHOST_TrayMenuWin32 menu(hwnd, m_labels);
+  m_menu = &menu;
+  const int chosen = menu.show(hwnd);
+  m_menu = nullptr;
+  if (chosen >= int(kFirstCommandId)) {
+    run_command(size_t(chosen - kFirstCommandId));
   }
 }
 
 void TrayIcon::run_command(size_t index)
 {
-  if (m_handler == nullptr || index >= m_commands.size()) {
+  if (m_handler == nullptr || index >= m_commands.size() || m_commands[index].empty()) {
     return;
   }
   m_handler(m_commands[index].c_str(), m_user_data);
@@ -274,28 +277,79 @@ bool TrayIcon::add(const char *tooltip, const GHOST_TrayItem *items, int item_co
   m_nid.cbSize = sizeof(m_nid);
   m_nid.hWnd = m_hwnd;
   m_nid.uID = 1;
-  m_nid.uFlags = NIF_MESSAGE | NIF_TIP | NIF_ICON;
+  m_nid.uFlags = NIF_MESSAGE | NIF_TIP | NIF_ICON | NIF_SHOWTIP;
   m_nid.uCallbackMessage = kTrayCallbackMessage;
-  /* Icon 1 is the application icon from the resource script. */
-  m_nid.hIcon = LoadIconW(GetModuleHandleW(nullptr),
-                          reinterpret_cast<LPCWSTR>(MAKEINTRESOURCEW(1)));
-  if (m_nid.hIcon == nullptr) {
-    m_nid.hIcon = LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_APPLICATION));
-  }
+  refresh_icon();
   /* szTip is a fixed array, so truncation is the only failure mode. */
   wcsncpy(m_nid.szTip, wide_tooltip.c_str(), ARRAYSIZE(m_nid.szTip) - 1);
 
-  m_added = Shell_NotifyIconW(NIM_ADD, &m_nid) != FALSE;
+  m_added = notify_add();
   return m_added;
+}
+
+bool TrayIcon::notify_add()
+{
+  if (!Shell_NotifyIconW(NIM_ADD, &m_nid)) {
+    return false;
+  }
+  /* Required after every NIM_ADD, including shell restarts. Version 4 preserves the
+   * documented keyboard activation and callback coordinates. */
+  m_nid.uVersion = NOTIFYICON_VERSION_4;
+  Shell_NotifyIconW(NIM_SETVERSION, &m_nid);
+  return true;
+}
+
+void TrayIcon::refresh_icon()
+{
+  /* APPICON is a named application resource. Numeric 1 is the .blend file icon. Keep the
+   * application's brand colors; menu contrast belongs to the native shell palette. */
+  using MetricsForDpi = int(WINAPI *)(int, UINT);
+  const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+  const auto metrics_for_dpi = reinterpret_cast<MetricsForDpi>(
+      GetProcAddress(user32, "GetSystemMetricsForDpi"));
+  const UINT dpi = GHOST_ThemeWin32_MenuDpi(m_hwnd);
+  const int width = metrics_for_dpi ? metrics_for_dpi(SM_CXSMICON, dpi) : GetSystemMetrics(SM_CXSMICON);
+  const int height = metrics_for_dpi ? metrics_for_dpi(SM_CYSMICON, dpi) : GetSystemMetrics(SM_CYSMICON);
+  HICON icon = static_cast<HICON>(
+      LoadImageW(GetModuleHandleW(nullptr), L"APPICON", IMAGE_ICON, width, height, LR_DEFAULTCOLOR));
+  if (!icon) {
+    icon = static_cast<HICON>(LoadImageW(nullptr,
+                                       MAKEINTRESOURCEW(32512), /* IDI_APPLICATION, explicitly UTF-16. */
+                                       IMAGE_ICON,
+                                       width,
+                                       height,
+                                       LR_DEFAULTCOLOR));
+  }
+  if (!icon) {
+    return;
+  }
+  const HICON previous = m_icon;
+  m_icon = icon;
+  m_nid.hIcon = m_icon;
+  if (m_added) {
+    NOTIFYICONDATAW update = m_nid;
+    update.uFlags = NIF_ICON;
+    Shell_NotifyIconW(NIM_MODIFY, &update);
+  }
+  if (previous) {
+    DestroyIcon(previous);
+  }
 }
 
 void TrayIcon::remove()
 {
-  if (!m_added) {
-    return;
+  if (m_menu) {
+    EndMenu();
   }
-  Shell_NotifyIconW(NIM_DELETE, &m_nid);
+  if (m_added) {
+    Shell_NotifyIconW(NIM_DELETE, &m_nid);
+  }
   m_added = false;
+  if (m_icon) {
+    DestroyIcon(m_icon);
+    m_icon = nullptr;
+    m_nid.hIcon = nullptr;
+  }
 }
 
 }  // namespace

@@ -30,6 +30,9 @@
 
 #ifdef RNA_RUNTIME
 
+#  include "GHOST_C-api.h"
+#  include "BLI_string.h"
+
 static const EnumPropertyItem event_mouse_type_items[] = {
     {LEFTMOUSE, "LEFTMOUSE", 0, "Left", ""},
     {MIDDLEMOUSE, "MIDDLEMOUSE", 0, "Middle", ""},
@@ -731,6 +734,35 @@ static PointerRNA rna_PieMenu_layout_get(PointerRNA *ptr)
   RNA_pointer_create(ptr->owner_id, &RNA_UILayout, layout, &rptr);
 
   return rptr;
+}
+
+static bool rna_Window_blui_has_modal_interaction_get(PointerRNA *ptr)
+{
+  return WM_window_has_modal_interaction((const wmWindow *)ptr->data);
+}
+
+static bool rna_WindowManager_blui_has_path_drag_get(PointerRNA *ptr)
+{
+  wmWindowManager *manager = ptr->data;
+  for (wmDrag *drag = manager->drags.first; drag; drag = drag->next) {
+    if (drag->type == WM_DRAG_PATH) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void rna_Window_blui_native_handle_get(PointerRNA *ptr, char *value)
+{
+  const wmWindow *window = ptr->data;
+  BLI_snprintf(value, 32, "%llu", (unsigned long long)(uintptr_t)GHOST_GetNativeWindowHandle(window->ghostwin));
+}
+
+static int rna_Window_blui_native_handle_length(PointerRNA *ptr)
+{
+  char value[32];
+  rna_Window_blui_native_handle_get(ptr, value);
+  return strlen(value);
 }
 
 static void rna_Window_scene_set(PointerRNA *ptr,
@@ -2387,6 +2419,15 @@ static void rna_def_window(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "Window", "Open window");
   RNA_def_struct_sdna(srna, "wmWindow");
 
+  prop = RNA_def_property(srna, "blui_has_modal_interaction", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop, "rna_Window_blui_has_modal_interaction_get", NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Modal Interaction Active", "Running modal operator or temporary editor interaction");
+  prop = RNA_def_property(srna, "blui_native_handle", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_funcs(prop, "rna_Window_blui_native_handle_get", "rna_Window_blui_native_handle_length", NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Native Window Handle", "Borrowed OS handle; valid only while this window is alive");
+
   prop = RNA_def_property(srna, "parent", PROP_POINTER, PROP_NONE);
   RNA_def_property_ui_text(prop, "Parent Window", "Active workspace and scene follow this window");
 
@@ -2517,6 +2558,10 @@ static void rna_def_windowmanager(BlenderRNA *brna)
       "Window manager data-block defining open windows and other user interface data");
   RNA_def_struct_clear_flag(srna, STRUCT_ID_REFCOUNT);
   RNA_def_struct_sdna(srna, "wmWindowManager");
+
+  prop = RNA_def_property(srna, "blui_has_path_drag", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop, "rna_WindowManager_blui_has_path_drag_get", NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
   prop = RNA_def_property(srna, "operators", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "Operator");

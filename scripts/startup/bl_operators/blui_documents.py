@@ -273,15 +273,26 @@ class WM_OT_blui_close_moved_window(Operator):
     bl_options = {'INTERNAL'}
     source: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
     replacement: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
+    source_space: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
 
     def execute(self, context):
         source, replacement = int(self.source), int(self.replacement)
+        source_space = int(self.source_space or '0')
         manager = context.window_manager
         def close_after_modal_finished():
-            windows = {w.as_pointer(): w for w in manager.windows}
-            if source in windows and replacement in windows:
-                with bpy.context.temp_override(window=windows[source]):
-                    bpy.ops.wm.window_close(force_close=True)
+            try:
+                windows = {w.as_pointer(): w for w in manager.windows}
+                if source in windows and replacement in windows:
+                    screen = windows[source].screen
+                    # A queued workspace/editor change must not close a new document.
+                    if len(screen.areas) != 1 or (source_space and
+                            screen.areas[0].spaces.active.as_pointer() != source_space):
+                        return None
+                    with bpy.context.temp_override(window=windows[source]):
+                        bpy.ops.wm.window_close(force_close=True)
+            except (ReferenceError, RuntimeError):
+                # Loading another session or closing either window invalidates this request.
+                return None
             return None
         # The corner handler must finish before its window/event storage is freed.
         bpy.app.timers.register(close_after_modal_finished, first_interval=0.01)

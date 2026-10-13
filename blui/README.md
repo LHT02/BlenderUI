@@ -1,5 +1,13 @@
 # BLUI
 
+Current portable release work (2026-10-13): see [PROJECT.md](../PROJECT.md) for the
+verified state and [DESKTOP.md](DESKTOP.md) for the optional native desktop canvas,
+multi-monitor layouts, backgrounds, widgets and taskbar recovery. The historical
+notes below describe earlier builds, not the current remaining work.
+
+A portable distribution needs the complete runtime directory, including the new
+`BLUI-fileicon.exe` isolated icon helper; copying only `BLUI.exe` is insufficient.
+
 > ## Start here
 >
 > This document is long because it records what did *not* work as carefully as

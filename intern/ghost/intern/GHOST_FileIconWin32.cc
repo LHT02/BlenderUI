@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright 2026 BLUI */
 /** Windows file icons: prefer actual detail, not a padded jumbo bitmap. */
+#include "GHOST_IconResourceWin32.hh"
 #include "GHOST_ShellMenuWin32.hh"
 
 #ifdef _WIN32
@@ -162,37 +163,49 @@ bool GHOST_ShellMenuWin32_LoadFileIconRgba(const char *path,
   if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide.data(), length)) {
     return false;
   }
-  SHFILEINFOW file = {};
-  DWORD_PTR got = SHGetFileInfoW(wide.c_str(), 0, &file, sizeof(file), SHGFI_SYSICONINDEX);
-  if (!got) {
-    const DWORD attributes = PathIsDirectoryW(wide.c_str()) ? FILE_ATTRIBUTE_DIRECTORY :
-                                                              FILE_ATTRIBUTE_NORMAL;
-    got = SHGetFileInfoW(wide.c_str(),
-                         attributes,
-                         &file,
-                         sizeof(file),
-                         SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES);
-  }
-  if (!got) {
-    return false;
-  }
   IconPixels best;
-  for (const int tier : {SHIL_JUMBO, SHIL_EXTRALARGE, SHIL_LARGE, SHIL_SMALL}) {
-    IImageList *list = nullptr;
-    if (FAILED(SHGetImageList(tier, IID_IImageList, reinterpret_cast<void **>(&list))) || !list) {
-      continue;
-    }
-    HICON icon = nullptr;
-    list->GetIcon(file.iIcon, ILD_TRANSPARENT, &icon);
-    list->Release();
-    if (!icon) {
-      continue;
-    }
+  if (HICON icon = GHOST_Win32_LoadShortcutIconResource(wide.c_str())) {
     IconPixels candidate;
-    if (read_icon(icon, candidate) && candidate.visible_size() > best.visible_size()) {
+    if (read_icon(icon, candidate)) {
       best = std::move(candidate);
     }
     DestroyIcon(icon);
+  }
+  SHFILEINFOW file = {};
+  /* Original resources keep fine detail that Shell cache entries may already have discarded.
+   * Preserve the image-list path for folders, associations, broken links, and virtual targets. */
+  if (best.bgra.empty()) {
+    DWORD_PTR got = SHGetFileInfoW(wide.c_str(), 0, &file, sizeof(file), SHGFI_SYSICONINDEX);
+    if (!got) {
+      const DWORD attributes = PathIsDirectoryW(wide.c_str()) ? FILE_ATTRIBUTE_DIRECTORY :
+                                                                FILE_ATTRIBUTE_NORMAL;
+      got = SHGetFileInfoW(wide.c_str(),
+                           attributes,
+                           &file,
+                           sizeof(file),
+                           SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES);
+    }
+    if (!got) {
+      return false;
+    }
+    for (const int tier : {SHIL_JUMBO, SHIL_EXTRALARGE, SHIL_LARGE, SHIL_SMALL}) {
+      IImageList *list = nullptr;
+      if (FAILED(SHGetImageList(tier, IID_IImageList, reinterpret_cast<void **>(&list))) || !list)
+      {
+        continue;
+      }
+      HICON icon = nullptr;
+      list->GetIcon(file.iIcon, ILD_TRANSPARENT, &icon);
+      list->Release();
+      if (!icon) {
+        continue;
+      }
+      IconPixels candidate;
+      if (read_icon(icon, candidate) && candidate.visible_size() > best.visible_size()) {
+        best = std::move(candidate);
+      }
+      DestroyIcon(icon);
+    }
   }
   if (best.bgra.empty()) {
     return false;
@@ -217,10 +230,14 @@ bool GHOST_ShellMenuWin32_LoadFileIconRgba(const char *path,
     for (int x = 0; x < width; x++) {
       const size_t from = (size_t(y + ymin) * best.width + x + xmin) * 4;
       const size_t to = (size_t(y) * width + x) * 4;
-      pixels[to] = best.bgra[from + 2];
-      pixels[to + 1] = best.bgra[from + 1];
-      pixels[to + 2] = best.bgra[from];
-      pixels[to + 3] = best.bgra[from + 3];
+      const unsigned int alpha = best.bgra[from + 3];
+      /* DrawIconEx produces premultiplied pixels. File-browser image previews use straight
+       * alpha: undo that multiplication once so antialiased edges do not become dark halos. */
+      for (int channel = 0; channel < 3; channel++) {
+        const unsigned int color = best.bgra[from + 2 - channel];
+        pixels[to + channel] = alpha ? std::min(255u, (color * 255 + alpha / 2) / alpha) : 0;
+      }
+      pixels[to + 3] = alpha;
     }
   }
   *r_pixels = pixels;

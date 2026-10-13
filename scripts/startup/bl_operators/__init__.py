@@ -17,6 +17,7 @@ _modules = [
     "file",
     "blui_file",
     "blui_documents",
+    "blui_desktop",
     "geometry_nodes",
     "image",
     "mesh",

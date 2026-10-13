@@ -27,6 +27,7 @@
 
 #include "ED_markers.h"
 #include "ED_screen.h"
+#include "ED_sequencer.h"
 #include "ED_space_api.h"
 #include "ED_time_scrub_ui.h"
 #include "ED_transform.h"
@@ -95,6 +96,7 @@ static SpaceLink *sequencer_create(const ScrArea *UNUSED(area), const Scene *sce
   sseq->timeline_overlay.flag = SEQ_TIMELINE_SHOW_STRIP_NAME | SEQ_TIMELINE_SHOW_STRIP_SOURCE |
                                 SEQ_TIMELINE_SHOW_STRIP_DURATION | SEQ_TIMELINE_SHOW_GRID |
                                 SEQ_TIMELINE_SHOW_FCURVES | SEQ_TIMELINE_SHOW_STRIP_COLOR_TAG;
+  ED_sequencer_timeline_range_ensure(sseq, scene);
 
   BLI_rctf_init(&sseq->runtime.last_thumbnail_area, 0.0f, 0.0f, 0.0f, 0.0f);
   sseq->runtime.last_displayed_thumbnails = NULL;
@@ -167,9 +169,9 @@ static SpaceLink *sequencer_create(const ScrArea *UNUSED(area), const Scene *sce
   region->regiontype = RGN_TYPE_WINDOW;
 
   /* Seq space goes from (0,8) to (0, efra). */
-  region->v2d.tot.xmin = 0.0f;
+  region->v2d.tot.xmin = sseq->timeline_start - 1.0f;
   region->v2d.tot.ymin = 0.0f;
-  region->v2d.tot.xmax = scene->r.efra;
+  region->v2d.tot.xmax = sseq->timeline_end + 1.0f;
   region->v2d.tot.ymax = 8.5f;
 
   region->v2d.cur = region->v2d.tot;
@@ -241,6 +243,7 @@ static void sequencer_refresh(const bContext *C, ScrArea *area)
   ARegion *region_main = sequencer_find_region(area, RGN_TYPE_WINDOW);
   ARegion *region_preview = sequencer_find_region(area, RGN_TYPE_PREVIEW);
   bool view_changed = false;
+  ED_sequencer_timeline_range_ensure(sseq, CTX_data_scene(C));
 
   switch (sseq->view) {
     case SEQ_VIEW_PREVIEW:
@@ -624,13 +627,9 @@ static void sequencer_main_region_message_subscribe(const wmRegionMessageSubscri
       .notify = ED_region_do_msg_notify_tag_redraw,
   };
 
-  /* Timeline depends on scene properties. */
+  /* The playhead is still shared, but playback bounds belong to this SpaceSeq. */
   {
-    bool use_preview = (scene->r.flag & SCER_PRV_RANGE);
     const PropertyRNA *props[] = {
-        use_preview ? &rna_Scene_frame_preview_start : &rna_Scene_frame_start,
-        use_preview ? &rna_Scene_frame_preview_end : &rna_Scene_frame_end,
-        &rna_Scene_use_preview_range,
         &rna_Scene_frame_current,
     };
 
@@ -639,6 +638,21 @@ static void sequencer_main_region_message_subscribe(const wmRegionMessageSubscri
 
     for (int i = 0; i < ARRAY_SIZE(props); i++) {
       WM_msg_subscribe_rna(mbus, &idptr, props[i], &msg_sub_value_region_tag_redraw, __func__);
+    }
+  }
+
+  {
+    PointerRNA spaceptr;
+    RNA_pointer_create(&params->screen->id,
+                       &RNA_SpaceSequenceEditor,
+                       params->area->spacedata.first,
+                       &spaceptr);
+    const PropertyRNA *props[] = {
+        &rna_SpaceSequenceEditor_timeline_start,
+        &rna_SpaceSequenceEditor_timeline_end,
+    };
+    for (int i = 0; i < ARRAY_SIZE(props); i++) {
+      WM_msg_subscribe_rna(mbus, &spaceptr, props[i], &msg_sub_value_region_tag_redraw, __func__);
     }
   }
 

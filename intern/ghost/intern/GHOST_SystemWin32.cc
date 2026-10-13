@@ -2119,10 +2119,15 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, uint msg, WPARAM wParam, 
           break;
         }
         case WM_SETTINGCHANGE: {
-          /* Microsoft: "Note that some applications send this message with lParam set to NULL" */
-          if ((lParam != NULL) && (wcscmp(LPCWSTR(lParam), L"ImmersiveColorSet") == 0)) {
-            window->ThemeRefresh();
-          }
+          /* Theme and high-contrast preferences can arrive with a null lParam. Refreshing
+           * read-only colors is cheap and must not dereference the caller's optional string. */
+          window->ThemeRefresh();
+          break;
+        }
+        case WM_THEMECHANGED:
+        case WM_SYSCOLORCHANGE:
+        case WM_DWMCOLORIZATIONCOLORCHANGED: {
+          window->ThemeRefresh();
           break;
         }
         /* ======================

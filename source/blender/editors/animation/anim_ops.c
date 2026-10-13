@@ -436,6 +436,15 @@ static int anim_set_sfra_exec(bContext *C, wmOperator *op)
 
   frame = scene->r.cfra;
 
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+  if (sseq) {
+    int start, end;
+    ED_sequencer_timeline_range_get(sseq, scene, &start, &end);
+    ED_sequencer_timeline_range_set(sseq, frame, max_ii(frame, end));
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, sseq);
+    return OPERATOR_FINISHED;
+  }
+
   /* if Preview Range is defined, set the 'start' frame for that */
   if (PRVRANGEON) {
     scene->r.psfra = frame;
@@ -490,6 +499,15 @@ static int anim_set_efra_exec(bContext *C, wmOperator *op)
   }
 
   frame = scene->r.cfra;
+
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+  if (sseq) {
+    int start, end;
+    ED_sequencer_timeline_range_get(sseq, scene, &start, &end);
+    ED_sequencer_timeline_range_set(sseq, min_ii(start, frame), frame);
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, sseq);
+    return OPERATOR_FINISHED;
+  }
 
   /* if Preview Range is defined, set the 'end' frame for that */
   if (PRVRANGEON) {
@@ -565,6 +583,13 @@ static int previewrange_define_exec(bContext *C, wmOperator *op)
     efra = sfra;
   }
 
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+  if (sseq) {
+    ED_sequencer_timeline_range_set(sseq, round_fl_to_int(sfra), round_fl_to_int(efra));
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, sseq);
+    return OPERATOR_FINISHED;
+  }
+
   scene->r.flag |= SCER_PRV_RANGE;
   scene->r.psfra = round_fl_to_int(sfra);
   scene->r.pefra = round_fl_to_int(efra);
@@ -615,6 +640,14 @@ static int previewrange_clear_exec(bContext *C, wmOperator *UNUSED(op))
   /* sanity checks */
   if (ELEM(NULL, scene, curarea)) {
     return OPERATOR_CANCELLED;
+  }
+
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+  if (sseq) {
+    ED_sequencer_timeline_range_set(sseq, scene->r.sfra, scene->r.efra);
+    ED_area_tag_redraw(curarea);
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, sseq);
+    return OPERATOR_FINISHED;
   }
 
   /* simply clear values */

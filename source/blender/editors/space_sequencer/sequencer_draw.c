@@ -2344,11 +2344,12 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
   }
 }
 
-static void seq_draw_sfra_efra(const Scene *scene, View2D *v2d)
+static void seq_draw_sfra_efra(const Scene *scene, const SpaceSeq *sseq, View2D *v2d)
 {
   const Editing *ed = SEQ_editing_get(scene);
-  const int frame_sta = scene->r.sfra;
-  const int frame_end = scene->r.efra + 1;
+  int frame_sta, frame_end;
+  ED_sequencer_timeline_range_get(sseq, scene, &frame_sta, &frame_end);
+  frame_end++;
 
   GPU_blend(GPU_BLEND_ALPHA);
 
@@ -2556,7 +2557,9 @@ static void draw_cache_view(const bContext *C)
     const float bg_color[4] = {1.0f, 0.4f, 0.2f, 0.1f};
 
     immUniformColor4f(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
-    immRectf(pos, scene->r.sfra, stripe_bot, scene->r.efra, stripe_top);
+    int frame_start, frame_end;
+    ED_sequencer_timeline_range_get(CTX_wm_space_seq(C), scene, &frame_start, &frame_end);
+    immRectf(pos, frame_start, stripe_bot, frame_end, stripe_top);
   }
 
   for (Sequence *seq = scene->ed->seqbasep->first; seq != NULL; seq = seq->next) {
@@ -2675,6 +2678,8 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
   SpaceSeq *sseq = CTX_wm_space_seq(C);
   View2D *v2d = &region->v2d;
 
+  ED_sequencer_timeline_range_ensure(sseq, scene);
+
   seq_prefetch_wm_notify(C, scene);
 
   GPUViewport *viewport = WM_draw_region_get_viewport(region);
@@ -2710,7 +2715,7 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
   ED_region_draw_cb_draw(C, region, REGION_DRAW_PRE_VIEW);
   GPU_framebuffer_bind_no_srgb(framebuffer_overlay);
 
-  seq_draw_sfra_efra(scene, v2d);
+  seq_draw_sfra_efra(scene, sseq, v2d);
 
   if (ed) {
     draw_seq_strips(C, ed, region);
@@ -2727,7 +2732,8 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
   }
 
   UI_view2d_view_ortho(v2d);
-  ANIM_draw_previewrange(C, v2d, 1);
+  /* The local range is already drawn above. A shared Scene preview overlay
+   * would misleadingly shade a different video editor's playback range. */
 
   if ((sseq->gizmo_flag & SEQ_GIZMO_HIDE) == 0) {
     WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
@@ -2761,5 +2767,10 @@ void draw_timeline_seq_display(const bContext *C, ARegion *region)
 
   const ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene));
   SEQ_timeline_boundbox(scene, seqbase, &v2d->tot);
+  int frame_start, frame_end;
+  ED_sequencer_timeline_range_get(sseq, scene, &frame_start, &frame_end);
+  v2d->tot.xmin = frame_start - 1.0f;
+  v2d->tot.xmax = frame_end + 1.0f;
+  SEQ_timeline_expand_boundbox(scene, seqbase, &v2d->tot);
   UI_view2d_scrollers_draw(v2d, NULL);
 }

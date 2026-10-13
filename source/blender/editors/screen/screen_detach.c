@@ -15,8 +15,13 @@ bool ED_screen_area_detach(bContext *C, ScrArea *area, const int xy[2], ReportLi
 {
   wmWindow *source = CTX_wm_window(C);
   wmWindowManager *wm = CTX_wm_manager(C);
+  if (!wm || !source || BLI_findindex(&wm->windows, source) == -1 || !source->ghostwin) {
+    return false;
+  }
   bScreen *source_screen = WM_window_get_active_screen(source);
-  if (!area || BLI_findindex(&source_screen->areabase, area) == -1 || ED_area_is_global(area)) {
+  if (!source_screen || source_screen->temp || source_screen->state != SCREENNORMAL || !area ||
+      BLI_findindex(&source_screen->areabase, area) == -1 || ED_area_is_global(area))
+  {
     return false;
   }
   const int width = MAX2(area->v3->vec.x - area->v1->vec.x, 320);

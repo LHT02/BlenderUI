@@ -79,7 +79,8 @@ MINIMUM_KEYMAPS = 100
 # Exact counts, so "one preset silently lost 40 keymaps but is still above the
 # floor" is caught. Keep in step with MEASURED_DANGLING_BINDINGS below.
 MEASURED_KEYMAP_COUNTS = {
-    "Blender": 112,
+    # Optional native desktop adds Node Generic, Node Editor and its Select Box tool map.
+    "Blender": 115,
     "Blender_27x": 103,
     "Industry_Compatible": 103,
 }

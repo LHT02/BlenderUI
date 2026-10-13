@@ -98,6 +98,7 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      * `ED_spacetypes_init`). */
     RNA_ENUM_ITEM_HEADING(N_("General"), NULL),
     {SPACE_FILE, "FILE_BROWSER", ICON_FILEBROWSER, "File Browser", "Browse for files and assets"},
+    {SPACE_NODE, "NODE_EDITOR", ICON_NODETREE, "Desktop Canvas", "Arrange files on an infinite canvas"},
     {SPACE_IMAGE, "IMAGE_EDITOR", ICON_IMAGE, "Image Editor", "View and edit images"},
     {SPACE_SEQ, "SEQUENCE_EDITOR", ICON_SEQUENCE, "Video Sequencer", "Video editing tools"},
 
@@ -572,6 +573,9 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
 
 static ScrArea *rna_area_from_space(PointerRNA *ptr)
 {
+  if (!ptr->owner_id || GS(ptr->owner_id->name) != ID_SCR) {
+    return NULL;
+  }
   bScreen *screen = (bScreen *)ptr->owner_id;
   SpaceLink *link = (SpaceLink *)ptr->data;
   return BKE_screen_find_area_from_space(screen, link);
@@ -1637,6 +1641,29 @@ static void rna_SpaceConsole_rect_update(Main *UNUSED(bmain),
 {
   SpaceConsole *sc = ptr->data;
   WM_main_add_notifier(NC_SPACE | ND_SPACE_CONSOLE | NA_EDITED, sc);
+}
+
+static void rna_SequenceEditor_timeline_start_set(PointerRNA *ptr, int value)
+{
+  SpaceSeq *sseq = ptr->data;
+  CLAMP(value, MINAFRAME, MAXFRAME);
+  ED_sequencer_timeline_range_set(sseq, value, max_ii(value, sseq->timeline_end));
+}
+
+static void rna_SequenceEditor_timeline_end_set(PointerRNA *ptr, int value)
+{
+  SpaceSeq *sseq = ptr->data;
+  CLAMP(value, MINAFRAME, MAXFRAME);
+  ED_sequencer_timeline_range_set(sseq, min_ii(value, sseq->timeline_start), value);
+}
+
+static void rna_SequenceEditor_timeline_update(bContext *C, PointerRNA *ptr)
+{
+  ScrArea *area = rna_area_from_space(ptr);
+  if (area) {
+    ED_area_tag_redraw(area);
+  }
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, ptr->data);
 }
 
 static void rna_SequenceEditor_update_cache(Main *UNUSED(bmain),
@@ -3511,6 +3538,22 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "SpaceSequenceEditor", "Space");
   RNA_def_struct_sdna(srna, "SpaceSeq");
   RNA_def_struct_ui_text(srna, "Space Sequence Editor", "Sequence editor space data");
+
+  prop = RNA_def_property(srna, "timeline_start", PROP_INT, PROP_TIME);
+  RNA_def_property_int_sdna(prop, NULL, "timeline_start");
+  RNA_def_property_int_funcs(prop, NULL, "rna_SequenceEditor_timeline_start_set", NULL);
+  RNA_def_property_range(prop, MINAFRAME, MAXFRAME);
+  RNA_def_property_ui_text(prop, "Editor Start", "First frame of this video editor's independent playback range");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, "rna_SequenceEditor_timeline_update");
+
+  prop = RNA_def_property(srna, "timeline_end", PROP_INT, PROP_TIME);
+  RNA_def_property_int_sdna(prop, NULL, "timeline_end");
+  RNA_def_property_int_funcs(prop, NULL, "rna_SequenceEditor_timeline_end_set", NULL);
+  RNA_def_property_range(prop, MINAFRAME, MAXFRAME);
+  RNA_def_property_ui_text(prop, "Editor End", "Last frame of this video editor's independent playback range");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, "rna_SequenceEditor_timeline_update");
 
   rna_def_space_generic_show_region_toggles(srna,
                                             (1 << RGN_TYPE_TOOL_HEADER) | (1 << RGN_TYPE_UI) |

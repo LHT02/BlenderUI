@@ -82,6 +82,7 @@ void node_operatortypes()
   WM_operatortype_append(NODE_OT_add_object);
   WM_operatortype_append(NODE_OT_add_collection);
   WM_operatortype_append(NODE_OT_add_file);
+  WM_operatortype_append(NODE_OT_blui_canvas_drop);
   WM_operatortype_append(NODE_OT_add_mask);
 
   WM_operatortype_append(NODE_OT_new_node_tree);

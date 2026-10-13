@@ -21,6 +21,9 @@ struct bNodeSocket *node_group_find_output_socket(struct bNode *groupnode, const
 struct bNodeSocket *node_group_input_find_socket(struct bNode *node, const char *identifier);
 struct bNodeSocket *node_group_output_find_socket(struct bNode *node, const char *identifier);
 
+/** Generic groups only organize data and sockets; no shader/geometry evaluation hooks. */
+void register_node_type_custom_group(struct bNodeType *ntype);
+
 #ifdef __cplusplus
 }
 #endif

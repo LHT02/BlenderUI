@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "DNA_asset_types.h"
+#include "DNA_node_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_windowmanager_types.h"
@@ -51,6 +52,7 @@
 #include "UI_resources.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -218,6 +220,30 @@ wmDrag *WM_drag_data_create(bContext *C, int icon, int type, void *poin, double 
           }
           if (data->paths_len == 0) {
             data->paths[data->paths_len++] = BLI_strdup(data->path);
+          }
+        }
+        else if (SpaceNode *canvas = CTX_wm_space_node(C)) {
+          if (canvas->edittree && STREQ(canvas->tree_idname, "BLUIDesktopTree") &&
+              WM_operatortype_find("WM_OT_blui_canvas_drag_prepare", true)) {
+            PointerRNA properties;
+            WM_operator_properties_create(&properties, "WM_OT_blui_canvas_drag_prepare");
+            RNA_string_set(&properties, "filepath", data->path);
+            WM_operator_name_call(C, "WM_OT_blui_canvas_drag_prepare", WM_OP_EXEC_DEFAULT, &properties, nullptr);
+            WM_operator_properties_free(&properties);
+            data->paths = static_cast<char **>(MEM_callocN(sizeof(char *) * 1000, __func__));
+            LISTBASE_FOREACH (bNode *, node, &canvas->edittree->nodes) {
+              if (!(node->flag & SELECT) || !STREQ(node->idname, "BLUIDesktopFile") || data->paths_len == 1000) {
+                continue;
+              }
+              PointerRNA pointer;
+              RNA_pointer_create(&canvas->edittree->id, &RNA_Node, node, &pointer);
+              if (PropertyRNA *property = RNA_struct_find_property(&pointer, "filepath")) {
+                data->paths[data->paths_len++] = RNA_property_string_get_alloc(&pointer, property, nullptr, 0, nullptr);
+              }
+            }
+            if (data->paths_len == 0) {
+              data->paths[data->paths_len++] = BLI_strdup(data->path);
+            }
           }
         }
       }

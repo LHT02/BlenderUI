@@ -547,6 +547,12 @@ struct wmEventHandler_Op *WM_event_add_modal_handler_ex(struct wmWindow *win,
 struct wmEventHandler_Op *WM_event_add_modal_handler(struct bContext *C, struct wmOperator *op)
     ATTR_NONNULL(1, 2);
 /**
+ * Read-only main-thread lifetime gate for asynchronous editor-data replacement.
+ * Includes active modal operators/macros and temporary UI interactions holding RNA pointers.
+ * Does not expose or retain handler addresses.
+ */
+bool WM_window_has_modal_interaction(const struct wmWindow *win);
+/**
  * Modal handlers store a pointer to an area which might be freed while the handler runs.
  * Use this function to NULL all handler pointers to \a old_area.
  */

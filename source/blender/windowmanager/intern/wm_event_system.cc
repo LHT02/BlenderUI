@@ -4503,6 +4503,27 @@ wmEventHandler_Op *WM_event_add_modal_handler(bContext *C, wmOperator *op)
   return WM_event_add_modal_handler_ex(win, area, region, op);
 }
 
+bool WM_window_has_modal_interaction(const wmWindow *win)
+{
+  if (!win) {
+    return false;
+  }
+  LISTBASE_FOREACH (const wmEventHandler *, handler, &win->modalhandlers) {
+    if (handler->type == WM_HANDLER_TYPE_OP) {
+      const wmEventHandler_Op *operator_handler =
+          reinterpret_cast<const wmEventHandler_Op *>(handler);
+      if (operator_handler->op) {
+        return true;
+      }
+    }
+    else if (handler->type == WM_HANDLER_TYPE_UI) {
+      /* Active text fields and popups can retain node RNA pointers as well as transforms. */
+      return true;
+    }
+  }
+  return false;
+}
+
 void WM_event_modal_handler_area_replace(wmWindow *win, const ScrArea *old_area, ScrArea *new_area)
 {
   LISTBASE_FOREACH (wmEventHandler *, handler_base, &win->modalhandlers) {

@@ -27,9 +27,13 @@ static const EnumPropertyItem dock_targets[] = {
 
 static void restore_context(bContext *C, wmWindow *window, ScrArea *area, ARegion *region)
 {
+  if (!window || BLI_findindex(&CTX_wm_manager(C)->windows, window) == -1) {
+    CTX_wm_window_set(C, NULL);
+    return;
+  }
   CTX_wm_window_set(C, window);
-  const bool live = area &&
-                    BLI_findindex(&WM_window_get_active_screen(window)->areabase, area) != -1;
+  const bScreen *screen = WM_window_get_active_screen(window);
+  const bool live = screen && area && BLI_findindex(&screen->areabase, area) != -1;
   CTX_wm_area_set(C, live ? area : NULL);
   CTX_wm_region_set(
       C, live && region && BLI_findindex(&area->regionbase, region) != -1 ? region : NULL);
@@ -55,7 +59,8 @@ bool screen_dock_apply(bContext *C,
   }
   bScreen *source_screen = WM_window_get_active_screen(source_window);
   bScreen *target_screen = WM_window_get_active_screen(target_window);
-  if (source_screen->temp || target_screen->temp ||
+  if (!source_screen || !target_screen || source_screen->temp || target_screen->temp ||
+      source_screen->state != SCREENNORMAL || target_screen->state != SCREENNORMAL ||
       BLI_findindex(&source_screen->areabase, source) == -1 ||
       BLI_findindex(&target_screen->areabase, target) == -1 || ED_area_is_global(source) ||
       ED_area_is_global(target))
@@ -66,18 +71,22 @@ bool screen_dock_apply(bContext *C,
   wmWindow *previous_window = CTX_wm_window(C);
   ScrArea *previous_area = CTX_wm_area(C);
   ARegion *previous_region = CTX_wm_region(C);
+  /* Context callbacks dereference C->wm.area. Never query them after freeing that area. */
+  struct Main *bmain = CTX_data_main(C);
   if (!confirmed && ELEM(dock, SCREEN_DOCK_CENTER, SCREEN_DOCK_JOIN)) {
     char arguments[1024];
     BLI_snprintf(arguments,
                  sizeof(arguments),
                  "{\"source_window\":\"%llu\",\"source_area\":\"%llu\",\"source_space\":\"%llu\","
-                 "\"target_window\":\"%llu\",\"target_area\":\"%llu\",\"dock_target\":\"%s\","
+                 "\"target_window\":\"%llu\",\"target_area\":\"%llu\",\"target_space\":\"%llu\","
+                 "\"dock_target\":\"%s\","
                  "\"factor\":%.9g}",
                  (unsigned long long)(uintptr_t)source_window,
                  (unsigned long long)(uintptr_t)source,
                  (unsigned long long)(uintptr_t)source->spacedata.first,
                  (unsigned long long)(uintptr_t)target_window,
                  (unsigned long long)(uintptr_t)target,
+                 (unsigned long long)(uintptr_t)target->spacedata.first,
                  dock == SCREEN_DOCK_JOIN ? "JOIN" : "CENTER",
                  factor);
     CTX_wm_window_set(C, target_window);
@@ -96,8 +105,13 @@ bool screen_dock_apply(bContext *C,
     bool joined = source_window == target_window &&
                   screen_area_join(C, source_screen, source, target);
     if (joined) {
-      ED_image_document_collect(CTX_data_main(C));
-      ED_area_tag_redraw(source);
+      /* Partial-edge joins can trim the original source into a remainder and free it. */
+      CTX_wm_area_set(C, NULL);
+      CTX_wm_region_set(C, NULL);
+      ED_image_document_collect(bmain);
+      LISTBASE_FOREACH (ScrArea *, area, &source_screen->areabase) {
+        ED_area_tag_redraw(area);
+      }
       WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);
     }
     restore_context(C, previous_window, previous_area, previous_region);
@@ -140,11 +154,18 @@ bool screen_dock_apply(bContext *C,
       BKE_report(reports, RPT_WARNING, "Editor moved; source window could not be closed");
     }
   }
-  else if (!screen_area_close(C, source_screen, source)) {
-    ED_area_tag_redraw(source);
-    BKE_report(reports, RPT_WARNING, "Editor moved; source area could not be closed");
+  else {
+    if (!screen_area_close(C, source_screen, source)) {
+      ED_area_tag_redraw(source);
+      BKE_report(reports, RPT_WARNING, "Editor moved; source area could not be closed");
+    }
+    else {
+      /* screen_area_close frees source; file_context must not see its stale SpaceFile. */
+      CTX_wm_area_set(C, NULL);
+      CTX_wm_region_set(C, NULL);
+    }
   }
-  ED_image_document_collect(CTX_data_main(C));
+  ED_image_document_collect(bmain);
   WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);
   WM_event_add_notifier(C, NC_WINDOW, NULL);
   restore_context(C, previous_window, previous_area, previous_region);
@@ -168,6 +189,7 @@ static int area_dock_exec(bContext *C, wmOperator *op)
   const uintptr_t source_ptr = pointer_property(op, "source_area"),
                   target_ptr = pointer_property(op, "target_area");
   const uintptr_t source_space = pointer_property(op, "source_space");
+  const uintptr_t target_space = pointer_property(op, "target_space");
   LISTBASE_FOREACH (wmWindow *, window, &CTX_wm_manager(C)->windows) {
     if ((uintptr_t)window == source_win) {
       source_window = window;
@@ -187,7 +209,9 @@ static int area_dock_exec(bContext *C, wmOperator *op)
       }
     }
   }
-  if (!source || (source_space && (uintptr_t)source->spacedata.first != source_space)) {
+  if (!source || !target || (source_space && (uintptr_t)source->spacedata.first != source_space) ||
+      (target_space && (uintptr_t)target->spacedata.first != target_space))
+  {
     BKE_report(op->reports, RPT_ERROR, "Docking cancelled: source or target editor changed");
     return OPERATOR_CANCELLED;
   }
@@ -212,9 +236,13 @@ void SCREEN_OT_area_dock(wmOperatorType *ot)
   ot->exec = area_dock_exec;
   ot->poll = ED_operator_screenactive;
   ot->flag = OPTYPE_INTERNAL;
-  const char *names[] = {
-      "source_window", "source_area", "source_space", "target_window", "target_area"};
-  for (int i = 0; i < 5; i++) {
+  const char *names[] = {"source_window",
+                         "source_area",
+                         "source_space",
+                         "target_window",
+                         "target_area",
+                         "target_space"};
+  for (int i = 0; i < 6; i++) {
     PropertyRNA *prop = RNA_def_string(
         ot->srna, names[i], NULL, 32, "Editor", "Live editor identity");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);

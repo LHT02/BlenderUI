@@ -29,6 +29,7 @@
 #include "ED_gizmo_library.h"
 #include "ED_gpencil_legacy.h"
 #include "ED_markers.h"
+#include "ED_node.h"
 #include "ED_object.h"
 #include "ED_paint.h"
 #include "ED_render.h"
@@ -62,6 +63,8 @@ void ED_spacetypes_init(void)
   ED_spacetype_image();
   ED_spacetype_info();
   ED_spacetype_file();
+  /* Native View2D/nodes provide the BLUI desktop canvas, not a web overlay. */
+  ED_spacetype_node();
   ED_spacetype_text();
   ED_spacetype_sequencer();
   ED_spacetype_console();
@@ -163,6 +166,7 @@ void ED_spacemacros_init(void)
    * The four left - file, sequencer, paint, gpencil - belong to components BLUI
    * keeps, so they stay. */
   ED_operatormacros_file();
+  ED_operatormacros_node();
   ED_operatormacros_sequencer();
   ED_operatormacros_gpencil();
 

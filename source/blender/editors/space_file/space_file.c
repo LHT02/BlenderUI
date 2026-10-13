@@ -159,6 +159,14 @@ static void file_exit(wmWindowManager *wm, ScrArea *area)
     WM_event_remove_timer_notifier(wm, NULL, sfile->previews_timer);
     sfile->previews_timer = NULL;
   }
+  /* Real editor moves preserve SpaceFile identity, but window-owned timers must not migrate. */
+  if (sfile->smoothscroll_timer) {
+    file_params_smoothscroll_timer_clear(wm, NULL, sfile);
+  }
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  if (params) {
+    file_params_renamefile_clear(params);
+  }
 
   ED_fileselect_exit(wm, sfile);
 }
@@ -838,14 +846,26 @@ static int /*eContextResult*/ file_context(const bContext *C,
 {
   bScreen *screen = CTX_wm_screen(C);
   SpaceFile *sfile = CTX_wm_space_file(C);
-  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
-
-  BLI_assert(!ED_area_is_global(CTX_wm_area(C)));
-
   if (CTX_data_dir(member)) {
     CTX_data_dir_set(result, file_context_dir);
     return CTX_RESULT_OK;
   }
+  /* Non-file queries (e.g. "blend_data") must not touch file-list runtime during layout exit. */
+  if (!CTX_data_equals(member, "active_file") && !CTX_data_equals(member, "selected_files") &&
+      !CTX_data_equals(member, "asset_library_ref") &&
+      !CTX_data_equals(member, "selected_asset_files") && !CTX_data_equals(member, "id") &&
+      !CTX_data_equals(member, "selected_ids")) {
+    return CTX_RESULT_MEMBER_NOT_FOUND;
+  }
+  if (!screen || !sfile) {
+    return CTX_RESULT_NO_DATA;
+  }
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  if (!params) {
+    return CTX_RESULT_NO_DATA;
+  }
+
+  BLI_assert(!ED_area_is_global(CTX_wm_area(C)));
 
   /* The following member checks return file-list data, check if that needs refreshing first. */
   if (file_main_region_needs_refresh_before_draw(sfile)) {

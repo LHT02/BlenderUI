@@ -75,11 +75,14 @@ def main():
     print("  NOTE  %d screen(s) before any cycling" % _screens_at_start)
     _log("screens at start: %d" % _screens_at_start)
 
-    # Close everything. The process is expected to stay alive with none open.
+    # This fixture owns all its windows and tests the tray's no-window path,
+    # not document prompts (covered by check_document_lifecycle.py). A cached
+    # image/text space may now correctly require confirmation even when its
+    # current editor is Console, so close this fixture explicitly.
     for window in list(window_manager.windows):
         try:
             with bpy.context.temp_override(window=window):
-                bpy.ops.wm.window_close()
+                bpy.ops.wm.window_close(force_close=True)
         except Exception as exc:  # noqa: BLE001
             report(False, "closing a window raised %s: %s" % (type(exc).__name__, exc))
 
@@ -136,7 +139,7 @@ def bad_component():
 
     for window in list(window_manager.windows):
         with bpy.context.temp_override(window=window):
-            bpy.ops.wm.window_close()
+            bpy.ops.wm.window_close(force_close=True)
     report(len(window_manager.windows) == 0,
            "back to no windows before the bad request (%d)" % len(window_manager.windows))
 
@@ -162,7 +165,7 @@ def bad_component():
     # the fix, the second cycle's window was on `Default.001`.
     for window in list(window_manager.windows):
         with bpy.context.temp_override(window=window):
-            bpy.ops.wm.window_close()
+            bpy.ops.wm.window_close(force_close=True)
     bpy.ops.wm.window_new(workspace="Files")
 
     report(len(window_manager.windows) == 1,

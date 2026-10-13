@@ -6,6 +6,8 @@
  */
 
 #include "BLI_utildefines.h"
+#include "DNA_node_types.h"
+#include "DNA_space_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
@@ -2114,6 +2116,10 @@ void FILE_OT_shell_context_menu(wmOperatorType *ot)
 
 static bool file_clipboard_poll(bContext *C)
 {
+  SpaceNode *canvas = CTX_wm_space_node(C);
+  if (canvas && canvas->edittree && STREQ(canvas->tree_idname, "BLUIDesktopTree")) {
+    return true;
+  }
   SpaceFile *sfile = CTX_wm_space_file(C);
   return ED_operator_file_browsing_active(C) && sfile && sfile->files;
 }
@@ -2165,7 +2171,23 @@ static int file_clipboard_put_exec(bContext *C, wmOperator *op, const bool move)
   SpaceFile *sfile = CTX_wm_space_file(C);
 
   int count = 0;
-  char **paths = file_clipboard_selected_paths(sfile, &count);
+  char **paths = NULL;
+  char *explicit_paths = RNA_string_get_alloc(op->ptr, "paths", NULL, 0, NULL);
+  if (explicit_paths[0]) {
+    paths = MEM_callocN(sizeof(char *) * 1000, __func__);
+    for (char *current = explicit_paths; current && current[0] && count < 1000;) {
+      char *next = strchr(current, '\n');
+      if (next) {
+        *next++ = '\0';
+      }
+      paths[count++] = BLI_strdup(current);
+      current = next;
+    }
+  }
+  else if (sfile) {
+    paths = file_clipboard_selected_paths(sfile, &count);
+  }
+  MEM_freeN(explicit_paths);
   if (count == 0) {
     file_clipboard_free_paths(paths, count);
     BKE_report(op->reports, RPT_ERROR, "No file selected");
@@ -2206,8 +2228,27 @@ static void file_ops_message(const char *title, const char *body)
 static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
 {
   SpaceFile *sfile = CTX_wm_space_file(C);
-  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
-  if (params == NULL) {
+  SpaceNode *canvas = CTX_wm_space_node(C);
+  FileSelectParams *params = sfile ? ED_fileselect_get_active_params(sfile) : NULL;
+  char destination[FILE_MAX];
+  const char *operator_id = "FILE_OT_explorer_drop";
+  if (canvas && canvas->edittree && STREQ(canvas->tree_idname, "BLUIDesktopTree")) {
+    PointerRNA pointer;
+    RNA_id_pointer_create(&canvas->edittree->id, &pointer);
+    char *directory = RNA_string_get_alloc(&pointer, "directory", NULL, 0, NULL);
+    if (strlen(directory) >= sizeof(destination)) {
+      MEM_freeN(directory);
+      BKE_report(op->reports, RPT_ERROR, "Directory path is too long for native clipboard paste");
+      return OPERATOR_CANCELLED;
+    }
+    BLI_strncpy(destination, directory, sizeof(destination));
+    MEM_freeN(directory);
+    operator_id = "WM_OT_blui_canvas_paste";
+  }
+  else if (params) {
+    BLI_strncpy(destination, params->dir, sizeof(destination));
+  }
+  else {
     return OPERATOR_CANCELLED;
   }
 
@@ -2222,8 +2263,8 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
   /* Snapshot the clipboard, then use the same asynchronous, collision-safe
    * worker as drag/drop. No filesystem traversal on the UI thread. */
   PointerRNA props;
-  WM_operator_properties_create(&props, "FILE_OT_explorer_drop");
-  RNA_string_set(&props, "directory", params->dir);
+  WM_operator_properties_create(&props, operator_id);
+  RNA_string_set(&props, "directory", destination);
   DynStr *sources = BLI_dynstr_new();
   for (int i = 0; i < count; i++) {
     if (i) {
@@ -2239,7 +2280,7 @@ static int file_clipboard_paste_exec(bContext *C, wmOperator *op)
   RNA_boolean_set(&props, "move", move);
   RNA_boolean_set(&props, "from_clipboard", true);
   const int result = WM_operator_name_call(
-      C, "FILE_OT_explorer_drop", WM_OP_EXEC_DEFAULT, &props, NULL);
+      C, operator_id, WM_OP_EXEC_DEFAULT, &props, NULL);
   WM_operator_properties_free(&props);
   return result;
 }
@@ -2252,6 +2293,7 @@ void FILE_OT_clipboard_copy(wmOperatorType *ot)
 
   ot->exec = file_clipboard_copy_exec;
   ot->poll = file_clipboard_poll;
+  RNA_def_string(ot->srna, "paths", NULL, 0, "Paths", "Optional explicit selected paths");
 }
 
 void FILE_OT_clipboard_cut(wmOperatorType *ot)
@@ -2262,6 +2304,7 @@ void FILE_OT_clipboard_cut(wmOperatorType *ot)
 
   ot->exec = file_clipboard_cut_exec;
   ot->poll = file_clipboard_poll;
+  RNA_def_string(ot->srna, "paths", NULL, 0, "Paths", "Optional explicit selected paths");
 }
 
 void FILE_OT_clipboard_paste(wmOperatorType *ot)

@@ -54,6 +54,7 @@ _modules = [
     "space_console",
     "space_filebrowser",
     "space_filebrowser_explorer",
+    "space_blui_desktop",
     "space_image",
     "space_info",
     "space_sequencer",
@@ -87,6 +88,8 @@ def register():
     localization.register()
     from bl_ui import space_filebrowser_shell
     space_filebrowser_shell.register()
+    from blui_desktop import runtime
+    runtime.register()
 
     from bpy.props import (
         EnumProperty,
@@ -146,6 +149,8 @@ def register():
 
 
 def unregister():
+    from blui_desktop import runtime
+    runtime.unregister()
     from bl_ui import space_filebrowser_shell
     space_filebrowser_shell.unregister()
     from blui_explorer import localization

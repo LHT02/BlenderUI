@@ -34,11 +34,18 @@ def _redraw():
 
 
 def directory(context):
+    if context.space_data and context.space_data.type == 'NODE_EDITOR':
+        from blui_desktop.types import canvas
+        tree = canvas(context)
+        return tree.directory if tree else ''
     space = context.space_data
     return os.fsdecode(space.params.directory) if space and space.type == 'FILE_BROWSER' and space.params else ""
 
 
 def selected_paths(context):
+    if context.space_data and context.space_data.type == 'NODE_EDITOR':
+        from blui_desktop.file_actions import selected_paths as desktop_paths
+        return desktop_paths(context)
     root = directory(context)
     if not root:
         return []
@@ -245,6 +252,10 @@ class FILE_OT_explorer_reveal(FileSelection, Operator):
     bl_label = "Open File Location"
     bl_description = "Show the selected item in Windows Explorer"
 
+    @classmethod
+    def poll(cls, context):
+        return bool(selected_paths(context))
+
     def execute(self, context):
         import subprocess
         paths = selected_paths(context)
@@ -261,6 +272,8 @@ class FILE_OT_explorer_drop(Operator):
     from_clipboard: BoolProperty(options={'HIDDEN', 'SKIP_SAVE'})
 
     def execute(self, _context):
+        from blui_desktop.file_actions import clear_drag
+        clear_drag()
         paths = [p for p in self.sources.splitlines() if p]
         if not paths or not self.directory:
             self.report({'ERROR'}, iface("No files or destination for this drop"))

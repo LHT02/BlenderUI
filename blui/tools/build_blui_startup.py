@@ -21,6 +21,7 @@ Run with:
 """
 
 import sys
+import os
 
 import bpy
 
@@ -48,10 +49,14 @@ def _parse_output():
 
 def _build_plan():
     all_ws = list(bpy.data.workspaces)
-    keep = all_ws[: len(BLUI_WORKSPACES)]
-    drop = all_ws[len(BLUI_WORKSPACES) :]
+    named = [bpy.data.workspaces.get(name) for name, _space in BLUI_WORKSPACES]
+    keep = named if all(named) else all_ws[: len(BLUI_WORKSPACES)]
+    drop = [workspace for workspace in all_ws if workspace not in keep]
 
-    plan = []
+    plan = [("neutral_mode", None)]
+    # Rename first, avoiding Files.001-style collisions when rebuilding an existing factory file.
+    for index, workspace in enumerate(keep):
+        workspace.name = '__BLUI_FACTORY_%d' % index
     for workspace, (name, space) in zip(keep, BLUI_WORKSPACES):
         plan.append(("activate", workspace))
         screens = workspace.screens
@@ -80,7 +85,14 @@ def _step():
     window = bpy.context.window
 
     try:
-        if action == "activate":
+        if action == "neutral_mode":
+            active = window.view_layer.objects.active
+            if active and active.mode != 'OBJECT':
+                result = bpy.ops.object.mode_set(mode='OBJECT')
+                if result != {'FINISHED'}:
+                    raise RuntimeError('Factory startup could not leave hidden edit mode')
+            print('STARTUP: neutral object mode; native global Undo remains available')
+        elif action == "activate":
             window.workspace = payload
             print("STARTUP: activate %r" % payload.name)
         elif action == "close":
@@ -117,15 +129,19 @@ def _step():
                     print("STARTUP: selected %r" % payload)
                     break
         elif action == "save":
+            bpy.context.preferences.filepaths.save_version = 0
             summary = [(w.name, [s.type for sc in w.screens for a in sc.areas for s in a.spaces])
                        for w in bpy.data.workspaces]
             print("STARTUP: final workspaces: %s" % summary)
             bpy.ops.wm.save_as_mainfile(filepath=_output, check_existing=False, compress=False)
             print("STARTUP: wrote %s" % _output)
-            bpy.ops.wm.quit_blender()
-            return None
+            # This generator is a disposable build process: don't overwrite shared quit.blend.
+            sys.stdout.flush()
+            os._exit(0)
     except Exception as exc:  # noqa: BLE001
         print("STARTUP: ERROR on %s: %s" % (action, exc))
+        sys.stdout.flush()
+        os._exit(1)
 
     return 0.05
 

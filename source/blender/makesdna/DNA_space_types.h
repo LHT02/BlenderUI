@@ -674,6 +674,9 @@ typedef struct SpaceSeq {
   char multiview_eye;
   char _pad2[7];
 
+  /** BLUI playback/display range belongs to this editor, not the shared Scene. */
+  int timeline_start, timeline_end;
+
   SpaceSeqRuntime runtime;
 } SpaceSeq;
 
@@ -698,7 +701,8 @@ typedef enum eSpaceSeq_Flag {
   SEQ_MARKER_TRANS = (1 << 1),
   SEQ_DRAW_COLOR_SEPARATED = (1 << 2),
   SEQ_CLAMP_VIEW = (1 << 3),
-  SPACE_SEQ_FLAG_UNUSED_4 = (1 << 4),
+  /** Distinguishes a saved local 0..0 range from an older file's absent range. */
+  SEQ_TIMELINE_LOCAL_RANGE = (1 << 4),
   SPACE_SEQ_FLAG_UNUSED_5 = (1 << 5),
   SEQ_USE_ALPHA = (1 << 6), /* use RGBA display mode for preview */
   SPACE_SEQ_FLAG_UNUSED_9 = (1 << 9),

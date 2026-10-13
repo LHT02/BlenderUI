@@ -2358,7 +2358,7 @@ void uiTemplateColorRamp(uiLayout *layout,
 /**
  * \param icon_scale: Scale of the icon, 1x == button height.
  */
-void uiTemplateIcon(uiLayout *layout, int icon_value, float icon_scale);
+void uiTemplateIcon(uiLayout *layout, int icon_value, float icon_scale, const char *filepath);
 /**
  * \param icon_scale: Scale of the icon, 1x == button height.
  */

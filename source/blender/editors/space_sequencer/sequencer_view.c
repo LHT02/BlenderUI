@@ -30,6 +30,7 @@
 /* For menu, popup, icons, etc. */
 #include "ED_anim_api.h"
 #include "ED_screen.h"
+#include "ED_sequencer.h"
 #include "ED_time_scrub_ui.h"
 #include "ED_util_imbuf.h"
 
@@ -79,6 +80,10 @@ static int sequencer_view_all_exec(bContext *C, wmOperator *op)
   const Editing *ed = SEQ_editing_get(scene);
 
   SEQ_timeline_init_boundbox(scene, &box);
+  int frame_start, frame_end;
+  ED_sequencer_timeline_range_get(CTX_wm_space_seq(C), scene, &frame_start, &frame_end);
+  box.xmin = frame_start - 1.0f;
+  box.xmax = frame_end + 1.0f;
   MetaStack *ms = SEQ_meta_stack_active_get(ed);
   /* Use meta strip range instead of scene. */
   if (ms != NULL) {

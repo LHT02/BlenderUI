@@ -12,6 +12,7 @@
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
+#  include "GHOST_ThemeWin32.hh"
 
 #  include <epoxy/wgl.h>
 #  include <tchar.h>
@@ -128,7 +129,17 @@ bool win32_chk(bool result, const char *file, int line, const char *text)
 
 void GHOST_Context::initClearGL()
 {
+#ifdef _WIN32
+  /* The compositor can display this buffer before Blender's first UI redraw. Do not flash a
+   * fixed gray surface when Windows requests a dark or light application frame. */
+  const COLORREF background = GHOST_ThemeWin32_Palette(false).background;
+  glClearColor(GetRValue(background) / 255.0f,
+               GetGValue(background) / 255.0f,
+               GetBValue(background) / 255.0f,
+               0.0f);
+#else
   glClearColor(0.294, 0.294, 0.294, 0.000);
+#endif
   glClear(GL_COLOR_BUFFER_BIT);
   glClearColor(0.000, 0.000, 0.000, 0.000);
 }

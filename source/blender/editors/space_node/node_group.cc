@@ -75,7 +75,8 @@ static bool node_group_operator_active_poll(bContext *C)
                  "ShaderNodeTree",
                  "CompositorNodeTree",
                  "TextureNodeTree",
-                 "GeometryNodeTree"))
+                 "GeometryNodeTree",
+                 "BLUIDesktopTree"))
     {
       return true;
     }
@@ -92,7 +93,7 @@ static bool node_group_operator_editable(bContext *C)
      * Disabled otherwise to allow python-nodes define their own operators
      * with same key-map. */
     if (ED_node_is_shader(snode) || ED_node_is_compositor(snode) || ED_node_is_texture(snode) ||
-        ED_node_is_geometry(snode))
+        ED_node_is_geometry(snode) || STREQ(snode->tree_idname, "BLUIDesktopTree"))
     {
       return true;
     }
@@ -121,6 +122,11 @@ const char *node_group_idname(bContext *C)
   }
   if (ED_node_is_geometry(snode)) {
     return ntreeType_Geometry->group_idname;
+  }
+  if (STREQ(snode->tree_idname, "BLUIDesktopTree") && snode->edittree &&
+      snode->edittree->typeinfo)
+  {
+    return snode->edittree->typeinfo->group_idname;
   }
 
   return "";
@@ -695,6 +701,16 @@ static bool node_group_make_test_selected(bNodeTree &ntree,
   if (nodes_to_group.is_empty()) {
     return false;
   }
+  if (STREQ(ntree_idname, "BLUIDesktopTree")) {
+    /* A desktop collection is an actual nested tree of file references/widgets,
+     * not an executable graph. Never expose engineering socket interfaces. */
+    for (const bNode *node : nodes_to_group) {
+      if (!BLI_listbase_is_empty(&node->inputs) || !BLI_listbase_is_empty(&node->outputs)) {
+        BKE_report(&reports, RPT_WARNING, "Desktop groups only contain socket-free cards and panels");
+        return false;
+      }
+    }
+  }
   /* make a local pseudo node tree to pass to the node poll functions */
   bNodeTree *ngroup = ntreeAddTree(nullptr, "Pseudo Node Group", ntree_idname);
   BLI_SCOPED_DEFER([&]() {
@@ -870,20 +886,22 @@ static void node_group_make_insert_selected(const bContext &C,
   float2 real_min, real_max;
   get_min_max_of_nodes(nodes_to_move, true, real_min, real_max);
 
-  /* Reuse an existing output node or create a new one. */
-  group.ensure_topology_cache();
-  bNode *output_node = [&]() {
-    if (bNode *node = group.group_output_node()) {
-      return node;
+  const bool use_socket_interface = !STREQ(group.idname, "BLUIDesktopTree");
+  bNode *output_node = nullptr;
+  bNode *input_node = nullptr;
+  if (use_socket_interface) {
+    /* Reuse an existing output node or create a new one. Desktop containers
+     * deliberately omit these compute-only socket nodes. The actual node/data
+     * migration and parent preservation below remains native and unchanged. */
+    group.ensure_topology_cache();
+    output_node = group.group_output_node();
+    if (!output_node) {
+      output_node = nodeAddStaticNode(&C, &group, NODE_GROUP_OUTPUT);
+      output_node->locx = real_max[0] - center[0] + 50.0f;
     }
-    bNode *output_node = nodeAddStaticNode(&C, &group, NODE_GROUP_OUTPUT);
-    output_node->locx = real_max[0] - center[0] + 50.0f;
-    return output_node;
-  }();
-
-  /* Create new group input node for easier organization of the new nodes inside the group. */
-  bNode *input_node = nodeAddStaticNode(&C, &group, NODE_GROUP_INPUT);
-  input_node->locx = real_min[0] - center[0] - 200.0f;
+    input_node = nodeAddStaticNode(&C, &group, NODE_GROUP_INPUT);
+    input_node->locx = real_min[0] - center[0] - 200.0f;
+  }
 
   struct InputSocketInfo {
     /* The unselected node the original link came from. */
@@ -1023,8 +1041,10 @@ static void node_group_make_insert_selected(const bContext &C,
   bke::nodeRebuildIDVector(&ntree);
 
   /* Update input and output node first, since the group node declaration can depend on them. */
-  nodes::update_node_declaration_and_sockets(group, *input_node);
-  nodes::update_node_declaration_and_sockets(group, *output_node);
+  if (use_socket_interface) {
+    nodes::update_node_declaration_and_sockets(group, *input_node);
+    nodes::update_node_declaration_and_sockets(group, *output_node);
+  }
 
   /* move nodes in the group to the center */
   for (bNode *node : nodes_to_move) {

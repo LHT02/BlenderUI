@@ -37,6 +37,7 @@
 #include "ED_node.h"
 #include "ED_screen.h"
 #include "ED_screen_types.h"
+#include "ED_sequencer.h"
 
 #include "UI_interface.h"
 
@@ -1662,9 +1663,22 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
     screen->animtimer = WM_event_add_timer(wm, win, TIMER0, (1.0 / FPS));
 
     sad->region = CTX_wm_region(C);
+    SpaceSeq *sseq = CTX_wm_space_seq(C);
+    if (sseq) {
+      ED_sequencer_timeline_range_ensure(sseq, scene);
+      ED_sequencer_timeline_range_get(
+          sseq, scene, &sad->local_range_start, &sad->local_range_end);
+      sad->use_local_range = true;
+    }
     /* If start-frame is larger than current frame, we put current-frame on start-frame.
      * NOTE(ton): first frame then is not drawn! */
-    if (PRVRANGEON) {
+    if (sad->use_local_range) {
+      sad->sfra = scene->r.cfra;
+      if (scene->r.cfra < sad->local_range_start || scene->r.cfra > sad->local_range_end) {
+        scene->r.cfra = enable < 0 ? sad->local_range_end : sad->local_range_start;
+      }
+    }
+    else if (PRVRANGEON) {
       if (scene->r.psfra > scene->r.cfra) {
         sad->sfra = scene->r.cfra;
         scene->r.cfra = scene->r.psfra;

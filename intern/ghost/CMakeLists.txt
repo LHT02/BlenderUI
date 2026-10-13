@@ -469,8 +469,11 @@ elseif(WIN32)
     intern/GHOST_DropTargetWin32.cc
     intern/GHOST_ShellMenuWin32.cc
     intern/GHOST_FileIconWin32.cc
+    intern/GHOST_IconResourceWin32.cc
     intern/GHOST_SystemWin32.cc
     intern/GHOST_TrackpadWin32.cc
+    intern/GHOST_ThemeWin32.cc
+    intern/GHOST_TrayMenuWin32.cc
     intern/GHOST_TrayWin32.cc
     intern/GHOST_WindowWin32.cc
     intern/GHOST_Wintab.cc
@@ -480,9 +483,12 @@ elseif(WIN32)
     intern/GHOST_DragSourceWin32.hh
     intern/GHOST_DropTargetWin32.hh
     intern/GHOST_ShellMenuWin32.hh
+    intern/GHOST_IconResourceWin32.hh
     intern/GHOST_SystemWin32.hh
     intern/GHOST_TaskbarWin32.hh
     intern/GHOST_TrackpadWin32.hh
+    intern/GHOST_ThemeWin32.hh
+    intern/GHOST_TrayMenuWin32.hh
     intern/GHOST_TrayWin32.hh
     intern/GHOST_WindowWin32.hh
     intern/GHOST_Wintab.hh
@@ -614,3 +620,17 @@ if(WITH_XR_OPENXR)
 endif()
 
 blender_add_lib(bf_intern_ghost "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(WIN32)
+  add_executable(BLUI-fileicon
+    intern/GHOST_FileIconWorkerWin32.cc
+    intern/GHOST_FileIconWin32.cc
+    intern/GHOST_IconResourceWin32.cc
+  )
+  target_include_directories(BLUI-fileicon PRIVATE intern)
+  target_link_libraries(BLUI-fileicon PRIVATE ole32 uuid shell32 shlwapi user32 gdi32 comctl32)
+  # This disposable host has no Blender dependencies. Bundle its CRT statically,
+  # so a portable install does not rely on the developer's VC redistributable.
+  target_compile_options(BLUI-fileicon PRIVATE /MT)
+  set_target_properties(BLUI-fileicon PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endif()

@@ -215,6 +215,7 @@ set(INC
   ../../../../intern/cycles/blender
   ../../../../intern/atomic
   ../../../../intern/guardedalloc
+  ../../../../intern/ghost
   ../../../../intern/memutil
   ../../../../intern/mantaflow/extern
 

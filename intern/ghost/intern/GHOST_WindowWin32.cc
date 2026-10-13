@@ -10,6 +10,7 @@
 #include "GHOST_ContextNone.hh"
 #include "GHOST_DropTargetWin32.hh"
 #include "GHOST_SystemWin32.hh"
+#include "GHOST_ThemeWin32.hh"
 #include "GHOST_WindowManager.hh"
 #include "utf_winfunc.h"
 #include "utfconv.h"
@@ -1050,22 +1051,12 @@ GHOST_TabletData GHOST_WindowWin32::getTabletData()
 
 void GHOST_WindowWin32::ThemeRefresh()
 {
-  DWORD lightMode;
-  DWORD pcbData = sizeof(lightMode);
-  if (RegGetValueW(HKEY_CURRENT_USER,
-                   L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\\",
-                   L"AppsUseLightTheme",
-                   RRF_RT_REG_DWORD,
-                   NULL,
-                   &lightMode,
-                   &pcbData) == ERROR_SUCCESS)
-  {
-    BOOL DarkMode = !lightMode;
-
-    /* `20 == DWMWA_USE_IMMERSIVE_DARK_MODE` in Windows 11 SDK.
-     * This value was undocumented for Windows 10 versions 2004 and later,
-     * supported for Windows 11 Build 22000 and later. */
-    DwmSetWindowAttribute(this->m_hWnd, 20, &DarkMode, sizeof(DarkMode));
+  const GHOST_ThemePaletteWin32 palette = GHOST_ThemeWin32_Palette(false);
+  const BOOL dark = palette.dark && !palette.high_contrast;
+  /* Use documented Windows 11 attribute 20, with the pre-2004 Windows 10 fallback.
+   * Unsupported attributes are harmless on older Windows. High-contrast colors remain native. */
+  if (FAILED(DwmSetWindowAttribute(m_hWnd, 20, &dark, sizeof(dark)))) {
+    DwmSetWindowAttribute(m_hWnd, 19, &dark, sizeof(dark));
   }
 }
 

@@ -2153,6 +2153,21 @@ static void node_draw_basis(const bContext &C,
     return;
   }
 
+  /* Desktop files are transparent icon cells, not opaque engineering nodes.
+   * Keep the actual native node hit boxes, selection, frames, groups and transforms. */
+  if (STREQ(ntree.idname, "BLUIDesktopTree") && STREQ(node.idname, "BLUIDesktopFile")) {
+    if (node.flag & SELECT) {
+      float selected[4];
+      UI_GetThemeColor4fv(TH_SELECT, selected);
+      selected[3] = 0.22f;
+      UI_draw_roundbox_corner_set(UI_CNR_ALL);
+      UI_draw_roundbox_4fv(&node.runtime->totr, true, BASIS_RAD, selected);
+    }
+    UI_block_end(&C, &block);
+    UI_block_draw(&C, &block);
+    return;
+  }
+
   /* Shadow. */
   if (!ELEM(node.type, GEO_NODE_SIMULATION_INPUT, GEO_NODE_SIMULATION_OUTPUT)) {
     node_draw_shadow(snode, node, BASIS_RAD, 1.0f);
@@ -2217,7 +2232,7 @@ static void node_draw_basis(const bContext &C,
     UI_block_emboss_set(&block, UI_EMBOSS);
   }
   /* Group edit. */
-  if (node.type == NODE_GROUP) {
+  if (node.is_group()) {
     iconofs -= iconbutw;
     UI_block_emboss_set(&block, UI_EMBOSS_NONE);
     uiBut *but = uiDefIconBut(&block,

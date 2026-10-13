@@ -3290,7 +3290,6 @@ static int sequencer_set_range_to_strips_exec(bContext *C, wmOperator *op)
   int sfra = MAXFRAME;
   int efra = -MAXFRAME;
   bool selected = false;
-  const bool preview = RNA_boolean_get(op->ptr, "preview");
 
   for (seq = ed->seqbasep->first; seq; seq = seq->next) {
     if (seq->flag & SELECT) {
@@ -3307,23 +3306,12 @@ static int sequencer_set_range_to_strips_exec(bContext *C, wmOperator *op)
     BKE_report(op->reports, RPT_WARNING, "Select one or more strips");
     return OPERATOR_CANCELLED;
   }
-  if (efra < 0) {
-    BKE_report(op->reports, RPT_ERROR, "Can't set a negative range");
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+  if (!sseq) {
     return OPERATOR_CANCELLED;
   }
-
-  if (preview) {
-    scene->r.flag |= SCER_PRV_RANGE;
-    scene->r.psfra = max_ii(0, sfra);
-    scene->r.pefra = efra;
-  }
-  else {
-    scene->r.flag &= ~SCER_PRV_RANGE;
-    scene->r.sfra = max_ii(0, sfra);
-    scene->r.efra = efra;
-  }
-
-  WM_event_add_notifier(C, NC_SCENE | ND_FRAME_RANGE, scene);
+  ED_sequencer_timeline_range_set(sseq, sfra, efra);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, sseq);
 
   return OPERATOR_FINISHED;
 }

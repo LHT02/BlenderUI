@@ -9,6 +9,9 @@
 #include "CLG_log.h"
 
 #include "DNA_movieclip_types.h"
+#include "DNA_genfile.h"
+#include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 
 #include "BLI_assert.h"
 #include "BLI_listbase.h"
@@ -276,8 +279,24 @@ static void versioning_convert_combined_noise_texture_node(bNodeTree *ntree)
   version_socket_update_is_used(ntree);
 }
 
-void blo_do_versions_400(FileData * /*fd*/, Library * /*lib*/, Main *bmain)
+void blo_do_versions_400(FileData *fd, Library * /*lib*/, Main *bmain)
 {
+  /* BLUI owns this extension irrespective of the Blender-version number. The
+   * older unused flag must not turn absent (zeroed) bounds into a saved 0..0
+   * range. The editor's first refresh initializes from its actual owning Scene. */
+  if (!DNA_struct_elem_find(fd->filesdna, "SpaceSeq", "int", "timeline_start")) {
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+          if (space->spacetype == SPACE_SEQ) {
+            SpaceSeq *sseq = reinterpret_cast<SpaceSeq *>(space);
+            sseq->timeline_start = sseq->timeline_end = 0;
+            sseq->flag &= ~SEQ_TIMELINE_LOCAL_RANGE;
+          }
+        }
+      }
+    }
+  }
   // if (!MAIN_VERSION_ATLEAST(bmain, 400, 0)) {
   /* This is done here because we will continue to write with the old format until 4.0, so we need
    * to convert even "current" files. Keep the check commented out for now so the versioning isn't

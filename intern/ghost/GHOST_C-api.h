@@ -15,6 +15,9 @@
 extern "C" {
 #endif
 
+/** Borrowed OS handle of this live GHOST window; never owns or extends its lifetime. */
+extern void *GHOST_GetNativeWindowHandle(GHOST_WindowHandle windowhandle);
+
 /**
  * Definition of a callback routine that receives events.
  * \param event: The event received.

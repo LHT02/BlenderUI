@@ -52,6 +52,7 @@
 #include "RE_texture.h"
 
 #include "NOD_composite.h"
+#include "NOD_common.h"
 #include "NOD_geometry.h"
 #include "NOD_socket.h"
 
@@ -1123,6 +1124,10 @@ static StructRNA *rna_NodeTree_register(Main *bmain,
   memcpy(nt, &dummy_nt, sizeof(dummy_nt));
 
   nt->type = NTREE_CUSTOM;
+  /* Desktop collections use the same native group make/edit/ungroup machinery. */
+  if (STREQ(nt->idname, "BLUIDesktopTree")) {
+    STRNCPY(nt->group_idname, "BLUIDesktopGroup");
+  }
 
   nt->rna_ext.srna = RNA_def_struct_ptr(&BLENDER_RNA, nt->idname, &RNA_NodeTree);
   nt->rna_ext.data = data;
@@ -3419,6 +3424,27 @@ static void rna_NodeInternal_draw_buttons_ext(ID *id,
   }
 }
 
+static bool rna_NodeCustomGroup_poll_instance(const bNode *node,
+                                              const bNodeTree *ntree,
+                                              const char **disabled_hint)
+{
+  const bNodeType *ntype = node->typeinfo;
+  if (ntype->poll && !ntype->poll(ntype, ntree, disabled_hint)) {
+    return false;
+  }
+  return nodeGroupPoll(ntree, (const bNodeTree *)node->id, disabled_hint);
+}
+
+static bool rna_NodeCustomGroup_poll_instance_with_py(const bNode *node,
+                                                      const bNodeTree *ntree,
+                                                      const char **disabled_hint)
+{
+  if (!rna_Node_poll_instance(node, ntree, disabled_hint)) {
+    return false;
+  }
+  return rna_NodeCustomGroup_poll_instance(node, ntree, disabled_hint);
+}
+
 static StructRNA *rna_NodeCustomGroup_register(Main *bmain,
                                                ReportList *reports,
                                                void *data,
@@ -3433,6 +3459,12 @@ static StructRNA *rna_NodeCustomGroup_register(Main *bmain,
     return NULL;
   }
 
+  /* Preserve an optional Python instance filter, but never let it bypass native
+   * tree compatibility or recursive group validation. */
+  nt->poll_instance = nt->poll_instance == rna_Node_poll_instance ?
+                          rna_NodeCustomGroup_poll_instance_with_py :
+                          rna_NodeCustomGroup_poll_instance;
+  register_node_type_custom_group(nt);
   nodeRegisterType(nt);
 
   /* update while blender is running */
@@ -3562,7 +3594,7 @@ static void rna_NodeGroup_node_tree_set(PointerRNA *ptr,
       id_us_plus(&ngroup->id);
     }
 
-    node->id = &ngroup->id;
+    node->id = ngroup ? &ngroup->id : NULL;
   }
 }
 

@@ -3062,6 +3062,20 @@ static int frame_jump_exec(bContext *C, wmOperator *op)
 {
   Scene *scene = CTX_data_scene(C);
   wmTimer *animtimer = CTX_wm_screen(C)->animtimer;
+  if (animtimer && !animtimer->customdata) {
+    return OPERATOR_CANCELLED;
+  }
+  int range_start = PSFRA, range_end = PEFRA;
+  if (animtimer) {
+    const ScreenAnimData *sad = animtimer->customdata;
+    if (sad->use_local_range) {
+      range_start = sad->local_range_start;
+      range_end = sad->local_range_end;
+    }
+  }
+  else if (CTX_wm_space_seq(C)) {
+    ED_sequencer_timeline_range_get(CTX_wm_space_seq(C), scene, &range_start, &range_end);
+  }
 
   /* Don't change scene->r.cfra directly if animtimer is running as this can cause
    * first/last frame not to be actually shown (bad since for example physics
@@ -3073,18 +3087,18 @@ static int frame_jump_exec(bContext *C, wmOperator *op)
     sad->flag |= ANIMPLAY_FLAG_USE_NEXT_FRAME;
 
     if (RNA_boolean_get(op->ptr, "end")) {
-      sad->nextfra = PEFRA;
+      sad->nextfra = range_end;
     }
     else {
-      sad->nextfra = PSFRA;
+      sad->nextfra = range_start;
     }
   }
   else {
     if (RNA_boolean_get(op->ptr, "end")) {
-      scene->r.cfra = PEFRA;
+      scene->r.cfra = range_end;
     }
     else {
-      scene->r.cfra = PSFRA;
+      scene->r.cfra = range_start;
     }
 
     areas_do_frame_follow(C, true);
@@ -4380,7 +4394,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   bScreen *screen = CTX_wm_screen(C);
   wmTimer *wt = screen->animtimer;
 
-  if (!(wt && wt == event->customdata)) {
+  if (!(wt && wt == event->customdata && wt->customdata)) {
     return OPERATOR_PASS_THROUGH;
   }
 
@@ -4492,7 +4506,19 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   /* reset 'jumped' flag before checking if we need to jump... */
   sad->flag &= ~ANIMPLAY_FLAG_JUMPED;
 
-  if (sad->flag & ANIMPLAY_FLAG_REVERSE) {
+  if (sad->use_local_range) {
+    /* Bounds are captured from the video editor that started playback, not
+     * whichever editor happens to have focus on this timer event. */
+    if ((sad->flag & ANIMPLAY_FLAG_REVERSE) && scene->r.cfra < sad->local_range_start) {
+      scene->r.cfra = sad->local_range_end;
+      sad->flag |= ANIMPLAY_FLAG_JUMPED;
+    }
+    else if (!(sad->flag & ANIMPLAY_FLAG_REVERSE) && scene->r.cfra > sad->local_range_end) {
+      scene->r.cfra = sad->local_range_start;
+      sad->flag |= ANIMPLAY_FLAG_JUMPED;
+    }
+  }
+  else if (sad->flag & ANIMPLAY_FLAG_REVERSE) {
     /* jump back to end? */
     if (PRVRANGEON) {
       if (scene->r.cfra < scene->r.psfra) {

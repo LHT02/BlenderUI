@@ -110,12 +110,40 @@ bool nodeGroupPoll(const bNodeTree *nodetree,
     }
     return false;
   }
-  if (nodetree->type != grouptree->type) {
+  if (nodetree->type != grouptree->type ||
+      (nodetree->type == NTREE_CUSTOM && !STREQ(nodetree->idname, grouptree->idname)))
+  {
     if (r_disabled_hint) {
       *r_disabled_hint = TIP_("Node group has different type");
     }
     return false;
   }
+
+  /* A corrupt/custom tree can already contain a cycle before RNA validation.
+   * Never recurse indefinitely through its instance polls. Normal shader trees
+   * retain a generous depth limit; desktop layouts deliberately bound theirs. */
+  static thread_local const bNodeTree *poll_stack[64] = {};
+  static thread_local int poll_depth = 0;
+  const int depth_limit = nodetree->type == NTREE_CUSTOM ? 16 : 64;
+  bool recursive = poll_depth >= depth_limit;
+  for (int i = 0; i < poll_depth && !recursive; i++) {
+    recursive = poll_stack[i] == grouptree;
+  }
+  if (recursive) {
+    if (r_disabled_hint) {
+      *r_disabled_hint = TIP_("Recursive or overly nested node group is not allowed");
+    }
+    return false;
+  }
+  poll_stack[poll_depth++] = grouptree;
+  struct PollStackGuard {
+    const bNodeTree **stack;
+    int &depth;
+    ~PollStackGuard()
+    {
+      stack[--depth] = nullptr;
+    }
+  } guard{poll_stack, poll_depth};
 
   for (const bNode *node : grouptree->all_nodes()) {
     if (node->typeinfo->poll_instance &&
@@ -295,6 +323,16 @@ void node_group_declare_dynamic(const bNodeTree & /*node_tree*/,
 }
 
 }  // namespace blender::nodes
+
+void register_node_type_custom_group(bNodeType *ntype)
+{
+  ntype->type = NODE_CUSTOM_GROUP;
+  ntype->nclass = NODE_CLASS_GROUP;
+  if (ntype->insert_link == nullptr) {
+    ntype->insert_link = node_insert_link_default;
+  }
+  ntype->declare_dynamic = blender::nodes::node_group_declare_dynamic;
+}
 
 /** \} */
 

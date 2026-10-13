@@ -24,6 +24,9 @@ typedef struct ScreenAnimData {
   int nextfra;                /* next frame to go to (when ANIMPLAY_FLAG_USE_NEXT_FRAME is set) */
   double lagging_frame_count; /* used for frame dropping */
   bool from_anim_edit;        /* playback was invoked from animation editor */
+  /** Value snapshot only: remains safe after focus changes or the editor closes. */
+  bool use_local_range;
+  int local_range_start, local_range_end;
 } ScreenAnimData;
 
 /** #ScreenAnimData.flag */

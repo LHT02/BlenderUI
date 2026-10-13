@@ -14,6 +14,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_dynstr.h"
+
 #include "BKE_context.h"
 #include "BKE_gpencil_legacy.h"
 #include "BKE_lib_id.h"
@@ -244,12 +246,8 @@ static SpaceLink *node_create(const ScrArea * /*area*/, const Scene * /*scene*/)
   /* backdrop */
   snode->zoom = 1.0f;
 
-  /* select the first tree type for valid type */
-  NODE_TREE_TYPES_BEGIN (treetype) {
-    strcpy(snode->tree_idname, treetype->idname);
-    break;
-  }
-  NODE_TREE_TYPES_END;
+  /* BLUI's custom tree is registered by startup Python before first draw. */
+  STRNCPY(snode->tree_idname, "BLUIDesktopTree");
 
   /* header */
   ARegion *region = MEM_cnew<ARegion>("header for node");
@@ -257,6 +255,11 @@ static SpaceLink *node_create(const ScrArea * /*area*/, const Scene * /*scene*/)
   BLI_addtail(&snode->regionbase, region);
   region->regiontype = RGN_TYPE_HEADER;
   region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+
+  region = MEM_cnew<ARegion>("BLUI desktop taskbar");
+  BLI_addtail(&snode->regionbase, region);
+  region->regiontype = RGN_TYPE_FOOTER;
+  region->alignment = RGN_ALIGN_BOTTOM;
 
   /* buttons/list view */
   region = MEM_cnew<ARegion>("buttons for node");
@@ -721,9 +724,80 @@ static void node_id_path_drop_copy(bContext * /*C*/, wmDrag *drag, wmDropBox *dr
 }
 
 /* this region dropbox definition */
+static int blui_canvas_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  /* Dropbox registration precedes startup Python. Resolve the Python action only on drop. */
+  if (!WM_operatortype_find("WM_OT_blui_canvas_drop", true)) {
+    return OPERATOR_CANCELLED;
+  }
+  char *paths = RNA_string_get_alloc(op->ptr, "paths", nullptr, 0, nullptr);
+  PointerRNA props;
+  WM_operator_properties_create(&props, "WM_OT_blui_canvas_drop");
+  RNA_string_set(&props, "paths", paths);
+  MEM_freeN(paths);
+  ARegion *region = CTX_wm_region(C);
+  if (event && region) {
+    float location[2];
+    UI_view2d_region_to_view(&region->v2d,
+                             event->xy[0] - region->winrct.xmin,
+                             event->xy[1] - region->winrct.ymin,
+                             &location[0], &location[1]);
+    location[0] /= UI_SCALE_FAC;
+    location[1] /= UI_SCALE_FAC;
+    RNA_float_set_array(&props, "drop_location", location);
+    RNA_boolean_set(&props, "has_drop_location", true);
+    RNA_boolean_set(&props, "copy", (event->modifier & KM_CTRL) != 0);
+  }
+  /* Forward the actual drop event, not a possibly stale destination eventstate. */
+  const int result = WM_operator_name_call(C, "WM_OT_blui_canvas_drop", WM_OP_EXEC_DEFAULT, &props, nullptr);
+  WM_operator_properties_free(&props);
+  return result;
+}
+
+void NODE_OT_blui_canvas_drop(wmOperatorType *ot)
+{
+  ot->name = "Add Files to Canvas";
+  ot->idname = "NODE_OT_blui_canvas_drop";
+  ot->description = "Add file references without moving the original files";
+  ot->invoke = blui_canvas_drop_invoke;
+  ot->poll = ED_operator_node_active;
+  ot->flag = OPTYPE_INTERNAL;
+  PropertyRNA *prop = RNA_def_string(ot->srna, "paths", nullptr, 0, "Paths", "Dropped file paths");
+  RNA_def_property_flag(prop, PropertyFlag(PROP_HIDDEN | PROP_SKIP_SAVE));
+}
+
+static bool blui_canvas_drop_poll(bContext *C, wmDrag *drag, const wmEvent * /*event*/)
+{
+  const SpaceNode *space = CTX_wm_space_node(C);
+  return space && space->nodetree && STREQ(space->tree_idname, "BLUIDesktopTree") && drag->type == WM_DRAG_PATH;
+}
+
+static void blui_canvas_drop_copy(bContext * /*C*/, wmDrag *drag, wmDropBox *drop)
+{
+  const wmDragPath *data = static_cast<wmDragPath *>(drag->poin);
+  DynStr *paths = BLI_dynstr_new();
+  if (data && data->paths_len > 0) {
+    for (int i = 0; i < MIN2(data->paths_len, 1000); i++) {
+      if (i) {
+        BLI_dynstr_append(paths, "\n");
+      }
+      BLI_dynstr_append(paths, data->paths[i]);
+    }
+  }
+  else if (const char *path = WM_drag_get_path(drag)) {
+    BLI_dynstr_append(paths, path);
+  }
+  char *value = BLI_dynstr_get_cstring(paths);
+  RNA_string_set(drop->ptr, "paths", value);
+  MEM_freeN(value);
+  BLI_dynstr_free(paths);
+}
+
 static void node_dropboxes()
 {
   ListBase *lb = WM_dropboxmap_find("Node Editor", SPACE_NODE, RGN_TYPE_WINDOW);
+
+  WM_dropbox_add(lb, "NODE_OT_blui_canvas_drop", blui_canvas_drop_poll, blui_canvas_drop_copy, nullptr, nullptr);
 
   WM_dropbox_add(lb,
                  "NODE_OT_add_object",
@@ -1032,7 +1106,11 @@ static void node_space_subtype_item_extend(bContext *C, EnumPropertyItem **item,
 {
   bool free;
   const EnumPropertyItem *item_src = RNA_enum_node_tree_types_itemf_impl(C, &free);
-  RNA_enum_items_add(item, totitem, item_src);
+  for (const EnumPropertyItem *entry = item_src; entry->identifier; entry++) {
+    if (STREQ(entry->identifier, "BLUIDesktopTree")) {
+      RNA_enum_item_add(item, totitem, entry);
+    }
+  }
   if (free) {
     MEM_freeN((void *)item_src);
   }
@@ -1168,6 +1246,16 @@ void ED_spacetype_node()
   art->init = node_header_region_init;
   art->draw = node_header_region_draw;
 
+  BLI_addhead(&st->regiontypes, art);
+
+  /* regions: listview/buttons */
+  art = MEM_cnew<ARegionType>("BLUI taskbar region");
+  art->regionid = RGN_TYPE_FOOTER;
+  art->prefsizey = HEADERY;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_HEADER;
+  art->listener = node_region_listener;
+  art->init = node_header_region_init;
+  art->draw = node_header_region_draw;
   BLI_addhead(&st->regiontypes, art);
 
   /* regions: listview/buttons */

@@ -3831,7 +3831,7 @@ void uiTemplateColorRamp(uiLayout *layout, PointerRNA *ptr, const char *propname
 /** \name Icon Template
  * \{ */
 
-void uiTemplateIcon(uiLayout *layout, int icon_value, float icon_scale)
+void uiTemplateIcon(uiLayout *layout, int icon_value, float icon_scale, const char *filepath)
 {
   uiBlock *block = uiLayoutAbsoluteBlock(layout);
   uiBut *but = uiDefIconBut(block,
@@ -3849,6 +3849,9 @@ void uiTemplateIcon(uiLayout *layout, int icon_value, float icon_scale)
                             0.0,
                             "");
   ui_def_but_icon(but, icon_value, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
+  if (filepath && filepath[0]) {
+    UI_but_drag_set_path(but, filepath);
+  }
 }
 
 /** \} */

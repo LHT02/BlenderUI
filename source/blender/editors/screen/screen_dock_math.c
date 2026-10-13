@@ -142,18 +142,24 @@ static ScreenDockTarget docking_target(ScreenDockState *state, const wmEvent *ev
 
 void screen_dock_update(bContext *C, ScreenDockState *state, const wmEvent *event)
 {
-  (void)C;
   state->target_window = WM_window_find_under_cursor(
       state->source_window, event->xy, state->current);
-  state->target = state->target_window ?
-                      BKE_screen_find_area_xy(WM_window_get_active_screen(state->target_window),
-                                              SPACE_TYPE_ANY,
-                                              state->current) :
+  if (state->target_window &&
+      BLI_findindex(&CTX_wm_manager(C)->windows, state->target_window) == -1)
+  {
+    state->target_window = NULL;
+  }
+  const bScreen *target_screen = state->target_window ?
+                                     WM_window_get_active_screen(state->target_window) :
+                                     NULL;
+  state->target = target_screen ?
+                      BKE_screen_find_area_xy(target_screen, SPACE_TYPE_ANY, state->current) :
                       NULL;
-  if (!state->target_window || !state->target || ED_area_is_global(state->target) ||
-      WM_window_get_active_screen(state->target_window)->temp)
+  if (!target_screen || !state->target || ED_area_is_global(state->target) ||
+      target_screen->temp || target_screen->state != SCREENNORMAL)
   {
     state->target = NULL;
+    state->target_window = NULL;
   }
   state->join_direction = SCREEN_DIR_NONE;
   state->dock_target = SCREEN_DOCK_NONE;
@@ -187,7 +193,7 @@ int screen_dock_cursor(const ScreenDockState *state, const wmEvent *event)
     return event->xy[0] < 0 || event->xy[1] < 0 ||
                    event->xy[0] > WM_window_pixels_x(state->source_window) ||
                    event->xy[1] > WM_window_pixels_y(state->source_window) ?
-               WM_CURSOR_EDIT :
+               WM_CURSOR_PICK_AREA :
                WM_CURSOR_STOP;
   }
   if (state->source == state->target) {

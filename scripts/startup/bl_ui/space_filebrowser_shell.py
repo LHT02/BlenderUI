@@ -84,7 +84,12 @@ def session(context, retry=False):
     entries = [entry for entry in (getattr(context, 'selected_files', None) or ())
                if entry.relative_path not in {'', '.', '..'}]
     paths = selected_paths(context) or [os.path.normpath(directory(context))]
-    folders = not entries or all(entry.is_directory for entry in entries)
+    if context.space_data and context.space_data.type == 'NODE_EDITOR':
+        from blui_desktop.file_actions import selected_nodes
+        nodes = selected_nodes(context)
+        folders = bool(nodes) and all(node.folder for node in nodes)
+    else:
+        folders = not entries or all(entry.is_directory for entry in entries)
     try:
         result = shell_client.get_session(paths, retry=retry, folders=folders)
         ensure_tick()

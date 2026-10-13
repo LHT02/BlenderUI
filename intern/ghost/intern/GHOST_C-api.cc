@@ -431,6 +431,19 @@ GHOST_WindowHandle GHOST_CreateWindow(GHOST_SystemHandle systemhandle,
                                                   (GHOST_IWindow *)parent_windowhandle);
 }
 
+void *GHOST_GetNativeWindowHandle(GHOST_WindowHandle windowhandle)
+{
+  if (!windowhandle) {
+    return nullptr;
+  }
+#ifdef WIN32
+  /* Win32 does not override the generic (null) getOSWindow implementation. */
+  return ((GHOST_WindowWin32 *)windowhandle)->getHWND();
+#else
+  return ((GHOST_IWindow *)windowhandle)->getOSWindow();
+#endif
+}
+
 GHOST_TUserDataPtr GHOST_GetWindowUserData(GHOST_WindowHandle windowhandle)
 {
   GHOST_IWindow *window = (GHOST_IWindow *)windowhandle;

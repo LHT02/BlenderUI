@@ -28,11 +28,11 @@ COMPONENTS = [
     "PREFERENCES",
 ]
 MACHINERY = ["EMPTY", "INFO", "TOPBAR", "STATUSBAR"]
+OPTIONAL_COMPONENTS = ["NODE_EDITOR"]  # Native desktop canvas is opt-in, not a replaced startup.
 
 # Editors that exist in Blender 3.6 and must not be reachable in BLUI.
 REMOVED = [
     "VIEW_3D",
-    "NODE_EDITOR",
     "CLIP_EDITOR",
     "DOPESHEET_EDITOR",
     "GRAPH_EDITOR",
@@ -61,7 +61,7 @@ print("BLUI editor set")
 area_type = enum_ids(bpy.types.Area.bl_rna.properties["type"])
 print("  Area.type enum: %s" % ", ".join(area_type))
 
-for identifier in COMPONENTS:
+for identifier in COMPONENTS + OPTIONAL_COMPONENTS:
     report(identifier in area_type, "component %r is an area type" % identifier)
 for identifier in REMOVED:
     report(identifier not in area_type, "removed editor %r is not an area type" % identifier)
@@ -83,7 +83,7 @@ else:
     print("  editor-type menu: %s" % ", ".join(op_type))
     for identifier in REMOVED:
         report(identifier not in op_type, "removed editor %r is not in the menu" % identifier)
-    for identifier in COMPONENTS:
+    for identifier in COMPONENTS + OPTIONAL_COMPONENTS:
         report(identifier in op_type, "component %r is in the menu" % identifier)
 
 # 3. A panel can only be registered for a space type that exists in that array,
@@ -104,7 +104,7 @@ for workspace in bpy.data.workspaces:
 
 print("  areas in the startup file: %s" % ", ".join(sorted(seen)))
 for identifier in sorted(seen):
-    report(identifier in COMPONENTS, "area type %r is a BLUI component" % identifier)
+    report(identifier in COMPONENTS + OPTIONAL_COMPONENTS, "area type %r is a BLUI component" % identifier)
 for identifier in COMPONENTS:
     report(identifier in seen, "component %r has a workspace" % identifier)
 

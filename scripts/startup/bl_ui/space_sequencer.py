@@ -13,6 +13,7 @@ from bl_ui.space_toolsystem_common import (
     ToolActivePanelHelper,
 )
 from rna_prop_ui import PropertyPanel
+from blui_explorer.localization import iface as blui_iface
 
 
 def _space_view_types(st):
@@ -158,6 +159,13 @@ class SEQUENCER_HT_header(Header):
         layout.prop(st, "view_type", text="")
 
         SEQUENCER_MT_editor_menus.draw_collapsible(context, layout)
+
+        row = layout.row(align=True)
+        row.prop(st, "timeline_start", text=blui_iface("Editor Start"), translate=False)
+        row.prop(st, "timeline_end", text=blui_iface("Editor End"), translate=False)
+        row.operator("screen.frame_jump", text="", icon='REW').end = False
+        row.operator("screen.animation_play", text="", icon='PAUSE' if context.screen.is_animation_playing else 'PLAY')
+        row.operator("screen.frame_jump", text="", icon='FF').end = True
 
         layout.separator_spacer()
 
@@ -342,15 +350,14 @@ class SEQUENCER_MT_range(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("anim.previewrange_set", text="Set Preview Range")
-        layout.operator("sequencer.set_range_to_strips", text="Set Preview Range to Strips").preview = True
-        layout.operator("anim.previewrange_clear", text="Clear Preview Range")
+        layout.operator("anim.previewrange_set", text=blui_iface("Set Editor Range"), translate=False)
+        layout.operator("sequencer.set_range_to_strips", text=blui_iface("Set Editor Range to Strips"), translate=False)
+        layout.operator("anim.previewrange_clear", text=blui_iface("Reset Editor Range"), translate=False)
 
         layout.separator()
 
         layout.operator("anim.start_frame_set", text="Set Start Frame")
         layout.operator("anim.end_frame_set", text="Set End Frame")
-        layout.operator("sequencer.set_range_to_strips", text="Set Frame Range to Strips")
 
 
 class SEQUENCER_MT_preview_zoom(Menu):
@@ -1078,7 +1085,7 @@ class SEQUENCER_MT_context_menu(Menu):
 
         layout.separator()
 
-        layout.operator("sequencer.set_range_to_strips", text="Set Preview Range to Strips").preview = True
+        layout.operator("sequencer.set_range_to_strips", text=blui_iface("Set Editor Range to Strips"), translate=False)
 
         layout.separator()
 
@@ -2342,6 +2349,22 @@ class SEQUENCER_PT_preview(SequencerButtonsPanel_Output, Panel):
             col.prop(render, "use_sequencer_override_scene_strip")
 
 
+class SEQUENCER_PT_editor_range(Panel):
+    bl_space_type = 'SEQUENCE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "View"
+    bl_label = "Editor Playback Range"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        layout.prop(context.space_data, "timeline_start")
+        layout.prop(context.space_data, "timeline_end")
+        layout.label(text=blui_iface("Range edits do not affect other editors"), icon='INFO', translate=False)
+        layout.operator("anim.previewrange_clear", text=blui_iface("Reset Editor Range"), translate=False)
+
+
 class SEQUENCER_PT_view(SequencerButtonsPanel_Output, Panel):
     bl_label = "View Settings"
     bl_category = "View"
@@ -2670,6 +2693,7 @@ classes = (
     SEQUENCER_PT_custom_props,
 
     SEQUENCER_PT_view,
+    SEQUENCER_PT_editor_range,
     SEQUENCER_PT_view_cursor,
     SEQUENCER_PT_frame_overlay,
     SEQUENCER_PT_view_safe_areas,

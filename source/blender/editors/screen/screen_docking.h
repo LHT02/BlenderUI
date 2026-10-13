@@ -17,6 +17,9 @@ typedef enum ScreenDockTarget {
 
 typedef struct ScreenDockState {
   ScrArea *source, *target;
+  wmWindowManager *manager;
+  bScreen *source_screen;
+  SpaceLink *source_space;
   wmWindow *source_window, *target_window, *draw_window;
   eScreenDir join_direction;
   eScreenAxis split_direction;
