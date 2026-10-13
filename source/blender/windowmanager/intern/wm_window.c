@@ -1134,6 +1134,24 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   wmWindowManager *wm = CTX_wm_manager(C);
 
+  /* Tray callbacks arrive between draws, when the context window is deliberately NULL.
+   * That does not mean there are no live windows: reusing a workspace's screen below
+   * would then make two windows share region buffers and redraw flags (one stays blank).
+   * Resolve a real copy source before deciding whether the no-window path is needed. */
+  if (win_src == NULL) {
+    if (wm->winactive && wm->winactive->ghostwin) {
+      win_src = wm->winactive;
+    }
+    else {
+      LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
+        if (window->ghostwin) {
+          win_src = window;
+          break;
+        }
+      }
+    }
+  }
+
   /* Which component the new window should show. Blender treats workspaces as
    * tabs within one document; BLUI has no such document, so naming one is how
    * "open Settings" becomes a window rather than a tab.
@@ -1230,7 +1248,8 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  if (win_src != NULL && workspace != NULL) {
+  if (win_src != NULL && workspace != NULL &&
+      WM_window_get_active_layout(win_src) != workspace->layouts.first) {
     BKE_workspace_active_set(win_new->workspace_hook, workspace);
 
     /* The layout the copy brought over belongs to the source workspace, so this
@@ -1242,6 +1261,18 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
           bmain, workspace, layout_src, win_new);
       BKE_workspace_active_layout_set(
           win_new->workspace_hook, win_new->winid, workspace, layout_new);
+    }
+  }
+
+  /* Copied regions intentionally have no draw buffers, but can inherit cleared
+   * redraw flags from the source. Rebuild every region, including headers which
+   * do not listen to the file-list refresh notification, for the first frame. */
+  bScreen *screen_new = WM_window_get_active_screen(win_new);
+  if (screen_new != NULL) {
+    screen_new->do_refresh = true;
+    screen_new->do_draw = true;
+    LISTBASE_FOREACH (ScrArea *, area, &screen_new->areabase) {
+      ED_area_tag_redraw(area);
     }
   }
 

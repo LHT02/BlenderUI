@@ -299,6 +299,17 @@ def check_preset(name, path):
             % (name, len(keymaps), expected_keymaps),
         )
 
+    gesture = kc.keymaps.get('Gesture Box')
+    report(gesture is not None and gesture.is_modal,
+           "preset %r has the native box gesture modal map" % name)
+    if gesture is not None:
+        for key, value, action in (('LEFTMOUSE', 'RELEASE', 'SELECT'),
+                                   ('ESC', 'PRESS', 'CANCEL'),
+                                   ('RIGHTMOUSE', 'PRESS', 'CANCEL')):
+            report(any(item.active and item.type == key and item.value == value and
+                       item.propvalue == action for item in gesture.keymap_items),
+                   "preset %r box gesture maps %s %s to %s" % (name, key, value, action))
+
     dangling = scan_dangling(kc)
     expected = MEASURED_DANGLING_BINDINGS.get(name)
     if expected == 0:

@@ -339,7 +339,10 @@ void file_on_reload_callback_register(SpaceFile *sfile,
 
 static void file_on_reload_callback_call(SpaceFile *sfile)
 {
-  if (sfile->runtime->on_reload == NULL) {
+  /* A newly copied screen can receive another browser's job-finished notifier
+   * before its first area initialization. Such a clone has no runtime and has
+   * not registered a reload callback; the first refresh will initialize it. */
+  if (sfile->runtime == NULL || sfile->runtime->on_reload == NULL) {
     return;
   }
 

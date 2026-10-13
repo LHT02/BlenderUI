@@ -3918,9 +3918,10 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
 
   /* assign map to operators */
   /* BLUI only assigns this to operators that exist: the 3D viewport, clip
-   * editor, node editor, graph editor and dope sheet are not registered, so
+   * editor, graph editor and dope sheet are not registered, so
    * naming their operators here would be a startup error. */
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_circle");
+  WM_modalkeymap_assign(keymap, "NODE_OT_select_circle");
 }
 
 /* straight line modal operators */
@@ -3979,6 +3980,10 @@ static void gesture_box_modal_keymap(wmKeyConfig *keyconf)
   WM_modalkeymap_assign(keymap, "ANIM_OT_previewrange_set");
   WM_modalkeymap_assign(keymap, "INFO_OT_select_box");
   WM_modalkeymap_assign(keymap, "FILE_OT_select_box");
+  /* The optional native desktop restores the node editor. Without this map,
+   * its box modal never receives SELECT/CANCEL on mouse release/Escape. */
+  WM_modalkeymap_assign(keymap, "NODE_OT_select_box");
+  WM_modalkeymap_assign(keymap, "NODE_OT_viewer_border");
   WM_modalkeymap_assign(keymap, "MARKER_OT_select_box");
   WM_modalkeymap_assign(keymap, "PAINT_OT_hide_show");
 #if 0 /* Template. */
@@ -4015,6 +4020,7 @@ static void gesture_lasso_modal_keymap(wmKeyConfig *keyconf)
    * `gesture_circle_modal_keymap`. */
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_stroke_cutter");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_lasso");
+  WM_modalkeymap_assign(keymap, "NODE_OT_select_lasso");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_lasso_gesture");
 }
 
