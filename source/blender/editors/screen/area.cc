@@ -3341,8 +3341,7 @@ void ED_region_header_layout(const bContext *C, ARegion *region)
   const bool taskbar = window && window->blui_shell_role == WM_BLUI_SHELL_TASKBAR &&
                        region->regiontype == RGN_TYPE_WINDOW;
   /* The standalone bar uses double-size native icon buttons, not a 20px header. */
-  const int centered_height = taskbar ? 2 * buttony : buttony;
-  int yco = centered_height + (region->winy - centered_height) / 2;
+  int yco = buttony + (region->winy - buttony) / 2;
   int maxco = xco;
 
   /* XXX workaround for 1 px alignment issue. Not sure what causes it...
@@ -3386,6 +3385,9 @@ void ED_region_header_layout(const bContext *C, ARegion *region)
     }
 
     UI_block_layout_resolve(block, &xco, &yco);
+    if (taskbar) {
+      UI_block_center_y(block, region->winy / 2.0f);
+    }
 
     /* for view2d */
     if (xco > maxco) {

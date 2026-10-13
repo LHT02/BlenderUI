@@ -1258,6 +1258,20 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
 
   BLI_assert(but->optype != nullptr);
 
+  const bContext *context_ui = static_cast<const bContext *>(block->evil_C);
+  const wmWindow *shell_window = context_ui ? CTX_wm_window(context_ui) : nullptr;
+  if (shell_window && shell_window->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
+    if (shell_window->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
+      /* The taskbar's native tooltip is clipped by its thin HWND. Live previews
+       * and context actions belong to independent shell popup windows. */
+      UI_but_drawflag_enable(but, UI_BUT_NO_TOOLTIP);
+    }
+    else if (name[0]) {
+      but->emboss = UI_EMBOSS_PULLDOWN;
+      UI_but_drawflag_enable(but, UI_BUT_TEXT_LEFT);
+    }
+  }
+
   if (icon_preview) {
     ui_def_but_icon(but, icon, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
     UI_but_drawflag_disable(but, UI_BUT_ICON_LEFT);
@@ -3731,8 +3745,16 @@ static void ui_litem_estimate_row(uiLayout *litem)
   }
 }
 
-static int ui_litem_min_width(int itemw)
+static int ui_litem_min_width(const uiItem *item, int itemw)
 {
+  if (item->type == ITEM_BUTTON) {
+    const uiBut *but = ((const uiButtonItem *)item)->but;
+    if (but->type == UI_BTYPE_BUT && (but->flag & UI_BUT_ICON_PREVIEW)) {
+      /* Opt-in preview operators may be scaled beyond the normal 40px icon
+       * minimum. Keep their scaled square width instead of squeezing only X. */
+      return itemw;
+    }
+  }
   return MIN2(2 * UI_UNIT_X, itemw);
 }
 
@@ -3778,7 +3800,7 @@ static void ui_litem_layout_row(uiLayout *litem)
       }
 
       ui_item_size(item, &itemw, &itemh);
-      minw = ui_litem_min_width(itemw);
+      minw = ui_litem_min_width(item, itemw);
 
       if (w - lastw > 0) {
         neww = ui_item_fit(itemw, x, totw, w - lastw, !item->next, litem->alignment, &extra_pixel);
@@ -3827,7 +3849,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 
   LISTBASE_FOREACH (uiItem *, item, &litem->items) {
     ui_item_size(item, &itemw, &itemh);
-    minw = ui_litem_min_width(itemw);
+    minw = ui_litem_min_width(item, itemw);
 
     if (item->flag & UI_ITEM_AUTO_FIXED_SIZE) {
       /* fixed minimum size items */

@@ -2433,6 +2433,7 @@ static void rna_def_window(BlenderRNA *brna)
       {WM_BLUI_SHELL_TASKBAR, "TASKBAR", 0, "Taskbar", "Independent BLUI taskbar"},
       {WM_BLUI_SHELL_STARTMENU, "STARTMENU", 0, "Start Menu", "Independent start menu"},
       {WM_BLUI_SHELL_TASK_CHOOSER, "TASK_CHOOSER", 0, "Task Windows", "Application window chooser"},
+      {WM_BLUI_SHELL_TASK_PREVIEW, "TASK_PREVIEW", 0, "Window Previews", "Non-activating live window previews"},
       {0, NULL, 0, NULL, NULL},
   };
   prop = RNA_def_property(srna, "blui_shell_role", PROP_ENUM, PROP_NONE);

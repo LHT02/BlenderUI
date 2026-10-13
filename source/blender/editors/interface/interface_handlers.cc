@@ -11653,6 +11653,53 @@ static void ui_popup_handler_remove(bContext *C, void *userdata)
   ui_apply_but_funcs_after(C);
 }
 
+static constexpr bool ui_button_state_has_modal_interaction(const uiHandleButtonState state)
+{
+  switch (state) {
+    case BUTTON_STATE_HIGHLIGHT:
+    case BUTTON_STATE_EXIT:
+      return false;
+    default:
+      return true;
+  }
+}
+
+static_assert(!ui_button_state_has_modal_interaction(BUTTON_STATE_HIGHLIGHT));
+static_assert(!ui_button_state_has_modal_interaction(BUTTON_STATE_EXIT));
+static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_TEXT_EDITING));
+static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_TEXT_SELECTING));
+static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_NUM_EDITING));
+static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_WAIT_RELEASE));
+static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_WAIT_DRAG));
+static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_MENU_OPEN));
+
+bool UI_handler_has_modal_interaction(const wmEventHandler_UI *handler, const wmWindow *window)
+{
+  if (!handler || !window || handler->head.type != WM_HANDLER_TYPE_UI ||
+      handler->handle_fn != ui_handler_region_menu || handler->remove_fn != nullptr ||
+      handler->user_data == nullptr)
+  {
+    /* Popup/panel-drag/custom callbacks have other userdata types. Never cast
+     * them to button data, and never treat an unrecognized handler as idle. */
+    return true;
+  }
+  if (handler->head.flag & WM_HANDLER_DO_FREE) {
+    /* Removal is postponed, but button_activate_exit may already have freed
+     * the userdata. This handler cannot run again: do not dereference it. */
+    return false;
+  }
+
+  /* The sole registration of this exact callback/remove pair in
+   * button_activate_state always supplies live uiHandleButtonData. */
+  const uiHandleButtonData *data = static_cast<const uiHandleButtonData *>(handler->user_data);
+  if (data->window != window || handler->context.menu || data->menu || data->searchbox ||
+      data->custom_interaction_handle)
+  {
+    return true;
+  }
+  return ui_button_state_has_modal_interaction(data->state);
+}
+
 void UI_region_handlers_add(ListBase *handlers)
 {
   WM_event_remove_ui_handler(

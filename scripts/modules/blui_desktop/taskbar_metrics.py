@@ -9,7 +9,7 @@ UI_UNIT = 20
 MAX_ICONS = 64
 
 
-def icon_capacity(width, ui_scale):
+def icon_capacity(width, ui_scale, *, icon_size=32, side_width=SIDE_UNITS * UI_UNIT):
     """Fit app buttons, keeping both side blocks, Start and overflow available.
 
     ``width`` is the region width in pixels; ``ui_scale`` converts logical UI
@@ -23,7 +23,12 @@ def icon_capacity(width, ui_scale):
             not math.isfinite(ui_scale) or ui_scale <= 0):
         raise ValueError('Invalid taskbar UI scale')
     logical_width = width / ui_scale
-    reserved = 2 * SIDE_UNITS * UI_UNIT + 2 * BUTTON_SIZE
-    if logical_width >= reserved + MAX_ICONS * BUTTON_SIZE:
+    if type(icon_size) is not int or not 16 <= icon_size <= 64:
+        raise ValueError('Invalid taskbar icon size')
+    if type(side_width) not in (int, float) or not math.isfinite(side_width) or side_width < 0:
+        raise ValueError('Invalid taskbar side width')
+    button = icon_size + 8
+    reserved = 2 * side_width + 2 * button
+    if logical_width >= reserved + MAX_ICONS * button:
         return MAX_ICONS
-    return max(1, min(MAX_ICONS, int(max(0, logical_width - reserved) // BUTTON_SIZE)))
+    return max(1, min(MAX_ICONS, int(max(0, logical_width - reserved) // button)))

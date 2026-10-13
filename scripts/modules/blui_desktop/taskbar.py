@@ -3,8 +3,9 @@
 # Design reference, not copied implementation:
 # https://github.com/dremin/RetroBar (Apache-2.0, WPF + ManagedShell)
 # https://github.com/cairoshell/ManagedShell/blob/master/src/ManagedShell.AppBar/ExplorerHelper.cs
-# BLUI deliberately preserves system AppBar/autohide/workarea settings; its native
-# independent native taskbar is not a notification-area host or registered shell AppBar.
+# This recovery guard preserves Explorer's AppBar/autohide/workarea settings.
+# The independent BLUI bar now reserves its own AppBar space via taskbar_appbar,
+# and notification_client owns the separate notification receiver.
 import atexit
 from collections import deque
 import json

@@ -44,6 +44,8 @@ def groups(tasks, *, monitor='', all_monitors=True, excluded=()):
             executable = task.get('executable', '')
             name = (ntpath.splitext(ntpath.basename(executable))[0] if executable_path(executable)
                     else task.get('title', '') or task.get('window_class', 'Application'))
+            if task.get('app_id'):
+                name = task.get('title', '') or name
             group = {'key': key, 'title': name, 'executable': executable,
                      'app_id': task.get('app_id', ''), 'tasks': [], 'active': False}
             lookup[key] = group

@@ -125,6 +125,14 @@ def interaction_busy(tree):
     return any(window.blui_has_modal_interaction for window in bpy.context.window_manager.windows)
 
 
+def shell_interaction_busy():
+    # Private INFO/WM shell lists never mutate document/node RNA. An ordinary
+    # hover in a NORMAL editor must not starve their async updates. Native shell
+    # classification still protects editing, popups, dragging and held buttons.
+    return any(window.blui_shell_role != 'NORMAL' and window.blui_has_modal_interaction
+               for window in bpy.context.window_manager.windows)
+
+
 @persistent
 def cancel_pending(_dummy=None):
     # Undo/file loading replaces Main/RNA identities. Never apply old results to a new Main.
@@ -145,6 +153,12 @@ def cancel_pending(_dummy=None):
     start_menu.close()
     from . import folder_panels
     folder_panels.close()
+    from . import shell_hover, taskbar_previews, taskbar_appbar, taskbar_settings, notification_client
+    shell_hover.close()
+    taskbar_previews.close_all()
+    taskbar_appbar.close_all()
+    taskbar_settings.shutdown()
+    notification_client.close()
     from .file_actions import clear_drag
     clear_drag()
 
@@ -161,6 +175,15 @@ def tick():
     folder_panels.tick(__import__(__name__, fromlist=['']), live)
     from . import start_menu
     start_menu.tick()
+    from . import taskbar_settings, taskbar_options_ui, notification_client, session
+    if service_live:
+        taskbar_settings.service_tick(session.storage_directory())
+        taskbar_options_ui.sync()
+    if taskbar_windows.role_windows('TASKBAR') and not session.disable_for_tests:
+        notification_client.start()
+    elif not taskbar_windows.role_windows('TASKBAR'):
+        notification_client.close()
+    notification_client.poll()
     if not bpy.context.window_manager.blui_has_path_drag:
         from .file_actions import clear_drag
         clear_drag()
@@ -271,6 +294,12 @@ def tick():
                 _task_error = str(exc)
                 _shell_retry_due = time.monotonic() + 3.0
         state = taskbar.tick()
+        from . import shell_hover
+        try:
+            shell_hover.tick()
+        except (RuntimeError, OSError, ValueError, ReferenceError) as exc:
+            _task_error = str(exc)
+            shell_hover.close()
         if state.get('tasks_revision', 0) != globals().get('_task_revision', 0):
             globals()['_task_revision'] = state['tasks_revision']
             _last_tasks = 0
@@ -280,7 +309,11 @@ def tick():
                 _last_monitors = time.monotonic()
             except RuntimeError:
                 pass
-        if not interaction_busy(None) and not any(action == 'icons' for _job, action, _id, _gen in _jobs):
+        # Icon admission only consumes RAM and starts an isolated job; it never
+        # changes Node/Area RNA. A lingering NORMAL hover must not starve shell
+        # application/Start icons. Node and thumbnail guards stay conservative.
+        icons_allowed = not interaction_busy(None) or (shell and not shell_interaction_busy())
+        if icons_allowed and not any(action == 'icons' for _job, action, _id, _gen in _jobs):
             paths = icon_cache.pending()
             if paths:
                 try:
@@ -303,14 +336,20 @@ def tick():
                         _background_due[key] = time.monotonic() + 30
                     except RuntimeError:
                         break
-    for _window, area in live + shell:
-        area.tag_redraw()
-    return .1 if _jobs or _ready or start_menu.busy() else 1.0
+    # Shell services may close a popup during this tick. Never dereference
+    # areas captured before those closures (RNA Window/Screen may already be freed).
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'NODE_EDITOR' or window.blui_shell_role != 'NORMAL':
+                area.tag_redraw()
+    return .1 if shell or _jobs or _ready or start_menu.busy() else 1.0
 
 
 def register():
-    from . import start_menu_ui, taskbar_windows
+    from . import start_menu_ui, taskbar_windows, taskbar_options_ui, notification_ui
     start_menu_ui.register_props()
+    taskbar_options_ui.register_props()
+    notification_ui.register_props()
     taskbar_windows.register()
     background.register(monitor_snapshot)
     for handlers in (bpy.app.handlers.undo_pre, bpy.app.handlers.redo_pre, bpy.app.handlers.load_pre):
@@ -362,10 +401,12 @@ def register():
 
 
 def unregister():
-    from . import start_menu_ui, taskbar, taskbar_windows
+    from . import start_menu_ui, taskbar, taskbar_windows, taskbar_options_ui, notification_ui
     taskbar_windows.close()
     taskbar_windows.unregister()
     start_menu_ui.unregister_props()
+    taskbar_options_ui.unregister_props()
+    notification_ui.unregister_props()
     taskbar.close()
     background.unregister()
     if bpy.app.timers.is_registered(tick):

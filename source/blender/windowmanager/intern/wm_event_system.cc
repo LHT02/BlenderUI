@@ -4518,7 +4518,14 @@ bool WM_window_has_modal_interaction(const wmWindow *win)
     }
     else if (handler->type == WM_HANDLER_TYPE_UI) {
       /* Active text fields and popups can retain node RNA pointers as well as transforms. */
-      return true;
+      if (win->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
+        /* Keep the original conservative Node/Canvas/normal editor guard. */
+        return true;
+      }
+      const wmEventHandler_UI *ui_handler = reinterpret_cast<const wmEventHandler_UI *>(handler);
+      if (UI_handler_has_modal_interaction(ui_handler, win)) {
+        return true;
+      }
     }
   }
   return false;

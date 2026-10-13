@@ -512,6 +512,13 @@ static void ui_block_bounds_calc_centered_pie(uiBlock *block)
   ui_block_bounds_calc(block);
 }
 
+void UI_block_center_y(uiBlock *block, float center_y)
+{
+  ui_block_bounds_calc(block);
+  const int delta = round_fl_to_int(center_y - (block->rect.ymin + block->rect.ymax) / 2.0f);
+  UI_block_translate(block, 0, delta);
+}
+
 static void ui_block_bounds_calc_popup(
     wmWindow *window, uiBlock *block, eBlockBoundsCalc bounds_calc, const int xy[2], int r_xy[2])
 {

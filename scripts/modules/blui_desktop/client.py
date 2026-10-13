@@ -40,9 +40,12 @@ def _validate_value(action, value):
     elif action == 'save':
         if not isinstance(value, str) or len(value) > 32768 or '\x00' in value:
             raise ValueError('Invalid desktop save result')
-    elif action in {'open', 'recycle', 'task_launch', 'start_state', 'start_launch', 'start_system'}:
+    elif action in {'open', 'recycle', 'task_launch', 'start_state', 'start_launch', 'start_system', 'start_location', 'taskbar_settings_save'}:
         if value is not True:
             raise ValueError('Invalid desktop open result')
+    elif action == 'taskbar_settings_load':
+        from . import taskbar_settings
+        taskbar_settings.validate(value)
     elif action == 'background':
         background.validate_pixels(value)
     elif action == 'previews':

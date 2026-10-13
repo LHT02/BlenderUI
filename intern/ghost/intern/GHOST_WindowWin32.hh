@@ -327,6 +327,11 @@ class GHOST_WindowWin32 : public GHOST_Window {
   GHOST_TTrackpadInfo getTrackpadInfo();
 
  private:
+  /* AppBar-only subclass; ordinary GHOST windows keep their original WndProc. */
+  static LRESULT CALLBACK bluiAppBarWndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  bool handleBluiAppBarMessage(UINT message, WPARAM wparam, LPARAM lparam);
+  void releaseBluiAppBar();
+
   /**
    * \param type: The type of rendering context create.
    * \return Indication of success.
@@ -371,6 +376,8 @@ class GHOST_WindowWin32 : public GHOST_Window {
   GHOST_DropTargetWin32 *m_dropTarget;
   /** Window handle. */
   HWND m_hWnd;
+  WNDPROC m_bluiAppBarPreviousProc;
+  bool m_bluiAppBarNotifying;
   /** Device context handle. */
   HDC m_hDC;
 

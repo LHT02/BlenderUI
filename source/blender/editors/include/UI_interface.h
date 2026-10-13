@@ -54,6 +54,7 @@ struct uiWidgetColors;
 struct wmDrag;
 struct wmDropBox;
 struct wmEvent;
+struct wmEventHandler_UI;
 struct wmGizmo;
 struct wmKeyConfig;
 struct wmKeyMap;
@@ -879,6 +880,8 @@ void UI_block_order_flip(uiBlock *block);
 void UI_block_flag_enable(uiBlock *block, int flag);
 void UI_block_flag_disable(uiBlock *block, int flag);
 void UI_block_translate(uiBlock *block, int x, int y);
+/** Center a resolved block vertically (standalone, variable-height taskbars). */
+void UI_block_center_y(uiBlock *block, float center_y);
 
 int UI_but_return_value_get(uiBut *but);
 
@@ -1970,6 +1973,13 @@ bool UI_panel_list_matches_data(struct ARegion *region,
  * as screen/ if ED_KEYMAP_UI is set, or internally in popup functions. */
 
 void UI_region_handlers_add(struct ListBase *handlers);
+/**
+ * Read-only modal classification for a shell window's existing UI handler.
+ * Ordinary button highlight/exit does not hold an active edit. Unknown
+ * callbacks, popups, search boxes and custom interactions remain conservative.
+ */
+bool UI_handler_has_modal_interaction(const struct wmEventHandler_UI *handler,
+                                      const struct wmWindow *window);
 void UI_popup_handlers_add(struct bContext *C,
                            struct ListBase *handlers,
                            uiPopupBlockHandle *popup,

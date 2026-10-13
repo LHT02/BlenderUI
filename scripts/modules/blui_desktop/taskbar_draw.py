@@ -2,7 +2,7 @@
 """Blender-native INFO Header/Panel content for independent taskbar and chooser windows."""
 from datetime import datetime
 from bpy.types import Header, Panel
-from . import icon_cache, runtime, taskbar_groups, taskbar_metrics, taskbar_windows
+from . import icon_cache, runtime, taskbar_groups, taskbar_metrics, taskbar_windows, taskbar_options_ui
 from .taskbar_actions import current_groups, find_group
 from blui_explorer.localization import iface
 
@@ -17,20 +17,30 @@ class BLUI_HT_standalone_taskbar(Header):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
         centered = taskbar_windows.alignment() == 'CENTER'
+        appearance = taskbar_options_ui.values(context)
+        button = appearance['icon_size'] + 8
+        scale = button / 40
+        # Start is always anchored left, outside the application group row.
+        from . import notification_ui
+        side_width = 96 + notification_ui.logical_width(maxicons=6)
+        start = layout.row(align=True)
+        start.ui_units_x = (side_width if centered else button + 16) / 20
+        start_button = start.row()
+        start_button.scale_x = start_button.scale_y = scale
+        start_button.operator('wm.blui_start_menu', text='', icon='BLENDER', icon_preview=True)
+        start.label(text='')
         if centered:
-            balance = layout.row(align=True)
-            balance.ui_units_x = taskbar_metrics.SIDE_UNITS
-            balance.label(text='')
             layout.separator_spacer()
         body = layout.row(align=True)
-        body.operator('wm.blui_start_menu', text='', icon='BLENDER', icon_preview=True)
         rows = current_groups(context.window)
         # A bounded native row never balloons a thin window into a screen-wide
         # text list. Overflow opens a full-height native chooser, not a clipped menu.
-        capacity = taskbar_metrics.icon_capacity(context.region.width, context.preferences.system.ui_scale)
+        capacity = taskbar_metrics.icon_capacity(context.region.width, context.preferences.system.ui_scale,
+            icon_size=appearance['icon_size'], side_width=side_width)
         for group in rows[:capacity]:
-            icon = icon_cache.value(group['executable'])
+            icon = icon_cache.application(group)
             entry = body.row(align=True)
+            entry.scale_x = entry.scale_y = scale
             entry.enabled = any(task.get('actionable') for task in group['tasks'])
             if icon:
                 op = entry.operator('wm.blui_taskbar_group', text='', icon_value=icon,
@@ -41,15 +51,17 @@ class BLUI_HT_standalone_taskbar(Header):
             op.key = group['key']
         if len(rows) > capacity:
             overflow = body.row(align=True)
-            overflow.scale_y = 2
+            overflow.scale_y = button / 20
             overflow.operator('wm.blui_taskbar_settings', text='…')
         layout.separator_spacer()
         right = layout.row(align=True)
-        right.ui_units_x = taskbar_metrics.SIDE_UNITS
-        right.scale_y = 2
-        right.operator_context = 'EXEC_DEFAULT'
-        right.operator('wm.blui_taskbar_settings', text='', icon='PREFERENCES')
-        right.operator('wm.blui_taskbar_settings', text=datetime.now().strftime('%H:%M'), emboss=False, translate=False)
+        right.ui_units_x = side_width / 20
+        notification_ui.draw_icons(right, context, maxicons=6, button_height=button)
+        controls = right.row(align=True)
+        controls.scale_y = button / 20
+        controls.operator_context = 'EXEC_DEFAULT'
+        controls.operator('wm.blui_taskbar_settings', text='', icon='PREFERENCES')
+        controls.operator('wm.blui_taskbar_settings', text=datetime.now().strftime('%H:%M'), emboss=False, translate=False)
 
 
 class BLUI_PT_taskbar_chooser(Panel):
@@ -66,11 +78,21 @@ class BLUI_PT_taskbar_chooser(Panel):
         state = taskbar_windows.menu_state(context.window)
         layout = self.layout
         layout.operator_context = 'EXEC_DEFAULT'
+        if state.get('kind') in {'TASK_CONTEXT', 'START_APP', 'START_CONTEXT'}:
+            from .shell_context_ui import draw_context
+            draw_context(layout, context, state)
+            return
+        if state.get('kind') == 'NOTIFICATION':
+            from .notification_ui import draw_notification
+            draw_notification(layout, context)
+            return
         heading = layout.row()
         heading.label(text=iface('Taskbar Settings') if state.get('kind') == 'SETTINGS' else iface('Application Windows'))
         op = heading.operator('wm.window_close', text='', icon='X')
         op.force_close = True
         if state.get('kind') == 'SETTINGS':
+            taskbar_options_ui.draw_settings(layout, context)
+            layout.separator()
             for mode, label in (('LEFT', 'Windows 10: Left'), ('CENTER', 'Windows 11: Center')):
                 op = layout.operator('wm.blui_taskbar_layout', text=iface(label),
                                      depress=taskbar_windows.alignment() == mode, translate=False)
@@ -98,7 +120,7 @@ class BLUI_PT_taskbar_chooser(Panel):
             for task in group['tasks']:
                 row = layout.row(align=True)
                 row.enabled = task.get('actionable', False)
-                icon = icon_cache.value(group['executable'])
+                icon = icon_cache.application(group)
                 kwargs = {'icon_value': icon} if icon else {'icon': 'WINDOW'}
                 op = row.operator('wm.blui_taskbar_pick', text=task['title'][:100],
                                   depress=task['active'], translate=False, **kwargs)

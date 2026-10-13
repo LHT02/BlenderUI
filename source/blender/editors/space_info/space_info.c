@@ -105,6 +105,11 @@ static void info_main_region_init(wmWindowManager *wm, ARegion *region)
     }
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       if (BLI_findindex(&area->regionbase, region) >= 0) {
+        /* Shell panels are fixed-DPI menus, not an Info report viewport. */
+        keymap = WM_keymap_ensure(wm->defaultconf, "View2D", 0, 0);
+        WM_event_remove_keymap_handler(&region->handlers, keymap);
+        keymap = WM_keymap_ensure(wm->defaultconf, "Frames", 0, 0);
+        WM_event_remove_keymap_handler(&region->handlers, keymap);
         if (window->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
           ED_region_header_init(region);
           keymap = WM_keymap_ensure(wm->defaultconf, "BLUI Taskbar", SPACE_INFO, RGN_TYPE_WINDOW);
@@ -113,8 +118,9 @@ static void info_main_region_init(wmWindowManager *wm, ARegion *region)
         }
         else {
           ED_region_panels_init(wm, region);
+          region->v2d.keepzoom |= V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y;
           keymap = WM_keymap_ensure(wm->defaultconf, "BLUI Shell Popup", SPACE_INFO, RGN_TYPE_WINDOW);
-          WM_event_add_keymap_handler(&region->handlers, keymap);
+          WM_event_add_keymap_handler_priority(&region->handlers, keymap, 0);
         }
         return;
       }
@@ -142,12 +148,15 @@ static void info_textview_update_rect(const bContext *C, ARegion *region)
 
 static int info_context(const bContext *C, const char *member, bContextDataResult *result)
 {
-  if (!CTX_data_equals(member, "blui_taskbar_button")) {
+  const bool taskbar_only = CTX_data_equals(member, "blui_taskbar_button");
+  const bool hover = CTX_data_equals(member, "blui_shell_hover_button");
+  if (!taskbar_only && !hover && !CTX_data_equals(member, "blui_shell_button")) {
     return CTX_RESULT_MEMBER_NOT_FOUND;
   }
   const wmWindow *window = CTX_wm_window(C);
   const ARegion *region = CTX_wm_region(C);
-  if (!window || window->blui_shell_role != WM_BLUI_SHELL_TASKBAR || !window->eventstate ||
+  if (!window || window->blui_shell_role == WM_BLUI_SHELL_NORMAL ||
+      (taskbar_only && window->blui_shell_role != WM_BLUI_SHELL_TASKBAR) || !window->eventstate ||
       !region || region->regiontype != RGN_TYPE_WINDOW)
   {
     return CTX_RESULT_NO_DATA;
@@ -156,7 +165,7 @@ static int info_context(const bContext *C, const char *member, bContextDataResul
    * Hit-test live UI blocks instead of reusing a previously clicked button. */
   /* eventstate may already contain a later queued mouse move. Use the press
    * being handled, so a quick move after clicking cannot launch another app. */
-  const wmEvent *event = window->event_queue.first;
+  const wmEvent *event = hover ? NULL : window->event_queue.first;
   const int *xy = event ? event->xy : window->eventstate->xy;
   const rcti point = {xy[0], xy[0] + 1, xy[1], xy[1] + 1};
   uiBut *button = UI_region_but_find_rect_over(region, &point);
@@ -175,7 +184,8 @@ static void info_main_region_draw(const bContext *C, ARegion *region)
     ED_region_header(C, region);
     return;
   }
-  if (window && ELEM(window->blui_shell_role, WM_BLUI_SHELL_STARTMENU, WM_BLUI_SHELL_TASK_CHOOSER)) {
+  if (window && ELEM(window->blui_shell_role, WM_BLUI_SHELL_STARTMENU,
+                     WM_BLUI_SHELL_TASK_CHOOSER, WM_BLUI_SHELL_TASK_PREVIEW)) {
     ED_region_panels(C, region);
     return;
   }

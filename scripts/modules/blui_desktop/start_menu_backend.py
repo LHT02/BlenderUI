@@ -19,7 +19,11 @@ from . import model, start_menu_model as schema
 
 _FOLDERS = {'user': 'A77F5D77-2E2B-44C3-A6A2-ABA601054A51',
             'common': '0139D44E-6AFE-49F2-8690-3DAFCAE6FFB8',
-            'profile': '5E6C858F-0E22-4760-9AFE-EA3317B67173'}
+            'profile': '5E6C858F-0E22-4760-9AFE-EA3317B67173',
+            'documents': 'FDD39AD0-238F-46AF-ADB4-6C85480369C7',
+            'pictures': '33E28130-4E1E-4676-835A-98395C3BC3BB',
+            'music': '4BD8D571-6D19-48D3-BE97-422220080E43',
+            'downloads': '374DE290-123F-4565-9164-39C4925E467B'}
 _REPARSE = 0x400
 MAX_ENTRIES = 8192
 MAX_DEPTH = 8
@@ -245,6 +249,17 @@ def start_launch(value):
     return True
 
 
+def start_location(value):
+    """Open only the containing Programs folder of an explicitly selected, rechecked app."""
+    if os.name != 'nt':
+        raise RuntimeError('Opening Windows program locations requires Windows')
+    path = validated_target(value)
+    with _file_guard(path):
+        validated_target(value)
+        os.startfile(os.path.dirname(path))
+    return True
+
+
 def _shutdown(restart):
     """User-confirmed shutdown without FORCE/FORCEIFHUNG, preserving Windows save prompts."""
     class Luid(ctypes.Structure):
@@ -283,6 +298,10 @@ def start_system(action):
         raise ValueError('Unsupported Start menu system action')
     if action == 'FILES':
         os.startfile(known_folder('profile'))
+    elif action in {'DOCUMENTS', 'PICTURES', 'MUSIC', 'DOWNLOADS'}:
+        os.startfile(known_folder(action.lower()))
+    elif action in {'COMPUTER', 'CONTROL_PANEL'}:
+        os.startfile('shell:MyComputerFolder' if action == 'COMPUTER' else 'shell:ControlPanelFolder')
     elif action in {'SETTINGS', 'POWER_SETTINGS'}:
         os.startfile('ms-settings:' if action == 'SETTINGS' else 'ms-settings:powersleep')
     elif action == 'LOCK':

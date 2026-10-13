@@ -207,6 +207,26 @@ class BackendTests(unittest.TestCase):
                 backend.start_launch(row)
             started.assert_not_called()
 
+    def test_open_location_rechecks_identity_without_launching_the_app(self):
+        row = self._row()
+        @contextmanager
+        def guard(path):
+            self.assertEqual(path, row['path'])
+            yield
+        with mock.patch.object(backend, '_program_roots', return_value=self.roots), \
+                mock.patch.object(backend, '_file_guard', guard), \
+                mock.patch.object(backend, 'validated_target', wraps=backend.validated_target) as checked, \
+                mock.patch.object(os, 'startfile', create=True) as started:
+            self.assertTrue(backend.start_location(row))
+            started.assert_called_once_with(os.path.dirname(row['path']))
+            self.assertEqual(checked.call_count, 2)
+        self._write('Tools/test.lnk', b'changed fixture')
+        with mock.patch.object(backend, '_program_roots', return_value=self.roots), \
+                mock.patch.object(os, 'startfile', create=True) as started:
+            with self.assertRaises(ValueError):
+                backend.start_location(row)
+            started.assert_not_called()
+
     @unittest.skipUnless(os.name == 'nt', 'The file identity guard is native Windows')
     def test_real_file_guard_denies_fixture_writes_but_permits_reads(self):
         row = self._row()
@@ -230,6 +250,16 @@ class BackendTests(unittest.TestCase):
             backend.start_system('SHUTDOWN')
             backend.start_system('RESTART')
             self.assertEqual(power.call_args_list, [mock.call(False), mock.call(True)])
+
+    def test_system_locations_use_known_folder_redirection_or_fixed_shell_names(self):
+        with mock.patch.object(backend, 'known_folder', side_effect=lambda kind: 'C:\\redirected\\' + kind), \
+                mock.patch.object(os, 'startfile', create=True) as started:
+            for action in ('FILES', 'DOCUMENTS', 'PICTURES', 'MUSIC', 'DOWNLOADS', 'COMPUTER', 'CONTROL_PANEL'):
+                self.assertTrue(backend.start_system(action))
+            self.assertEqual(started.call_args_list, [mock.call('C:\\redirected\\profile'),
+                mock.call('C:\\redirected\\documents'), mock.call('C:\\redirected\\pictures'),
+                mock.call('C:\\redirected\\music'), mock.call('C:\\redirected\\downloads'),
+                mock.call('shell:MyComputerFolder'), mock.call('shell:ControlPanelFolder')])
 
 
 class Job:
@@ -313,6 +343,20 @@ class FacadeTests(unittest.TestCase):
         self.assertIn('changed', start_menu.snapshot()['error'])
         self.assertEqual(start_menu.snapshot()['recent'], [program()['id']])
 
+    def test_open_location_uses_index_identity_and_does_not_record_app_usage(self):
+        self._load()
+        start_menu.open_location(program()['id'])
+        job = Job.instances[-1]
+        self.assertEqual(job.action, 'start_location')
+        self.assertEqual(job.args[0]['id'], program()['id'])
+        with self.assertRaises(RuntimeError):
+            start_menu.open_location(program()['id'])
+        job.complete(True)
+        start_menu.tick()
+        self.assertEqual(start_menu.snapshot()['recent'], [])
+        with self.assertRaises(ValueError):
+            start_menu.open_location(program('Removed')['id'])
+
     def test_save_ack_does_not_clear_more_recent_edit(self):
         self._load([program('A'), program('B')])
         start_menu.pin(program('A')['id'])
@@ -351,9 +395,9 @@ class UIAvailabilityTests(unittest.TestCase):
     """Load the real UI adapter with minimal RNA doubles, without a Blender window."""
     def _adapter(self, operator):
         fake_bpy, fake_props, fake_types = ModuleType('bpy'), ModuleType('bpy.props'), ModuleType('bpy.types')
-        for name in ('EnumProperty', 'IntProperty', 'PointerProperty', 'StringProperty'):
+        for name in ('BoolProperty', 'CollectionProperty', 'EnumProperty', 'IntProperty', 'PointerProperty', 'StringProperty'):
             setattr(fake_props, name, lambda **_kwargs: None)
-        for name in ('Menu', 'Operator', 'Panel', 'PropertyGroup'):
+        for name in ('Menu', 'Operator', 'Panel', 'PropertyGroup', 'UIList'):
             setattr(fake_types, name, type(name, (), {}))
         fake_bpy.types = fake_types
         fake_bpy.ops = SimpleNamespace(wm=SimpleNamespace(blui_shell_window_create=operator))

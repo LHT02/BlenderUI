@@ -1,5 +1,150 @@
 # BLUI 项目交接
 
+## 当前验收：2026-10-13 shell-redesign
+
+- 原生 Release 构建通过；382 项纯回归通过，日志 `D:/BlenderUI/build/shell-redesign-unit-release.log`。
+- Open-Shell 风格双栏、原生独立滚动/程序目录、开始/应用右键窗、两源 DWM LIVE 悬停、ESC/父子保活、原有 left/middle/Shift 操作通过真实窗口回归；滚轮不改 DPI/View2D zoom。
+- 私有真实通知接收与 UI 全链路通过：8图标/透明缓存、native LEFT/RIGHT版本4回调、独立overflow、删除与退出恢复。此验证不广播/接管用户系统通知，不能声称 Win11全量托盘兼容。
+- AppBar真实56→80预留与最大化避让、全屏降层/物理定位不升层、退出恢复通过；6组栏高/图标/1x2x像素和Start左/app中布局通过。自有辅助角色三轮保存/重载隔离通过。
+- 本机Calculator安装包真实AUMID资源经隔离原生解码为256×256；Programs快捷方式索引正常。直接AppsFolder索引尚未接入。
+- 编译EXE SHA256：`44DD2AB85CEA6DD6DC892CE8880049844B23D68A6198D1CB7403E58840E0B3FA`。
+- 新便携目录与 `.zip` 已保存至 `D:/BlenderUI/dist/BLUI-1.0.0-windows-x64-20261013-shell-redesign`；allowlist复制3826运行文件、无陈旧文件，另附5说明与README。ZIP共3832文件、125649902字节，逐文件CRC完整通过、必需runtime/helper/新增模块齐全且无PDB/pyc缓存。成包本体原生菜单/右键/滚轮/DWM综合回归PASS（`portable-shell-redesign-native.log`），EXE与build哈希一致，不覆盖旧版、不结束用户实例。
+- 最终build本体菜单/通知UI/AppBar/旧任务栏交互串行复跑全部PASS，日志 `D:/BlenderUI/build/release-check_*.log`；AppBar夹具追加物理定位不重新升全屏Z序的真实断言。
+- 兼容边界：原系统栏显式隐藏只改可见性、可能仍有预留空带；跨BLUI进程栏未全局去重；不响应TaskbarCreated的历史图标和部分Win11系统控件未镜像。保留系统栏恢复入口，不声称完整替代Explorer。
+
+下方“开发中/待实测”段落记录实现时序，以此验收段和后续成包记录为当前状态。
+
+## 原生 UI 悬停与真模态状态区分（2026-10-13，本轮实际GUI修复）
+
+- 实机发现任意 WM_HANDLER_TYPE_UI 都被认为忙，普通按钮悬停/延迟移除也会阻挡
+  开始菜单异步RNA列表更新及任务栏悬停预览。新增只读 UI_handler_has_modal_interaction，
+  通过真实callback/remove身份确认userdata类型；先识别DO_FREE，不解引用已释放button data。
+- 仅shell role的HIGHLIGHT/EXIT可继续服务；文本/数字编辑、等待释放/拖动、popup、searchbox、
+  custom interaction和未知UI callback保持阻塞。Normal Node/Canvas原有保守守门未改变。
+- 主代理将仅操作私有INFO/shell RNA的服务改用shell-window scope；Node结构/背景/缩略图
+  继续原有全局守门；图标job admission只读RAM队列并隔离提取，不被无关hover阻挡，不削弱节点指针防护。
+- 状态分类附编译期断言，新增5项source安全回归，约束callback类型确认/DO_FREE提前检查、
+  popup/search/custom交互保守、Normal守门不放宽；真实GUI行为仍由主代理编译后回归验证。
+- 新7项shell scope纯回归通过AST提取实际runtime守门函数，未导入bpy或启动GUI：
+  NORMAL忙只阻挡文档/节点服务，不阻挡独立shell列表；所有shell role的真实held交互
+  仍阻挡；无shell/空窗口/闲置shell为false，且shell检查不读取无关NORMAL模态RNA。
+- 新 check_taskbar_appearance_ui.py 仅交主代理串行运行，子代理未运行：真实RNA尺寸控件
+  32/16、80/64、160/64各在user UI scale1/2回归栏高、实际图标像素和Start左侧独立布局；
+  图标由真实隔离Job加载本程序，任务列表仅本PID单窗，禁AppBar/系统栏/通知区接管，
+  仅launcher被拦截；独立截图阈值不改旧32px像素夹具的默认断言。
+
+## 可调任务栏尺寸与原生最大化避让（2026-10-13，本轮集成中）
+
+- 新 taskbar_settings 模块提供栏高32–160、图标16–64逻辑像素设置，默认56/32，
+  高度至少为图标+16。RAM变更通过隔离worker异步持久化，沿用原子写入、锁和有效备份，
+  修订号防止旧请求覆盖新值；load/save进行中再改尺寸会合并而非丢失。
+- 新 taskbar_appbar 模块仅为 BLUI 自有 TASKBAR HWND 注册 Windows AppBar，
+  QUERYPOS/SETPOS 返回系统认可区域，让最大化窗口尊重任务栏；保留原系统栏时遵守其
+  现有占用，多显示器负坐标/DPI分别计算，不写 SPI_SETWORKAREA 或改其他应用窗体。
+- 主代理接入 callback 0x82A7、实际定位/关窗/加载清理及 UI 设置；独立模块在每次写操作
+  前复核 PID/线程/进程创建时间/窗口类，回收时不碰复用 HWND 新主人。说明见
+  blui/TASKBAR_APPBAR.md；原生实际注册验证仅由主代理在自有夹具中进行并及时释放。
+- 尺寸设置8项、AppBar13项纯 mock 回归通过；连同DWM和既有任务栏模块共92项回归通过，
+  diff格式检查通过。AppBar只在系统认可区域变化时发SETPOS，位置变更另发ABM_WINDOWPOSCHANGED。
+- 原生 GHOST TASKBAR-only WndProc subclass接入0x82A7：位置通知仅递增generation，
+  全屏通知只降低/恢复自身Z序（不激活），TaskbarCreated递增restart使Python重发NEW；
+  WINDOWPOSCHANGED/ACTIVATE通知Shell，有原生重入保护，无回调中QUERY/SETPOS循环。
+  新 HWND property token补强同进程句柄复用，销毁前原生移除登记作为Python清理兜底。
+- AppBar原生通知适配后的18项纯 mock 回归通过；补充重启重登记、全屏/epoch读取、
+  marker安装失败和其他控制器marker保护。原生全屏重入恢复之前guard值而非直接清零。
+- AppBar按原生generation/restart/fullscreen、完整监视器几何/DPI、逻辑尺寸及窗体身份
+  缓存认可区域：状态不变的服务tick不再进行任何Shell串行IPC；通知变化只重新query一次，
+  记录SETPOS之后generation避免自通知循环，新增相关纯mock回归。
+- 新 check_appbar_windows.py 交给主代理串行运行，子代理未运行：隔离配置/禁止自动系统栏
+  控制，在本进程新TASKBAR上真实预留56→80逻辑像素、验证自有NORMAL最大化避让、
+  自有原生通知/全屏Z序及工作区恢复；失败/45秒超时先注销再销毁自己的bar，不操作外部窗体。
+
+## 进行中：真正的双栏开始菜单、任务栏交互与系统集成（2026-10-13）
+
+- 用户实测指出旧开始菜单未符合Open-Shell，右键/tooltip被薄任务栏裁切，滚轮误缩放。
+  同时要求UWP图标、可调栏高/图标大小、独立开始键、系统托盘和窗口避让，本轮合并处理。
+- 子模块并行实现开始菜单原生UIList/程序层级、隔离包图标、DWM直播缩略图、AppBar/配置、
+  隔离通知区协议；主代理负责原生事件隔离、独立popup、整合、构建、实测及打包提交。
+- 新增TASK_PREVIEW不激活的独立角色；shell区域移除INFO通用缩放和帧键位，面板锁定zoom。
+  通用live按钮上下文区分当前按下事件和悬停坐标；shell文本操作项左对齐，任务栏关闭被裁切
+  的内置tooltip。可变尺寸任务栏以实际布局居中，默认组件不变。新启动项文件位置动作接入IPC。
+- 尚未构建/实测，不能将源码集成视为已完成系统托盘或窗口避让。
+- 新增独立shell_context_ui与shell_hover：右键截获启动项/任务应用，菜单放独立原生窗；
+  悬停350ms延迟显示DWM预览，跨入预览保留、离开延迟关闭，点击卡片走原身份校验激活。
+  所有DWM/光标查询在timer，draw仅读缓存。仍待原生布局、滚动和事件实测。
+- UWP主UI按AUMID缓存，不再使用共享宿主exe图标；包资源在worker解析后走原生headless PNG
+  解码，单包请求限制在独立超时内。任务栏源包含用户可调尺寸；AppBar保留原系统栏时尊重
+  已有AppBar，认可区域用自有物理坐标定位，不用已经扣除任务栏的work区再次夹紧。
+- 开始键固定独立左侧，任务组可居中/左排；尺寸控件、原子配置IPC、通知区UI与独立context/
+  preview classes接入注册及timer。AppBar注册位置常态半秒校正，预览悬停常态100ms服务；
+  load/undo/关窗前取消DWM关系和工作区占用，通知区helper退出仅影响本次创建的进程。
+- 应用右键动作使用实时身份并通过WM_CLOSE正常关闭，不结束进程或绕过保存提示；启动项
+  context Pin后仅关子菜单，Open后关闭同一身份的开始父菜单。通知图标右键转交其原有回调。
+- 完整纯回归首测340项通过；通知区OWN私有真实协议、32px透明HICON、负坐标version4回调
+  已通过。初测解释器退出被stdin线程锁卡住，辅助进程修复只退出自身后重测完整通过。
+  开始菜单/尺寸/context/预览新增词条补充简繁中文；Preview也支持原生ESC关闭。
+
+## 真实通知区接收器（2026-10-13，本轮集成中）
+
+- notification_host / notification_protocol / notification_pixels 分离进程窗体、纯协议
+  与图标像素；真实 Shell_NotifyIcon 的 ADD/MODIFY/DELETE/SETVERSION 接收及版本4
+  点击/悬停回调，不是静态占位。设计参考 RetroBar/ManagedShell，未复制第三方源码。
+- 显式启用广播 TaskbarCreated；仅隐藏的自有接收窗口参与 zorder，通知包有界转发原
+  已校验 Explorer。无远程VM、注入、AutoTray/注册表/系统窗口重排或 Explorer 终止。
+  父进程原始只读句柄、EOF/关闭清理自身再恢复广播，系统栏保留未重登记历史图标。
+- `--qa-private` 私有类单播模式不广播/截获系统消息，用于主代理 OWN PID 验证；
+  不等同全量 Win11 内建通知控件验证。主 UI 的 IPC 与按钮接入由主代理整合；
+  协议、身份竞态、版本4负坐标、限额及透明像素纯回归见新测试与 NOTIFICATION_TRAY.md。
+- 已新增23项纯协议/像素/转发与关闭顺序回归，全部通过；OWN-only check_notification_host.py 原生私有
+  单播测试脚本已准备，等待主代理串行运行，覆盖 UTF8、真实 HICON、版本4负坐标及清理。
+- 主代理私有真实接收/像素/回调断言已通过，发现 shutdown 后 Python daemon stdin 的
+  BufferedReader 锁可延迟解释器退出；已让 reader 收到 shutdown 停读，最终快照有界确认，
+  脚本只在自身 HWND 清理/恢复广播完成后自退出。主代理重测完整退出流程已通过；
+  中文tip、实际HICON->RGBA、ADD/MODIFY/DELETE、版本4负坐标右键以及私有窗口清理均通过。
+- 启动/关闭失败原因保留在最终 disabled 快照，不会被空错误清理状态覆盖。
+- 新 OWN-only check_shell_redesign_ui.py 综合原生测试脚本已由主代理串行运行通过：
+  原生按钮右键独立菜单、无激活悬停 DWM、80项模拟 Programs UIList 实际滚轮且缩放不变、
+  Start-app 子菜单父窗生命周期；仅自有窗/假索引，不启动应用或改变系统任务栏。
+  DWM API LIVE 成功登记与 GL 截图分开记录，GL截图不被误称为DWM像素证据。
+- 综合脚本UIList插桩保持 draw_item 的8个显式参数；Bpy桥接按 co_argcount 分配参数，
+  不能使用变长参数包装而破坏原生回调。
+- 综合原生首轮已验证两个独立右键菜单、两条 OWN DWM LIVE 与真实滚轮不改变缩放，
+  后续发现fixture持久化 Start RNA 可在外部失焦关闭后 UAF。脚本已全改为跨tick仅保留
+  (pointer,HWND) 并鲜查；仅固定 OWN Start 的foreground读取用于wheel/search测试，
+  子菜单生命周期检查前恢复真实读取并显式执行生产focus tick，不掩盖生产逻辑。
+- 主代理综合第二轮完整通过，包含真实 Start-app 子菜单保活；只读安全review发现的
+  预览索引目标错配与源任务栏移除后孤儿预览，均由主代理修复并记录；未扩展为捕获全屏
+  或其它用户窗口的“可视证明”，保留 API LIVE/自有菜单像素证据的准确边界。
+- 新 preview-click 纯回归通过9项：AST提取真实 invoke，覆盖任务替换/重排/缩短、
+  同HWND但PID/线程/启动时间/窗口类改变、缺失目标token与边界点击，确保展示卡片身份
+  不被新的任务枚举下标错配；测试不加载Bpy或发送Win32消息。
+
+## UWP 应用真实图标（2026-10-13，本轮集成中）
+
+- 新独立 worker-only package_icons 模块使用 Kernel32 包查询读取当前用户安装包，
+  精确匹配 AUMID 的 Application.Id，优先高分辨率 targetsize unplated PNG。
+  无 PowerShell、安装、启动应用或主 UI 文件读取；清单/资产有限额，拒绝
+  DTD/entities、路径穿越、安装包外资产；缺失或拒绝读取返回中性备用图标。
+- ApplicationFrameHost 根窗保留原 HWND/PID/进程启动时间身份，异步枚举进程只对
+  明确 ApplicationFrameWindow 查找最多64个 CoreWindow 子窗的复核 UWP AUMID，
+  避免不同 UWP 应用误用同一个 broker 图标。歧义、竞态或身份变更不采用。
+- PNG 交由已有隔离 File Browser 预览解码器；任务栏 icon_cache 的 AUMID 接口
+  由主代理整合。新纯回归覆盖精确匹配、限定资产、尺寸、路径/XML与 broker 身份。
+- 已通过21项UWP纯测试；文档约定 targetsize/scale 文件直接有界探测，不依赖大型 Assets
+  目录的前512条排序结果，仍不递归扫描包目录；包括 UTF16 DTD 与安装卸载 API 竞态。
+
+## 任务栏悬停预览底层（2026-10-13，本轮集成中）
+
+- 新 taskbar_previews 模块通过可信系统 DWM API 将窗口实时合成到独立原生弹窗，
+  不截图、不写磁盘缓存、不载入 Shell 扩展、不操作来源窗口。由主代理接入悬停及窗体生命周期。
+- 目的地校验 BLUI 自有顶层 GHOST 窗体；来源校验 HWND/PID/线程/进程创建时间/窗口类，
+  登记和合成前复查。最小化、受保护、隐藏、身份改变和不可用来源明确回退占位。
+- 新独立纯几何模块提供最多四张预览及等比适配；清理接口关闭 DWM 登记，要求在关窗、
+  加载、撤销和卸载前调用，附进程退出清理。纯 mock 回归与真实 GUI 集成验证分离，
+  不读取/修改其他用户运行实例；详见 blui/TASKBAR_PREVIEWS.md。
+- 19 项 DWM 纯 mock 回归通过，覆盖 HWND/PID 复用、目的地身份变化、最小化/保护占位、
+  合成 API 失败与资源释放；活跃控制器保留到关闭/退出，避免丢失调用者引用后登记泄漏。
+
 ## 最新交付：任务栏大图标（2026-10-13）
 
 - 基线 c8b8095，新增可选原生 operator 大图标绘制：32逻辑像素高分辨率图标、40逻辑像素
@@ -499,3 +644,59 @@
 - 新增 `blui/tools/check_canvas_frame_shortcut.py`，用真实窗口输入验证 Blender、Blender_27x、Industry_Compatible 三套键位预设的 Shift+P。覆盖选中 A/B 加原生 Frame、未选 C 留框外、可见世界坐标不变、无残留模态、空选不建框、JSON 保存/重建父子关系、原生 Undo 及真实节点组 edit_tree 内加框。
 - 夹具只使用自有进程与临时文件；停用桌面持久化和异步定时器，不操作系统任务栏、真实桌面文件或用户配置。Undo 后按自有 HWND 和树名称重新取得 RNA，避免缓存已替换的 Main 指针。
 - 仅完成脚本语法检查（通过）；子代理未运行 GUI、构建或提交，待主代理统一构建后串行实测。
+
+## 2026-10-13 Open-Shell 双栏开始菜单修订
+
+- 图标 job admission 仅消费内存队列并提交隔离提取，允许私有 shell 在无真实交互时继续加载图标，不被 NORMAL 的保守 hover 守门饿死；Node/Canvas RNA、背景与缩略图的原模态守门不放宽。图标结果创建预览的既有主线程机制保持不变。
+
+- 六组原生栏高/图标/UI-scale 实测完整 PASS：32/16、80/64、160/64 × 1x/2x，PNG 实际 glyph 大小跟随设置、图标无裁剪、Start左侧与center应用命中独立；日志 `D:/BlenderUI/build/shell-redesign-appearance2-native.log`。64逻辑glyph实际约60×53，2x约119×107，已排除“只长按钮不长图标”。
+- AppBar 文档明确当前边界：显式隐藏原系统栏只改可见性、不解除 Explorer 的注册预留区，可能保留下方空带；跨 BLUI 进程仍各自标准注册，未全局去重。不会暗改 SPI_WORKAREA 或外国 AppBar 注册。
+
+- 通知区槽位保持24逻辑像素宽和正常通知glyph尺寸，点击高度跟随主任务按钮，确保大小变化时托盘图标也垂直居中，不留在高任务栏的上边缘。
+
+- 原生尺寸 QA 揪出 icon_preview 大于32逻辑像素时横向仍被 Blender 普通图标按钮40px最小宽规则压扁，导致64设置只长高不放大glyph。限定显式 opt-in 的 UI_BTYPE_BUT+ICON_PREVIEW 保留缩放后方形宽度，普通原生按钮和其它preview类型不变；待重新编译六组像素实测。
+
+- 通知 UI 原生复跑完整 PASS：8 个私有真实 NIM 图标及透明缓存/绘制、真实 native LEFT/RIGHT 事件与版本4 uid/坐标回调、独立 420×560 overflow UIList、DELETE/异步helper退出/源WNDPROC恢复；日志 `D:/BlenderUI/build/shell-redesign-notification-ui2-native.log`。只单播自有私有接收器，不改系统托盘。初轮夹具命中按钮边缘未触发点击，修订后按实测内部中心操作，未模拟回调成功。
+- 热拔插移除来源任务栏时，即使光标仍在预览内也立即回收孤儿预览和 DWM 关系，不再靠不断续期的离开计时器维持顶层窗。
+- TASK_PREVIEW 存档隔离真实夹具三轮保存/重载、普通 INFO 保留和仅栏时恢复 NORMAL 尺寸完整 PASS；日志 `D:/BlenderUI/build/shell-redesign-persistence2-native.log`。
+
+- TASK_PREVIEW 存档夹具停用本测试进程的 idle-hover 服务，避免测试直接创建、没有悬停候选的预览按正常逻辑被关闭；保存/载入 handler 和真实窗口 RNA 仍照常运行。综合菜单/滚轮/两源 LIVE DWM/真实子菜单保活已完整复跑 PASS，真实 Programs 自动填充重绘截图也已确认。
+
+- 预览点击绑定当时卡片的 HWND/PID/线程/启动时间/类名，不按后来刷新后的任务列表索引激活；任务关闭、重用或重新排序时精确匹配，否则取消并关闭，防止点 B 误激活 C 或旧第二张卡越界。说明页更新当前独立 AppBar/通知架构与兼容边界。
+
+- AppBar 复查修正两处边界：物理栏定位仅改坐标并保留 z-order，防止高度/拓扑变化重新盖住全屏应用；模态交互期间不提前确认新显示拓扑，释放后会重试热插拔建栏/回收。新增 busy→release 断屏生命周期纯回归。
+
+- 收紧 shell 生命周期：runtime 在可能关闭预览/菜单的服务之后重新枚举活窗口重绘，不再读取 tick 开头保留的旧 Area；预览窗右键关闭后立即返回，不继续访问已释放的当前 Window；通知图标退出/繁忙的右键回调改为可恢复报告。
+
+- 开始列表异步同步后显式标记原生菜单重绘；真实索引夹具等待该重绘并断言 APP 按钮到达 RNA，而非只检查索引后台状态。辅助窗口存档隔离夹具扩展 TASK_PREVIEW 角色，预览同样不得污染普通文档窗口保存链。
+
+- 原生 AppBar 实测完整通过：真实自有栏 56→80 逻辑高度预留工作区、自有正常窗口最大化避让、原生 fullscreen/generation 通知与 topmost 守门、退出恢复原工作区；日志 `D:/BlenderUI/build/shell-redesign-appbar-native.log`。未隐藏原系统栏、未移动外部窗口。
+- 综合 GUI 已测通过 bar 外 TASK_CONTEXT/START_CONTEXT、两条自有窗口 DWM LIVE 登记及 NOACTIVATE、真实 UIList 滚轮可见项变化且 DPI/View2D 缩放不变；随后夹具访问被正常失焦关闭的 Start 旧 RNA 导致本 QA 进程退出，已定位为测试 retained window 引用，正在改 fresh token lookup 后复跑。此处不作为全套 PASS。
+
+- 原生 GUI 发现普通悬停 UI handler 被全局模态守门误阻塞：新增 shell-only busy scope，并配合精确 native handler 状态分类，使开始列表、悬停预览和通知 RNA 能及时更新；正常 Node/Canvas 异步守门保持原样。开始原生夹具新增“索引完成后未输入/重开即自动显示条目”断言，通知区新增简繁本地化。待重编译实测。
+
+- 根据 Open-Shell `MenuContainer.cpp` / `ProgramsTree.cpp` 的 Windows 7 双栏结构重新组织开始菜单：左侧独立滚动列表、固定/最近首页及可折叠 Programs 文件夹树，右侧用户与固定位置入口，搜索置底；不复制或链接 Open-Shell 代码。
+- 新增纯内存层级 helper 与原生 UIList RNA 适配器；文件夹由已校验的相对路径推导、合并用户/公共相同文件夹，应用启动身份保持原样，停止 15 行分页设计。
+- 新增固定 allowlist 的文档、图片、音乐、下载、计算机、控制面板入口；应用所在位置仅针对已索引项，重新校验路径/文件身份并持有读保护后打开所在文件夹。启动、最近记录及原子固定项持久化不变。
+- 本轮改造开发中，子代理不启动 GUI、不构建、不提交；由主代理统一验证。
+- 开始窗口默认改为 640×620，HOME 首页和左侧 21 行独立滚动 UIList、原位展开文件夹及返回操作、底部搜索与右侧用户/系统/关机区已接入；所有程序不再分页，绘制回调不重建 RNA 列表。旧二进制不支持独立 shell 窗时明确失败，不再降级到任务栏内裁剪弹窗。
+- 新增文件夹合并/排序/展开/Unicode 身份/层级上限/首页去重/全局搜索纯测试，应用位置操作和固定系统位置入口也加入 mock 回归；UIList 类型注册兼容性测试同步更新，待执行。
+- 展开身份只接受 SHA256 键且最多 8 层程序目录；行按钮保留整行宽度，将文字左对齐交给主代理的 shell-only 原生样式，避免仅文字区可点击。
+- 39 项开始菜单纯测试已通过；`blui/START_MENU.md` 同步双栏、原位目录树、独立滚动、底部搜索和重新验证应用所在位置的新交互，明确 Open-Shell 仅为结构参考、不复制代码。GUI/构建仍待主代理统一执行。
+- 搜索 RNA 回调在事件边界同步纯内存列表，输入时即可更新，不等待退出搜索框；保留当前索引列表引用防止缓存 `id` 重用，空索引正确显示无匹配项。
+- 新增独立 `taskbar_options_ui.py` 外观 RNA 适配器：栏高 32–160、图标 16–64 逻辑像素，默认 56/32；回调只更新纯内存状态，并将高度不足时的规范值回写控件，不执行文件 IO。提供 values/sync、原生独立设置面板插槽、重置和注册接口，等待主代理与持久化服务集成。
+- 新增 `test_taskbar_options_ui.py`，验证 RNA 参数范围、图标放大后的栏高规范、同步不重复保存/版本自增、嵌套回调抑制、只重绘 shell、重置及无窗口上下文；待执行。
+- 外观 RNA 适配器 8 项纯测试全部通过；开始菜单 39 项仍全部通过，修改文件 AST 与 `git diff --check` 无错误。未执行 GUI、构建或 Git 提交。
+- 开始菜单焦点关闭新增自有 START_APP 子菜单保护（必须同时匹配源 RNA 指针和 HWND）；窗口被显示器边界裁剪或 UIScale 较大时，左栏行数按实际逻辑高度自适应，右栏缩小空隙/行高并将次要位置折叠为“更多位置”，保留搜索与电源入口。
+- 新增 `test_start_menu_layout.py` 覆盖 DPI 等比例、小屏/大字号裁剪、无结果占位、范围校验及正确子菜单/其他来源/已关闭子菜单的焦点关闭条件，待执行。
+- 49 项开始菜单相关纯测试通过（原 39 项加响应式/子菜单身份 10 项）。更多位置只在实际逻辑高度不足时出现，常规双栏设计保持不变。
+- 新增通知区纯协议边界 `notification_wire.py` 与异步客户端 `notification_client.py`：128 图标/4MiB 行上限，严格窗口身份和像素验证，Popen/所有 pipe IO/等待回收仅在自有线程；主线程只消耗内存并分批 8 项建立预览，回调只提交现有 key 的限定事件。关闭异步发 shutdown/EOF，只回收本 client 创建的 helper，保留 host 的自有窗口清理/恢复流程。尚待 UI 与测试。
+- 通知区写管道与监督线程分离，避免 helper 卡住导致管道写满时无法回收；快照/回调 6 秒失效保护，关闭优先让 host 清理与恢复，超过 2 秒仅结束本客户端拥有的 Popen。
+- 新增通知区原生 UI：默认最多 6 个 24px 逻辑槽位，隐藏/溢出图标进入独立 TASK_CHOOSER 通知区窗口，最多 128 项以原生 UIList 滚动；左键/双击/右键回调只提交已存在 key，helper 再次校验进程/窗口身份。draw 与 tooltip 只读 RAM，坐标只在明确点击时查询自有窗体。尚待回归与主代理集成。
+- 新增 `test_notification_client.py` 协议和内存客户端测试：元数据/尺寸/像素/容量/重复身份、限定回调、每批 8 图标、RAM 重建、队列忙/失效/关闭、快照防外部修改与私有 QA 启动保护；不启动真实 helper。待执行。
+- 通知区协议/客户端 13 项纯测试通过；新增 UI 6 项 mock 回归覆盖布局宽度、隐藏/溢出分槽、draw 无 IO、主 RNA 替换后重建、正常窗体禁止回调与 tooltip RAM 读取。仍未启动通知区 helper 或 GUI。
+- 通知区读取器补 4MiB 有界读取回归；主客户端/协议 14 项、UI 6 项通过，连同 host/protocol/pixels 既有回归，本目录通知区测试共 43 项通过。子代理未执行 GUI、helper、构建或提交。
+- 通知区 helper 启动显式 `-X utf8`，避免 Windows 管道使用 CP936 使中文 tooltip 破坏严格 UTF-8 协议；同时通知 host 代理将输出改为 UTF-8 字节写入。
+- 新增仅主代理串行运行的 `check_notification_ui_native.py`：在自有 NORMAL HWND 上安装唯一注册消息回调并严格恢复，仅向本 client 的私有 helper PID/类/HWND 发送 NIM；8 项图标（含隐藏/溢出）、实际预览 ID/栏绘制、原生 LEFT/RIGHT 鼠标回调、独立通知区 UIList、DELETE/异步关闭与原布局保持。Fixture 禁用正常 runtime timer、自行 poll，绝不广播/隐藏系统栏/注册 AppBar/启动外部应用。客户端追加只读 helper_pid 供所有权核验。尚未由子代理运行 GUI。
+- 新增原生 UI fixture AST 与 `git diff --check` 通过；43 项通知区纯测试仍通过。已交主代理执行，不新增未验证 hover 功能。
+- 主代理原生通知区 UI 首跑已验证真实 8 项缓存与栏像素绘制，但原生 LEFT 回调未收到；fixture 增加不替代真实功能的 operator/poll/command/WNDPROC 诊断，并扫描按钮水平/垂直内部中心后点击，检查所选项 callback 与注册消息一致。等待主代理重跑。

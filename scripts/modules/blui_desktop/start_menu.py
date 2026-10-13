@@ -77,6 +77,16 @@ def system_action(action):
     _jobs.append((client.Job('start_system', action, timeout=8), 'start_system', action, _generation))
 
 
+def open_location(identity):
+    identity = schema.key(identity)
+    row = next((row for row in _rows if row['id'] == identity), None)
+    if not _loaded or row is None:
+        raise ValueError('The program is no longer indexed; refresh the menu')
+    if any(action == 'start_location' for _, action, _, _ in _jobs):
+        raise RuntimeError('A system action is still pending')
+    _jobs.append((client.Job('start_location', row, timeout=8), 'start_location', identity, _generation))
+
+
 def tick():
     """Consume validated replies without RNA pointers, filesystem access or process waits."""
     global _rows, _preferences, _loaded, _truncated, _error, _dirty, _retry_at

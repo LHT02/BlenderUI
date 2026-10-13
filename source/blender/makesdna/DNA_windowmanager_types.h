@@ -370,6 +370,7 @@ typedef enum eWMBluiShellRole {
   WM_BLUI_SHELL_TASKBAR = 1,
   WM_BLUI_SHELL_STARTMENU = 2,
   WM_BLUI_SHELL_TASK_CHOOSER = 3,
+  WM_BLUI_SHELL_TASK_PREVIEW = 4,
 } eWMBluiShellRole;
 
 #ifdef ime_data

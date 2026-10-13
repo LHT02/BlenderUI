@@ -117,6 +117,56 @@ def _identity(user, handle, starts=None):
     return pid.value, int(thread), started, name.value
 
 
+def _window_app_id(user, handle, identity, base, metadata, starts):
+    """ApplicationFrameHost belongs to Windows; its CoreWindow belongs to the UWP app.
+
+    Enumerate only this verified frame's children in the worker. Keep activation
+    identity on the top-level frame, and never replace it with a child HWND/PID.
+    """
+    if base.get('app_id'):
+        return base['app_id']
+    executable = str(base.get('executable', '')).replace('\\', '/').rsplit('/', 1)[-1].lower()
+    if identity[3] != 'ApplicationFrameWindow' or executable != 'applicationframehost.exe':
+        return ''
+    if _identity(user, handle) != identity:
+        return ''
+    callback_type = c.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
+    candidates, children, visited, truncated = set(), [], 0, False
+    def visit(child, _parameter):
+        nonlocal visited, truncated
+        visited += 1
+        if visited > 64:
+            truncated = True
+            return False
+        current = _identity(user, child, starts)
+        if (current is None or current[0] == identity[0] or not current[2] or
+                current[3] != 'Windows.UI.Core.CoreWindow'):
+            return True
+        pid = current[0]
+        if pid not in metadata:
+            try:
+                metadata[pid] = _metadata(pid)
+            except (OSError, ValueError):
+                return True
+        app_id = metadata[pid].get('app_id', '')
+        from . import package_icons
+        if package_icons.split_app_id(app_id) and _identity(user, child) == current:
+            candidates.add(app_id)
+            children.append((child, current))
+        return True
+    try:
+        user.EnumChildWindows.argtypes = [w.HWND, callback_type, w.LPARAM]
+        user.EnumChildWindows.restype = w.BOOL
+        user.EnumChildWindows(handle, callback_type(visit), 0)
+    except (AttributeError, OSError):
+        return ''
+    # Ambiguous or changed frame: retain the neutral fallback, not another app's icon.
+    if (not truncated and len(candidates) == 1 and _identity(user, handle) == identity and
+            all(_identity(user, child) == current for child, current in children)):
+        return next(iter(candidates))
+    return ''
+
+
 def tasks():
     if os.name != 'nt':
         return []
@@ -143,6 +193,7 @@ def tasks():
         pid, thread, started, name = identity
         if pid not in metadata:
             metadata[pid] = _metadata(pid) if started else {'executable': '', 'app_id': ''}
+        app_id = _window_app_id(user, handle, identity, metadata[pid], metadata, starts)
         # Identity metadata is untrusted if the process/window changed mid-snapshot.
         if _identity(user, handle) != identity:
             return True
@@ -151,6 +202,7 @@ def tasks():
                        'actionable': bool(started),
                'active': handle == foreground, 'minimized': bool(user.IsIconic(handle)),
                **metadata[pid], 'monitor': _monitor(user, handle)}
+        row['app_id'] = app_id
         row['group_key'] = taskbar_groups.identity_key(row)
         result.append(row)
         return True
@@ -190,6 +242,22 @@ def act(handle, pid, minimize=False, *, identity=None, toggle=False):
         raise RuntimeError('This task changed; refresh the taskbar')
     user.ShowWindowAsync(handle, 6 if minimize else 9 if user.IsIconic(handle) else 5)
     return bool(minimize or user.SetForegroundWindow(handle))
+
+
+def close_task(row):
+    """User-selected, graceful close only; never terminate or bypass save prompts."""
+    from .taskbar_previews import _source
+    source = _source(row)
+    if source is None or not row.get('actionable'):
+        raise ValueError('This task has no verified identity; refresh the taskbar')
+    handle, identity = source
+    user = _api()
+    if _identity(user, handle) != identity:
+        raise RuntimeError('This task changed; refresh the taskbar')
+    user.PostMessageW.argtypes, user.PostMessageW.restype = [w.HWND, w.UINT, w.WPARAM, w.LPARAM], w.BOOL
+    if _identity(user, handle) != identity or not user.PostMessageW(handle, 0x10, 0, 0):
+        raise RuntimeError('Windows could not close this application window')
+    return True
 
 
 def launch(row):

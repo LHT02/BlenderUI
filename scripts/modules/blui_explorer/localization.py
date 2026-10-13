@@ -357,6 +357,52 @@ _TEXT.update({
 })
 
 
+_TEXT.update({
+    'All Programs': ('所有程序', '所有程式'),
+    'Search Results': ('搜索结果', '搜尋結果'),
+    'Back': ('返回', '返回'),
+    'Search Programs': ('搜索程序', '搜尋程式'),
+    'User': ('用户', '使用者'),
+    'User Files': ('用户文件', '使用者檔案'),
+    'Documents': ('文档', '文件'),
+    'Pictures': ('图片', '圖片'),
+    'Music': ('音乐', '音樂'),
+    'Downloads': ('下载', '下載'),
+    'Computer': ('计算机', '電腦'),
+    'Control Panel': ('控制面板', '控制台'),
+    'Shut Down': ('关机', '關機'),
+    'Expand Program Folder': ('展开程序文件夹', '展開程式資料夾'),
+    'Start Menu View': ('开始菜单视图', '開始功能表檢視'),
+    'More Places': ('更多位置', '更多位置'),
+    'Taskbar Height': ('任务栏高度', '工作列高度'),
+    'Icon Size': ('图标大小', '圖示大小'),
+    'Taskbar Appearance': ('任务栏外观', '工作列外觀'),
+    'Logical pixels; scaled for each display': ('逻辑像素，按各显示器缩放', '邏輯像素，依各顯示器縮放'),
+    'Reset Taskbar Appearance': ('重置任务栏外观', '重設工作列外觀'),
+    'Start stays separate from application groups': ('开始按钮与应用任务区分离', '開始按鈕與應用程式區分開'),
+    'Taskbar settings could not be saved': ('任务栏设置保存失败', '工作列設定無法儲存'),
+    'Shell Context Menu': ('系统组件菜单', '系統元件功能表'),
+    'Application Window Action': ('应用窗口操作', '應用程式視窗操作'),
+    'Start Application Action': ('开始菜单应用操作', '開始功能表應用程式操作'),
+    'Activate Window': ('激活窗口', '啟用視窗'),
+    'Minimize Window': ('最小化窗口', '最小化視窗'),
+    'Close Window': ('关闭窗口', '關閉視窗'),
+    'Pin App': ('固定应用', '釘選應用程式'),
+    'Open File Location': ('打开文件所在位置', '開啟檔案位置'),
+    'Window Previews': ('窗口预览', '視窗預覽'),
+    'Activate Window Preview': ('激活预览窗口', '啟用預覽視窗'),
+    'Preview Unavailable': ('此窗口暂不可预览', '此視窗暫無法預覽'),
+    'Notification Icon': ('通知图标', '通知圖示'),
+    'Notification Area': ('通知区域', '通知區域'),
+    'Show Notification Icons': ('显示通知图标', '顯示通知圖示'),
+    'No Notification Icons': ('暂无通知图标', '暫無通知圖示'),
+    'Notification area is unavailable': ('通知区域暂不可用', '通知區域暫無法使用'),
+    'This notification icon changed or exited': ('此通知图标已更改或退出', '此通知圖示已變更或結束'),
+    'Notification area is busy; try again': ('通知区域忙，请稍后重试', '通知區域忙碌，請稍後重試'),
+    'Notification area host exited': ('通知区域宿主已退出', '通知區域宿主已結束'),
+})
+
+
 def register():
     import bpy
     tables = {}

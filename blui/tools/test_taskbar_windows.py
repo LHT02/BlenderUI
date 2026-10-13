@@ -48,6 +48,8 @@ class WindowTests(unittest.TestCase):
                 context.window = self.previous
         context.temp_override = Override
         self.context = context
+        self.settings = mock.patch('blui_desktop.taskbar_settings.values', return_value={
+            'version': 1, 'revision': 0, 'height': 56, 'icon_size': 32}).start()
         self.created = []
         self.closed = []
         def create(**values):
@@ -80,11 +82,16 @@ class WindowTests(unittest.TestCase):
         specification = importlib.util.spec_from_file_location('blui_desktop._test_taskbar_windows', path)
         self.module = importlib.util.module_from_spec(specification)
         specification.loader.exec_module(self.module)
-        for function in ('_topmost', 'focus_window'):
+        for function in ('_topmost', 'focus_window', '_reserve'):
             patcher = mock.patch.object(self.module, function, return_value=True)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.place = mock.patch.object(window_placement, 'place', return_value=True).start()
+        def bounds(handle):
+            window = next(item for item in self.windows if item.blui_native_handle == handle)
+            monitor = next(row for row in self.snapshot['monitors'] if row['device'] == self.module.device(window))
+            return {'rect': self.module.bar_rect(monitor)}
+        mock.patch.object(window_placement, 'bounds', side_effect=bounds).start()
         self.recover = mock.patch.object(window_placement, 'recover', return_value=False).start()
         self.addCleanup(mock.patch.stopall)
 
@@ -124,6 +131,18 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(len(self.closed), 1)
         self.assertEqual(self.closed[0].blui_shell_role, 'TASKBAR')
         self.assertEqual(len(self.module.role_windows('TASKBAR')), 1)
+
+    def test_busy_topology_change_retries_after_interaction_releases(self):
+        self.module.open_for_displays(self.context)
+        previous = self.module._topology
+        self.snapshot = {'coordinate_space': 'physical', 'monitors': [display('RIGHT', 0, True)]}
+        with mock.patch.object(self.module.runtime, 'interaction_busy', return_value=True):
+            self.module.tick(self.snapshot)
+        self.assertEqual(self.module._topology, previous)
+        self.assertEqual(len(self.module.role_windows('TASKBAR')), 2)
+        self.module.tick(self.snapshot)
+        self.assertEqual(len(self.module.role_windows('TASKBAR')), 1)
+        self.assertNotEqual(self.module._topology, previous)
 
     def test_steady_tick_never_issues_window_placement_syscalls(self):
         self.module.open_for_displays(self.context)

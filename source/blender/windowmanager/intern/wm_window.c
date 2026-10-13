@@ -774,7 +774,7 @@ static void wm_window_ghostwindow_add(wmWindowManager *wm,
   if (win->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
     glSettings.flags |= GHOST_glBluiShellWindow;
   }
-  if (win->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
+  if (ELEM(win->blui_shell_role, WM_BLUI_SHELL_TASKBAR, WM_BLUI_SHELL_TASK_PREVIEW)) {
     glSettings.flags |= GHOST_glBluiTaskbarWindow;
   }
 

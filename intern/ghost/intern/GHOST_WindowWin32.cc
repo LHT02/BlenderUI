@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <math.h>
 #include <shellscalingapi.h>
+#include <shellapi.h>
 #include <string.h>
 #include <windowsx.h>
 
@@ -61,6 +62,8 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
       m_system(system),
       m_dropTarget(NULL),
       m_hWnd(0),
+      m_bluiAppBarPreviousProc(nullptr),
+      m_bluiAppBarNotifying(false),
       m_hDC(0),
       m_isDialog(dialog),
       m_hasMouseCaptured(false),
@@ -159,6 +162,10 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 
   /* Store a pointer to this class in the window structure. */
   ::SetWindowLongPtr(m_hWnd, GWLP_USERDATA, (LONG_PTR)this);
+  if (taskbar_window) {
+    m_bluiAppBarPreviousProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(
+        m_hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(bluiAppBarWndProc)));
+  }
 
   if (!m_system->m_windowFocus) {
     /* If we don't want focus then lower to bottom. */
@@ -287,6 +294,12 @@ GHOST_WindowWin32::~GHOST_WindowWin32()
   }
 
   if (m_hWnd) {
+    releaseBluiAppBar();
+    if (m_bluiAppBarPreviousProc && ::IsWindow(m_hWnd)) {
+      ::SetWindowLongPtrW(
+          m_hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(m_bluiAppBarPreviousProc));
+      m_bluiAppBarPreviousProc = nullptr;
+    }
     /* If this window is referenced by others as parent, clear that relation or windows will free
      * the handle while we still reference it. */
     for (GHOST_IWindow *iter_win : m_system->getWindowManager()->getWindows()) {
@@ -311,6 +324,117 @@ GHOST_WindowWin32::~GHOST_WindowWin32()
 
   delete m_directManipulationHelper;
   m_directManipulationHelper = NULL;
+}
+
+namespace {
+constexpr UINT blui_appbar_callback = WM_APP + 0x2A7;
+const wchar_t *blui_appbar_owner = L"BLUI.AppBar.Registered";
+const wchar_t *blui_appbar_token = L"BLUI.AppBar.Token";
+const wchar_t *blui_appbar_generation = L"BLUI.AppBar.Generation";
+const wchar_t *blui_appbar_restart = L"BLUI.AppBar.Restart";
+const wchar_t *blui_appbar_fullscreen = L"BLUI.AppBar.Fullscreen";
+
+bool blui_appbar_owned(HWND hwnd)
+{
+  DWORD pid = 0;
+  return reinterpret_cast<ULONG_PTR>(::GetPropW(hwnd, blui_appbar_owner)) ==
+             ::GetCurrentProcessId() &&
+         ::GetWindowThreadProcessId(hwnd, &pid) == ::GetCurrentThreadId() &&
+         pid == ::GetCurrentProcessId() &&
+         !(::GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CHILD) &&
+         (::GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_NOACTIVATE);
+}
+
+void blui_appbar_bump(HWND hwnd, const wchar_t *name)
+{
+  ULONG_PTR value = reinterpret_cast<ULONG_PTR>(::GetPropW(hwnd, name)) + 1;
+  ::SetPropW(hwnd, name, reinterpret_cast<HANDLE>(value ? value : 1));
+}
+}  // namespace
+
+LRESULT CALLBACK GHOST_WindowWin32::bluiAppBarWndProc(HWND hwnd,
+                                                   UINT message,
+                                                   WPARAM wparam,
+                                                   LPARAM lparam)
+{
+  GHOST_WindowWin32 *window = reinterpret_cast<GHOST_WindowWin32 *>(
+      ::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+  if (!window || window->m_hWnd != hwnd || !window->m_bluiAppBarPreviousProc) {
+    return ::DefWindowProcW(hwnd, message, wparam, lparam);
+  }
+  if (window->handleBluiAppBarMessage(message, wparam, lparam)) {
+    return 0;
+  }
+  return ::CallWindowProcW(window->m_bluiAppBarPreviousProc, hwnd, message, wparam, lparam);
+}
+
+bool GHOST_WindowWin32::handleBluiAppBarMessage(UINT message, WPARAM wparam, LPARAM lparam)
+{
+  if (!blui_appbar_owned(m_hWnd)) {
+    return false;
+  }
+  static const UINT taskbar_created = ::RegisterWindowMessageW(L"TaskbarCreated");
+  if (taskbar_created && message == taskbar_created) {
+    blui_appbar_bump(m_hWnd, blui_appbar_restart);
+    blui_appbar_bump(m_hWnd, blui_appbar_generation);
+    return true;
+  }
+  if (message == blui_appbar_callback) {
+    if (wparam == ABN_POSCHANGED) {
+      /* Timer reads the generation. Never synchronously QUERY/SETPOS from WndProc. */
+      blui_appbar_bump(m_hWnd, blui_appbar_generation);
+    }
+    else if (wparam == ABN_FULLSCREENAPP) {
+      if (lparam) {
+        ::SetPropW(m_hWnd, blui_appbar_fullscreen, reinterpret_cast<HANDLE>(1));
+      }
+      else {
+        ::RemovePropW(m_hWnd, blui_appbar_fullscreen);
+      }
+      const bool was_notifying = m_bluiAppBarNotifying;
+      m_bluiAppBarNotifying = true;
+      ::SetWindowPos(m_hWnd,
+                     lparam ? HWND_BOTTOM : HWND_TOPMOST,
+                     0,
+                     0,
+                     0,
+                     0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+      m_bluiAppBarNotifying = was_notifying;
+    }
+    return true;
+  }
+  if (message == WM_NCDESTROY) {
+    releaseBluiAppBar();
+    return false;
+  }
+  if (!m_bluiAppBarNotifying && (message == WM_WINDOWPOSCHANGED || message == WM_ACTIVATE)) {
+    APPBARDATA data = {};
+    data.cbSize = sizeof(data);
+    data.hWnd = m_hWnd;
+    data.lParam = message == WM_ACTIVATE && LOWORD(wparam) != WA_INACTIVE;
+    m_bluiAppBarNotifying = true;
+    ::SHAppBarMessage(message == WM_ACTIVATE ? ABM_ACTIVATE : ABM_WINDOWPOSCHANGED, &data);
+    m_bluiAppBarNotifying = false;
+  }
+  return false;
+}
+
+void GHOST_WindowWin32::releaseBluiAppBar()
+{
+  if (!m_hWnd || !blui_appbar_owned(m_hWnd)) {
+    return;
+  }
+  /* Clear the marker first, so synchronous Shell notifications cannot re-enter. */
+  ::RemovePropW(m_hWnd, blui_appbar_owner);
+  ::RemovePropW(m_hWnd, blui_appbar_token);
+  ::RemovePropW(m_hWnd, blui_appbar_generation);
+  ::RemovePropW(m_hWnd, blui_appbar_restart);
+  ::RemovePropW(m_hWnd, blui_appbar_fullscreen);
+  APPBARDATA data = {};
+  data.cbSize = sizeof(data);
+  data.hWnd = m_hWnd;
+  ::SHAppBarMessage(ABM_REMOVE, &data);
 }
 
 void GHOST_WindowWin32::adjustWindowRectForClosestMonitor(LPRECT win_rect,

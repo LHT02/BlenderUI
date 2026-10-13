@@ -28,5 +28,10 @@ class WM_OT_blui_windows_taskbar(Operator):
 
 from .taskbar_actions import classes as action_classes
 from .taskbar_draw import classes as draw_classes
+from .taskbar_options_ui import classes as options_classes
+from .shell_context_ui import classes as context_classes
+from .shell_hover import classes as hover_classes
+from .notification_ui import classes as notification_classes
 
-classes = (WM_OT_blui_windows_taskbar,) + action_classes + draw_classes
+classes = ((WM_OT_blui_windows_taskbar,) + options_classes + action_classes + draw_classes +
+           context_classes + hover_classes + notification_classes)

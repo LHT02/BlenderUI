@@ -2052,6 +2052,7 @@ static void WM_OT_blui_shell_window_create(wmOperatorType *ot)
       {WM_BLUI_SHELL_TASKBAR, "TASKBAR", 0, "Taskbar", "Independent taskbar"},
       {WM_BLUI_SHELL_STARTMENU, "STARTMENU", 0, "Start Menu", "Independent start menu"},
       {WM_BLUI_SHELL_TASK_CHOOSER, "TASK_CHOOSER", 0, "Task Windows", "Application window chooser"},
+      {WM_BLUI_SHELL_TASK_PREVIEW, "TASK_PREVIEW", 0, "Window Previews", "Non-activating live window previews"},
       {0, NULL, 0, NULL, NULL},
   };
   ot->name = "Create Shell UI Window";

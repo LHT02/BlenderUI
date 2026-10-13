@@ -18,6 +18,12 @@ def extract(paths):
         if not isinstance(path, str) or not path or len(path) > 32768 or '\x00' in path:
             raise ValueError('Invalid icon path')
         try:
+            if path.startswith('aumid:'):
+                from . import package_icons, thumbnails
+                asset = package_icons.resolve(path[6:])
+                row = thumbnails.extract([asset])[0] if asset else thumbnails.empty(path)
+                rows.append({**row, 'path': path})
+                continue
             result = subprocess.run([executable, path], stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2,
                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))

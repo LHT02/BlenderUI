@@ -5,6 +5,16 @@ verified state and [DESKTOP.md](DESKTOP.md) for the optional native desktop canv
 multi-monitor layouts, backgrounds, widgets and taskbar recovery. The historical
 notes below describe earlier builds, not the current remaining work.
 
+The current shell redesign uses an Open-Shell-style two-column Start menu with
+scrolling Programs folders, independent context/preview windows, live DWM hover
+thumbnails, adjustable bar height/icon size, AUMID-based packaged-app icons and
+an isolated notification receiver. Windows AppBar reservations make maximized
+windows avoid each BLUI bar. See [START_MENU.md](START_MENU.md),
+[TASKBAR_PREVIEWS.md](TASKBAR_PREVIEWS.md), [TASKBAR_APPBAR.md](TASKBAR_APPBAR.md)
+and [NOTIFICATION_TRAY.md](NOTIFICATION_TRAY.md) for verified contracts and limits.
+The original Windows shell is retained; this does not claim complete Win11 tray
+mirroring or full Explorer replacement.
+
 A portable distribution needs the complete runtime directory, including the new
 `BLUI-fileicon.exe` isolated icon helper; copying only `BLUI.exe` is insufficient.
 

@@ -12,9 +12,14 @@ import tempfile
 import time
 import traceback
 import bpy
-from blui_desktop import native_windows, session
+from blui_desktop import native_windows, runtime, session
 
 session.disable_for_tests = True
+# This fixture creates role windows directly, not through the hover controller.
+# Stop its idle-popup service; otherwise a deliberately unhovered preview is
+# correctly closed before the persistence assertion can inspect/save it.
+if bpy.app.timers.is_registered(runtime.tick):
+    bpy.app.timers.unregister(runtime.tick)
 fixture = Path(tempfile.mkdtemp(prefix='blui_shell_save_qa_'))
 (fixture / 'config').mkdir()
 os.environ['BLENDER_USER_CONFIG'] = str(fixture / 'config')
@@ -41,7 +46,8 @@ def execute(window, name, **props):
 
 def create_roles():
     source = windows('NORMAL')[0]
-    for role, width, height in (('TASKBAR', 800, 48), ('STARTMENU', 600, 680), ('TASK_CHOOSER', 440, 400)):
+    for role, width, height in (('TASKBAR', 800, 48), ('STARTMENU', 600, 680),
+                                ('TASK_CHOOSER', 440, 400), ('TASK_PREVIEW', 500, 180)):
         execute(source, 'blui_shell_window_create', role=role, width=width, height=height)
 
 
@@ -80,7 +86,7 @@ def step():
         create_roles()
         state['phase'], state['due'] = 1, time.monotonic() + .5
     elif phase == 1:
-        assert all(windows(role) for role in ('TASKBAR', 'STARTMENU', 'TASK_CHOOSER'))
+        assert all(windows(role) for role in ('TASKBAR', 'STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'))
         state['names'] = {window.screen.name for window in windows() if window.blui_shell_role != 'NORMAL'}
         path = fixture / 'with-shell.blend'
         save(path)

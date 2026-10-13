@@ -27,7 +27,8 @@ def main():
         arity = {'scan': 1, 'paths': 1, 'save': 2, 'load': 1, 'tasks': 0, 'open': 1,
                  'board_save': 2, 'board_load': 1, 'monitors': 0, 'weather': 1, 'icons': 1,
                  'background': 1, 'recycle': 1, 'previews': 1, 'task_launch': 1,
-                 'start_index': 1, 'start_state': 2, 'start_launch': 1, 'start_system': 1}
+                 'start_index': 1, 'start_state': 2, 'start_launch': 1, 'start_system': 1,
+                 'start_location': 1, 'taskbar_settings_load': 1, 'taskbar_settings_save': 2}
         if action not in arity or not isinstance(args, list) or len(args) != arity[action]:
             raise ValueError('Unsupported desktop request')
         if action == 'scan':
@@ -53,6 +54,9 @@ def main():
             result = thumbnails.extract(*args)
         elif action == 'task_launch':
             result = native_windows.launch(*args)
+        elif action.startswith('taskbar_settings_'):
+            from blui_desktop import taskbar_settings
+            result = getattr(taskbar_settings, action.removeprefix('taskbar_settings_'))(*args)
         elif action.startswith('start_'):
             from blui_desktop import start_menu_backend
             result = getattr(start_menu_backend, action)(*args)

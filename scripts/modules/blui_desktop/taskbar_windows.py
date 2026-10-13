@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Own native role windows, per-display placement and menu lifecycle; no draw-time OS work."""
 import os
+import sys
+import time
 import bpy
-from . import monitors, runtime, taskbar, taskbar_groups, window_placement
+from . import monitors, runtime, taskbar, taskbar_groups, taskbar_settings, window_placement
+from .taskbar_appbar import AppBarController, is_fullscreen
 from blui_explorer.localization import iface
 
 _bindings = {}
@@ -14,6 +17,8 @@ _pending = False
 _menus = {}
 _pending_menus = {}
 _keymaps = []
+_appbar = AppBarController()
+_reserve_due = 0.0
 
 
 def alignment():
@@ -49,18 +54,19 @@ def _system_hidden():
 
 def _geometry_key(snapshot):
     return (monitors.topology_key(snapshot) + ('#hidden' if _system_hidden() else '#visible') +
-            '#ui-scale:' + str(bpy.context.preferences.view.ui_scale))
+            '#ui-scale:' + str(bpy.context.preferences.view.ui_scale) +
+            '#appearance:' + str(taskbar_settings.values()))
 
 
 def bar_rect(display, *, system_hidden=False):
     # Monitor DPI is applied by the pure geometry helper; add only the user's
     # Blender display multiplier here, not system.ui_scale (which includes DPI).
-    height = taskbar_groups.BAR_HEIGHT * bpy.context.preferences.view.ui_scale
+    height = taskbar_settings.values()['height'] * bpy.context.preferences.view.ui_scale
     return taskbar_groups.bar_rect(display, height=height, system_hidden=system_hidden)
 
 
 def _screen_bar_place(window, rect):
-    """Fill the existing system-bar reserve without changing its AppBar/work-area settings."""
+    """Position an owned bar at the approved physical edge without changing z-order."""
     if not window.blui_is_taskbar or os.name != 'nt':
         raise ValueError('Only an owned taskbar can use the physical display edge')
     rect = monitors._rect(rect)
@@ -70,8 +76,8 @@ def _screen_bar_place(window, rect):
     if (not extended & 0x80 or not extended & 0x08000000 or
             window_placement._own(user, handle) != identity):
         raise RuntimeError('The BLUI taskbar identity changed')
-    if not user.SetWindowPos(handle, -1, rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1],
-                             0x4000 | 0x10 | 0x200):
+    if not user.SetWindowPos(handle, None, rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1],
+                             0x4000 | 0x10 | 0x200 | 0x4):
         raise OSError('Unable to position the BLUI taskbar')
 
 
@@ -103,7 +109,7 @@ def redraw():
 
 
 def create(context, role, width, height):
-    if role not in ('TASKBAR', 'STARTMENU', 'TASK_CHOOSER'):
+    if role not in ('TASKBAR', 'STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'):
         raise ValueError('Invalid native shell window role')
     before = {window.as_pointer() for window in context.window_manager.windows}
     result = bpy.ops.wm.blui_shell_window_create(role=role, width=width, height=height)
@@ -116,6 +122,8 @@ def create(context, role, width, height):
 def _topmost(window):
     # A fresh bpy role window is required, never an arbitrary/cached OS handle.
     if os.name != 'nt' or window.blui_shell_role == 'NORMAL':
+        return
+    if window.blui_is_taskbar and is_fullscreen(window):
         return
     handle = window_placement._handle(window.blui_native_handle)
     user = window_placement._api()
@@ -133,6 +141,11 @@ def close_window(window):
     current = next((item for item in role_windows() if _identity(item) == key), None)
     if current is None:
         return False
+    hover = sys.modules.get('blui_desktop.shell_hover')
+    if hover is not None:
+        hover.closed(current)
+    if current.blui_is_taskbar:
+        _appbar.close_window(current)
     _bindings.pop(key, None)
     _menus.pop(key, None)
     _pending_menus.pop(key, None)
@@ -176,9 +189,24 @@ def open_for_displays(context, snapshot=None, *, all_displays=True):
     for window in role_windows('TASKBAR'):
         if device(window) not in wanted:
             close_window(window)
+    _reserve(result, snapshot)
     _topology = _geometry_key(snapshot)
     _pending = False
     return result
+
+
+def _reserve(windows, snapshot):
+    global _reserve_due
+    from . import session
+    if session.disable_for_tests:
+        return
+    _reserve_due = time.monotonic() + .5
+    height = taskbar_settings.values()['height'] * bpy.context.preferences.view.ui_scale
+    rects = _appbar.reconcile({device(window): window for window in windows}, snapshot, height)
+    for window in windows:
+        rect = rects.get(device(window))
+        if rect and window_placement.bounds(window.blui_native_handle)['rect'] != rect:
+            _screen_bar_place(window, rect)
 
 
 def request_open(*, all_displays=True):
@@ -196,6 +224,10 @@ def tick(snapshot):
                 mapping.pop(key, None)
     key = _geometry_key(snapshot)
     changed = key != _topology
+    if (changed or _pending) and runtime.interaction_busy(None):
+        # Keep the old topology key so hotplug/size changes are retried once
+        # native interaction releases its Window/Area references.
+        return
     if (_pending or (role_windows('TASKBAR') and key != _topology)) and snapshot['monitors']:
         if not runtime.interaction_busy(None):
             open_for_displays(bpy.context, snapshot, all_displays=_all_displays)
@@ -208,6 +240,8 @@ def tick(snapshot):
                     pass
         _topology = key
     if snapshot['monitors']:
+        if role_windows('TASKBAR') and time.monotonic() >= _reserve_due:
+            _reserve(role_windows('TASKBAR'), snapshot)
         for key, (source_key, width, height) in list(_pending_menus.items()):
             window = next((window for window in role_windows() if _identity(window) == key), None)
             if window is None:
@@ -217,8 +251,8 @@ def tick(snapshot):
             place_menu(window, source, width, height)
 
 
-def place_menu(window, source_window, width, height):
-    if window.blui_shell_role not in ('STARTMENU', 'TASK_CHOOSER'):
+def place_menu(window, source_window, width, height, *, anchor_x=None, focus=True, scale_ui=True):
+    if window.blui_shell_role not in ('STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'):
         raise ValueError('Only an owned shell menu can be placed above the taskbar')
     snapshot = monitors.validate(runtime.monitor_snapshot())
     rows = snapshot['monitors']
@@ -232,15 +266,24 @@ def place_menu(window, source_window, width, height):
     display = next((row for row in rows if row['device'] == source_device),
                    next((row for row in rows if row['primary']), rows[0]))
     bar = bar_rect(display, system_hidden=_system_hidden())
+    source_bar = next((item for item in role_windows('TASKBAR') if device(item) == display['device']), None)
+    if source_bar is not None:
+        bar = window_placement.bounds(source_bar.blui_native_handle)['rect']
     anchor = [bar[0], bar[1]]
-    if _alignment == 'CENTER':
+    if scale_ui:
+        scale = bpy.context.preferences.view.ui_scale
+        width, height = width * scale, height * scale
+    if anchor_x is not None:
+        anchor[0] = int(anchor_x)
+    elif _alignment == 'CENTER' and window.blui_shell_role != 'STARTMENU':
         anchor[0] = (bar[0] + bar[2]) // 2 - round(width * display['dpi'][0] / 192)
     rect = taskbar_groups.menu_rect(display, anchor, width, height)
     window_placement.place(window.blui_native_handle, rect, snapshot, preferred=display['device'])
     _bindings[_identity(window)] = display['device']
     _pending_menus.pop(_identity(window), None)
     _topmost(window)
-    focus_window(window)
+    if focus:
+        focus_window(window)
     return True
 
 
@@ -267,7 +310,7 @@ def menu_state(window):
 
 
 def set_menu_state(window, value):
-    if window.blui_shell_role != 'TASK_CHOOSER' or not isinstance(value, dict):
+    if window.blui_shell_role not in ('TASK_CHOOSER', 'TASK_PREVIEW') or not isinstance(value, dict):
         raise ValueError('Invalid task chooser window')
     _menus[_identity(window)] = dict(value)
     for area in window.screen.areas:
@@ -277,6 +320,7 @@ def set_menu_state(window, value):
 def close(context=None):
     global _pending, _topology
     _pending, _topology = False, ''
+    _appbar.close()
     for window in list(role_windows()):
         close_window(window)
     _bindings.clear()
@@ -295,8 +339,14 @@ def register():
     # later modifier state (or the default Info/View2D maps consume the event).
     item = keymap.keymap_items.new('wm.blui_taskbar_middle', 'LEFTMOUSE', 'PRESS', shift=True)
     _keymaps.append((keymap, item))
+    item = keymap.keymap_items.new('wm.blui_shell_context_menu', 'RIGHTMOUSE', 'PRESS')
+    _keymaps.append((keymap, item))
     popup = configuration.keymaps.new(name='BLUI Shell Popup', space_type='INFO', region_type='WINDOW')
     item = popup.keymap_items.new('wm.blui_shell_popup_close', 'ESC', 'PRESS')
+    _keymaps.append((popup, item))
+    item = popup.keymap_items.new('wm.blui_shell_context_menu', 'RIGHTMOUSE', 'PRESS')
+    _keymaps.append((popup, item))
+    item = popup.keymap_items.new('wm.blui_preview_pick', 'LEFTMOUSE', 'PRESS')
     _keymaps.append((popup, item))
 
 

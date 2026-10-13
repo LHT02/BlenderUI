@@ -1,28 +1,20 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Native Start-menu panel, shared by the independent menu window and popup fallback."""
+"""Independent, Open-Shell/Windows 7 style two-column native Start menu."""
+import os
 import bpy
-from bpy.props import EnumProperty, IntProperty, PointerProperty, StringProperty
-from bpy.types import Menu, Operator, Panel, PropertyGroup
+from bpy.props import EnumProperty, PointerProperty, StringProperty
+from bpy.types import Menu, Operator, Panel
 from blui_explorer.localization import iface
-from . import icon_cache, session, start_menu, start_menu_model as schema
+from . import session, start_menu, start_menu_contents as contents, start_menu_layout, start_menu_model as schema
+from .start_menu_contents import BLUI_StartMenuSettings
 
-PAGE_SIZE = 15
-WIDTH, HEIGHT = 600, 680
+WIDTH, HEIGHT = 640, 620
 _focused = set()
-
-
-def _filter_changed(settings, _context):
-    settings.page = 0
-
-
-class BLUI_StartMenuSettings(PropertyGroup):
-    query: StringProperty(name='Search Apps', maxlen=256, update=_filter_changed, options={'SKIP_SAVE'})
-    section: EnumProperty(name='Programs', default='ALL', options={'SKIP_SAVE'}, update=_filter_changed,
-        items=(('PINNED', 'Pinned Apps', ''), ('ALL', 'All Apps', ''), ('RECENT', 'Recently Opened Apps', '')))
-    page: IntProperty(default=0, min=0, max=68, options={'SKIP_SAVE'})
+_username = os.environ.get('USERNAME', '')[:80]
 
 
 def register_props():
+    contents.reset()
     bpy.types.WindowManager.blui_start_menu_settings = PointerProperty(type=BLUI_StartMenuSettings, options={'SKIP_SAVE'})
 
 
@@ -30,6 +22,7 @@ def unregister_props():
     if bpy.app.timers.is_registered(_focus_tick):
         bpy.app.timers.unregister(_focus_tick)
     _focused.clear()
+    contents.reset()
     if hasattr(bpy.types.WindowManager, 'blui_start_menu_settings'):
         del bpy.types.WindowManager.blui_start_menu_settings
 
@@ -63,17 +56,25 @@ def _redraw_menus(context):
 def _focus_tick():
     """Fresh role lookups only; never retain a Window or close a normal user window."""
     from . import runtime, taskbar_windows
-    windows = [window for window in bpy.context.window_manager.windows if _role(window) == 'STARTMENU']
+    all_windows = list(bpy.context.window_manager.windows)
+    windows = [window for window in all_windows if _role(window) == 'STARTMENU']
     if not windows:
         _focused.clear()
         return None
     # Native text/menu/property confirmations own modal state; do not invalidate their RNA.
-    if runtime.interaction_busy(None):
+    if runtime.shell_interaction_busy():
         return .2
+    if contents.sync(bpy.context.window_manager.blui_start_menu_settings, start_menu.snapshot()):
+        _redraw_menus(bpy.context)
     live = set()
     for window in windows:
         token = (window.as_pointer(), window.blui_native_handle)
         live.add(token)
+        if start_menu_layout.owns_context_child(token, all_windows, taskbar_windows.menu_state):
+            # Right-click actions have their own full-height HWND. Moving focus
+            # from Start to its child is not a request to close the parent menu.
+            _focused.add(token)
+            continue
         try:
             if taskbar_windows.is_foreground(window):
                 _focused.add(token)
@@ -99,64 +100,84 @@ def _rows(settings, value):
     return value['rows']
 
 
-def _app_button(layout, row):
-    icon = icon_cache.value(row['path'])
-    kwargs = {'icon_value': icon} if icon else {'icon': 'WINDOW'}
-    op = layout.operator('wm.blui_start_launch', text=row['name'], translate=False, **kwargs)
-    op.app_id = row['id']
+def _system_button(layout, action, label, icon, *, scale=1.5):
+    row = layout.row()
+    row.scale_y = scale
+    row.alignment = 'EXPAND'
+    row.operator('wm.blui_start_system', text=iface(label), icon=icon,
+                 emboss=False, translate=False).action = action
 
 
 def draw_menu(layout, context):
     settings, value = context.window_manager.blui_start_menu_settings, start_menu.snapshot()
     layout.use_property_split = False
     layout.use_property_decorate = False
-    heading = layout.row(align=True)
-    heading.label(text=iface('Start'), icon='WINDOW', translate=False)
-    heading.operator('wm.blui_start_refresh', text='', icon='FILE_REFRESH')
-    if _role(context.window) == 'STARTMENU':
-        heading.operator('wm.window_close', text='', icon='X').force_close = True
-    layout.prop(settings, 'query', text='', icon='VIEWZOOM')
-    layout.prop(settings, 'section', expand=True)
+    layout.operator_context = 'INVOKE_DEFAULT'
+    dimensions = start_menu_layout.metrics(context.region.height, context.preferences.system.ui_scale,
+        empty=not settings.items and value['loaded'])
+    columns = layout.split(factor=.64)
+    left = columns.column(align=True)
+    heading = left.row(align=True)
+    caption = 'Search Results' if settings.query.strip() else 'All Programs' if settings.section == 'ALL' else 'Start'
+    heading.label(text=iface(caption), translate=False)
     if value['loading']:
-        layout.label(text=iface('Loading Apps'), icon='TIME', translate=False)
+        heading.label(text='', icon='TIME')
     if value['error']:
-        box = layout.box()
-        box.label(text=value['error'][:100], icon='ERROR', translate=False)
-    if value['truncated']:
-        layout.label(text=iface('App list limited; refresh to update'), icon='INFO', translate=False)
-    rows = _rows(settings, value)
-    pages = max(1, (len(rows) + PAGE_SIZE - 1) // PAGE_SIZE)
-    page = min(settings.page, pages - 1)
-    current = rows[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]
-    if not current and value['loaded']:
-        layout.label(text=iface('No Matching Apps'), icon='INFO', translate=False)
-    if settings.section == 'PINNED' and value['pins'] and not settings.query.strip():
-        grid = layout.grid_flow(columns=3, even_columns=True, align=True)
-        for row in current:
-            cell = grid.column(align=True)
-            _app_button(cell, row)
-            cell.operator('wm.blui_start_pin', text=iface('Unpin App'), icon='UNPINNED', translate=False).app_id = row['id']
+        heading.label(text='', icon='ERROR')
+    if not settings.items and value['loaded']:
+        left.label(text=iface('No Matching Apps'), icon='INFO', translate=False)
+    # UIList consumes wheel events itself. The right system column and bottom
+    # search field do not move or change DPI when the application list scrolls.
+    left.template_list('BLUI_UL_start_programs', 'start_programs', settings, 'items',
+                       settings, 'active', rows=dimensions['rows'], maxrows=dimensions['rows'])
+    left.separator(factor=.6)
+    programs = left.row()
+    programs.scale_y = 1.3
+    programs.alignment = 'EXPAND'
+    if settings.section == 'ALL' or settings.query.strip():
+        programs.operator('wm.blui_start_view', text=iface('Back'), icon='TRIA_LEFT',
+                          emboss=False, translate=False).section = 'HOME'
     else:
-        for row in current:
-            line = layout.row(align=True)
-            _app_button(line, row)
-            pinned = row['id'] in value['pins']
-            op = line.operator('wm.blui_start_pin', text='', icon='PINNED' if pinned else 'UNPINNED', depress=pinned)
-            op.app_id = row['id']
-    if pages > 1:
-        pager = layout.row(align=True)
-        prev = pager.row()
-        prev.enabled = page > 0
-        prev.operator('wm.blui_start_page', text='', icon='TRIA_LEFT').page = max(0, page - 1)
-        pager.label(text=f'{page + 1} / {pages}', translate=False)
-        next_page = pager.row()
-        next_page.enabled = page + 1 < pages
-        next_page.operator('wm.blui_start_page', text='', icon='TRIA_RIGHT').page = page + 1
-    layout.separator()
-    system = layout.row(align=True)
-    system.operator('wm.blui_start_system', text=iface('Files'), icon='FILE_FOLDER', translate=False).action = 'FILES'
-    system.operator('wm.blui_start_system', text=iface('Windows Settings'), icon='PREFERENCES', translate=False).action = 'SETTINGS'
-    system.menu('BLUI_MT_start_power', text=iface('Power'), icon='QUIT', translate=False)
+        programs.operator('wm.blui_start_view', text=iface('All Programs'), icon='TRIA_RIGHT',
+                          emboss=False, translate=False).section = 'ALL'
+    left.separator(factor=.6)
+    left.prop(settings, 'query', text='', icon='VIEWZOOM')
+    left.label(text=iface('Search Programs'), translate=False)
+
+    right = columns.column().box().column(align=True)
+    user = right.row()
+    user.scale_y = dimensions['user_scale']
+    user.alignment = 'LEFT'
+    user.label(text=_username or iface('User'), icon='USER', translate=False)
+    right.separator(factor=dimensions['separator'])
+    for action, label, icon in (
+            ('FILES', 'User Files', 'FILE_FOLDER'), ('DOCUMENTS', 'Documents', 'FILE'),
+            ('PICTURES', 'Pictures', 'IMAGE_DATA'), ('MUSIC', 'Music', 'SOUND'),
+            ('DOWNLOADS', 'Downloads', 'IMPORT'), ('COMPUTER', 'Computer', 'DESKTOP')):
+        if action not in dimensions['hidden']:
+            _system_button(right, action, label, icon, scale=dimensions['row_scale'])
+    if dimensions['hidden']:
+        places = right.row()
+        places.scale_y = dimensions['row_scale']
+        places.menu('BLUI_MT_start_locations', text=iface('More Places'), icon='FILE_FOLDER', translate=False)
+    right.separator(factor=dimensions['separator'])
+    if 'CONTROL_PANEL' not in dimensions['hidden']:
+        _system_button(right, 'CONTROL_PANEL', 'Control Panel', 'PREFERENCES', scale=dimensions['row_scale'])
+    _system_button(right, 'SETTINGS', 'Windows Settings', 'PREFERENCES', scale=dimensions['row_scale'])
+    refresh = right.row()
+    refresh.scale_y = dimensions['row_scale']
+    refresh.alignment = 'EXPAND'
+    refresh.operator('wm.blui_start_refresh', text=iface('Refresh Apps'), icon='FILE_REFRESH',
+                     emboss=False, translate=False)
+    # Both columns remain fixed; only the native list above owns scrolling.
+    if dimensions['spacer_units']:
+        spacer = right.column()
+        spacer.ui_units_y = dimensions['spacer_units']
+        spacer.label(text='')
+    power = right.row(align=True)
+    power.scale_y = 1.3
+    power.operator('wm.blui_start_system', text=iface('Shut Down'), icon='QUIT', translate=False).action = 'SHUTDOWN'
+    power.menu('BLUI_MT_start_power', text='', icon='TRIA_DOWN')
 
 
 class WM_OT_blui_start_menu(Operator):
@@ -171,7 +192,9 @@ class WM_OT_blui_start_menu(Operator):
         start_menu.ensure(session.storage_directory())
         settings = context.window_manager.blui_start_menu_settings
         settings.query = ''
-        settings.section = 'PINNED' if start_menu.snapshot()['pins'] else 'ALL'
+        settings.section = 'HOME'
+        settings.expanded_folders = ''
+        contents.sync(settings, start_menu.snapshot())
         if _shell_windows_available():
             source = context.window
             window = next((window for window in context.window_manager.windows if _role(window) == 'STARTMENU'), None)
@@ -192,8 +215,9 @@ class WM_OT_blui_start_menu(Operator):
                 bpy.app.timers.register(_focus_tick, first_interval=.3)
             _redraw_menus(context)
             return {'FINISHED'}
-        # Useful for older developer binaries; release taskbars always use the full independent window.
-        return context.window_manager.invoke_props_dialog(self, width=WIDTH)
+        # A dialog in a 56px taskbar is clipped by its HWND and cannot be a Start menu.
+        self.report({'ERROR'}, iface('Could not open Start menu'))
+        return {'CANCELLED'}
 
     def execute(self, _context):
         return {'FINISHED'}
@@ -215,10 +239,10 @@ class WM_OT_blui_shell_popup_close(Operator):
 
     @classmethod
     def poll(cls, context):
-        return _role(context.window) in {'STARTMENU', 'TASK_CHOOSER'}
+        return _role(context.window) in {'STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'}
 
     def execute(self, context):
-        if _role(context.window) not in {'STARTMENU', 'TASK_CHOOSER'}:
+        if _role(context.window) not in {'STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'}:
             return {'CANCELLED'}
         bpy.ops.wm.window_close(force_close=True)
         return {'FINISHED'}
@@ -246,13 +270,13 @@ class WM_OT_blui_start_pin(Operator):
         return {'FINISHED'}
 
 
-class WM_OT_blui_start_page(Operator):
-    bl_idname = 'wm.blui_start_page'
-    bl_label = 'App Page'
-    page: IntProperty(min=0, max=68, options={'HIDDEN', 'SKIP_SAVE'})
+class WM_OT_blui_start_location(Operator):
+    bl_idname = 'wm.blui_start_location'
+    bl_label = 'Open File Location'
+    app_id: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
 
     def execute(self, context):
-        context.window_manager.blui_start_menu_settings.page = self.page
+        start_menu.open_location(self.app_id)
         _redraw_menus(context)
         return {'FINISHED'}
 
@@ -261,7 +285,9 @@ class WM_OT_blui_start_system(Operator):
     bl_idname = 'wm.blui_start_system'
     bl_label = 'Start Menu System Action'
     action: EnumProperty(items=tuple((key, label, '') for key, label in
-        (('FILES', 'Files'), ('SETTINGS', 'Windows Settings'), ('POWER_SETTINGS', 'Power Settings'),
+        (('FILES', 'User Files'), ('DOCUMENTS', 'Documents'), ('PICTURES', 'Pictures'),
+         ('MUSIC', 'Music'), ('DOWNLOADS', 'Downloads'), ('COMPUTER', 'Computer'),
+         ('CONTROL_PANEL', 'Control Panel'), ('SETTINGS', 'Windows Settings'), ('POWER_SETTINGS', 'Power Settings'),
          ('LOCK', 'Lock Windows'), ('SHUTDOWN', 'Shut Down Windows'), ('RESTART', 'Restart Windows'))))
 
     def invoke(self, context, _event):
@@ -294,6 +320,17 @@ class BLUI_MT_start_power(Menu):
             self.layout.operator('wm.blui_start_system', text=iface(label), icon=icon, translate=False).action = action
 
 
+class BLUI_MT_start_locations(Menu):
+    bl_label = 'More Places'
+
+    def draw(self, _context):
+        self.layout.operator_context = 'INVOKE_DEFAULT'
+        for action, label, icon in (('DOCUMENTS', 'Documents', 'FILE'),
+                ('PICTURES', 'Pictures', 'IMAGE_DATA'), ('MUSIC', 'Music', 'SOUND'),
+                ('DOWNLOADS', 'Downloads', 'IMPORT'), ('CONTROL_PANEL', 'Control Panel', 'PREFERENCES')):
+            self.layout.operator('wm.blui_start_system', text=iface(label), icon=icon, translate=False).action = action
+
+
 class BLUI_PT_start_menu(Panel):
     bl_space_type = 'INFO'
     bl_region_type = 'WINDOW'
@@ -308,6 +345,7 @@ class BLUI_PT_start_menu(Panel):
         draw_menu(self.layout, context)
 
 
-classes = (BLUI_StartMenuSettings, WM_OT_blui_start_menu, WM_OT_blui_start_refresh,
-           WM_OT_blui_start_launch, WM_OT_blui_start_pin, WM_OT_blui_start_page,
-           WM_OT_blui_start_system, WM_OT_blui_shell_popup_close, BLUI_MT_start_power, BLUI_PT_start_menu)
+classes = contents.classes + (WM_OT_blui_start_menu, WM_OT_blui_start_refresh,
+           WM_OT_blui_start_launch, WM_OT_blui_start_pin, WM_OT_blui_start_location,
+           WM_OT_blui_start_system, WM_OT_blui_shell_popup_close, BLUI_MT_start_power,
+           BLUI_MT_start_locations, BLUI_PT_start_menu)

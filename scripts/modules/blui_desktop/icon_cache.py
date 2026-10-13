@@ -25,8 +25,26 @@ def value(path):
     return entry
 
 
+def cached_value(path):
+    """Read synthetic (notification) textures without enqueueing a file request."""
+    value = _icons.get(path, 0)
+    if path in _icons:
+        _icons.move_to_end(path)
+    return value
+
+
+def application(group):
+    """Packaged apps are keyed by AUMID, never by their shared broker executable."""
+    identity = group.get('app_id', '')
+    if isinstance(identity, str) and '!' in identity and 0 < len(identity) <= 512 and '\x00' not in identity:
+        return value('aumid:' + identity)
+    return value(group.get('executable', ''))
+
+
 def pending():
     batch = list(_queued)[:4]
+    if any(path.startswith('aumid:') for path in batch):
+        batch = batch[:1]  # A package lookup + native PNG decoder has its own deadline.
     _queued.difference_update(batch)
     return batch
 

@@ -26,6 +26,7 @@ bar = None
 main_pointer = source.as_pointer()
 main_screen = source.screen.as_pointer()
 menu_pointer = None
+paint_due = None
 
 
 def menus():
@@ -47,7 +48,7 @@ def finish(code):
 
 
 def tick():
-    global phase, due, app, bar, menu_pointer
+    global phase, due, app, bar, menu_pointer, paint_due
     try:
         if time.monotonic() - started > 35:
             raise AssertionError('Start menu native QA timed out')
@@ -68,6 +69,15 @@ def tick():
                 assert not value['error'], value['error']
                 return .05
             assert value['rows'], 'Readonly Programs fixture should find installed Windows apps'
+            settings = bpy.context.window_manager.blui_start_menu_settings
+            if not settings.items:
+                # The index must populate the open menu without typing or reopening.
+                return .05
+            assert any(item.kind == 'APP' for item in settings.items), 'Index loaded but no app buttons reached UI RNA'
+            if paint_due is None:
+                paint_due = time.monotonic() + .3
+            if time.monotonic() < paint_due:
+                return .05  # Allow the native draw after the asynchronous RNA update.
             menu = menus()[0]
             assert menu.width >= 450 and menu.height >= 500, 'Start menu must not be clipped to a thin taskbar'
             from blui_desktop import native_windows
@@ -75,7 +85,6 @@ def tick():
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             from qa_shell_pixels import verify
             verify(menu, 'start-menu')
-            settings = bpy.context.window_manager.blui_start_menu_settings
             settings.query = 'BLUI QA input is not a command && shutdown /s'
             assert start_menu_ui._rows(settings, value) == []
             app = value['rows'][0]
