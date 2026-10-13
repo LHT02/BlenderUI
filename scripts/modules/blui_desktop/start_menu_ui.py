@@ -288,18 +288,19 @@ class WM_OT_blui_start_system(Operator):
         (('FILES', 'User Files'), ('DOCUMENTS', 'Documents'), ('PICTURES', 'Pictures'),
          ('MUSIC', 'Music'), ('DOWNLOADS', 'Downloads'), ('COMPUTER', 'Computer'),
          ('CONTROL_PANEL', 'Control Panel'), ('SETTINGS', 'Windows Settings'), ('POWER_SETTINGS', 'Power Settings'),
-         ('LOCK', 'Lock Windows'), ('SHUTDOWN', 'Shut Down Windows'), ('RESTART', 'Restart Windows'))))
+         ('LOCK', 'Lock Windows'), ('SHUTDOWN', 'Shut Down Windows'), ('RESTART', 'Restart Windows'),
+         ('HIBERNATE', 'Hibernate Windows'))))
 
     def invoke(self, context, _event):
-        if self.action in {'LOCK', 'SHUTDOWN', 'RESTART'}:
+        if self.action in {'LOCK', 'SHUTDOWN', 'RESTART', 'HIBERNATE'}:
             return context.window_manager.invoke_props_dialog(self, width=440)
         return self.execute(context)
 
     def draw(self, _context):
         label = {'LOCK': 'Lock Windows?', 'SHUTDOWN': 'Shut Down Windows?',
-                 'RESTART': 'Restart Windows?'}.get(self.action, 'Continue?')
+                 'RESTART': 'Restart Windows?', 'HIBERNATE': 'Hibernate Windows?'}.get(self.action, 'Continue?')
         self.layout.label(text=iface(label), icon='QUESTION', translate=False)
-        if self.action in {'SHUTDOWN', 'RESTART'}:
+        if self.action in {'SHUTDOWN', 'RESTART', 'HIBERNATE'}:
             self.layout.label(text=iface('Save your work before continuing'), translate=False)
 
     def execute(self, context):
@@ -313,6 +314,9 @@ class BLUI_MT_start_power(Menu):
 
     def draw(self, _context):
         self.layout.operator_context = 'INVOKE_DEFAULT'
+        from . import power_state
+        if power_state.snapshot()['hibernate']:
+            self.layout.operator('wm.blui_start_system', text=iface('Hibernate'), icon='TIME', translate=False).action = 'HIBERNATE'
         for action, label, icon in (('POWER_SETTINGS', 'Power Settings', 'PREFERENCES'),
                                     ('LOCK', 'Lock Windows', 'LOCKED'),
                                     ('SHUTDOWN', 'Shut Down Windows', 'QUIT'),

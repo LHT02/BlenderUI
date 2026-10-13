@@ -23,6 +23,8 @@
 #include <Dwmapi.h>
 
 #include <assert.h>
+#include <atomic>
+#include <cstdint>
 #include <math.h>
 #include <shellscalingapi.h>
 #include <shellapi.h>
@@ -55,7 +57,9 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
                                      bool is_debug,
                                      bool dialog,
                                      bool shell_window,
-                                     bool taskbar_window)
+                                     bool taskbar_window,
+                                     bool desktop_window,
+                                     bool passive_window)
     : GHOST_Window(width, height, state, wantStereoVisual, false),
       m_mousePresent(false),
       m_inLiveResize(false),
@@ -64,6 +68,10 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
       m_hWnd(0),
       m_bluiAppBarPreviousProc(nullptr),
       m_bluiAppBarNotifying(false),
+      m_bluiDesktopWindow(desktop_window),
+      m_bluiDesktopReady(false),
+      m_bluiDesktopCleanupHwnd(nullptr),
+      m_bluiDesktopCleanupDC(nullptr),
       m_hDC(0),
       m_isDialog(dialog),
       m_hasMouseCaptured(false),
@@ -80,6 +88,11 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
       m_directManipulationHelper(NULL),
       m_debug_context(is_debug)
 {
+  /* Desktop loss must retain the exact GL context for context-local GPU cleanup.
+   * Other backends need an equivalent surface-loss contract before opting in. */
+  if (desktop_window && type != GHOST_kDrawingContextTypeOpenGL) {
+    return;
+  }
   DWORD style = parentwindow ?
                     WS_POPUPWINDOW | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX :
                     WS_OVERLAPPEDWINDOW;
@@ -95,7 +108,7 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
   DWORD extended_style = parentwindow ? WS_EX_APPWINDOW : 0;
   if (shell_window) {
     extended_style = WS_EX_TOOLWINDOW;
-    if (taskbar_window) {
+    if (taskbar_window || passive_window) {
       extended_style |= WS_EX_NOACTIVATE;
     }
   }
@@ -112,7 +125,7 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 
   wchar_t *title_16 = alloc_utf16_from_8((char *)title, 0);
   m_hWnd = ::CreateWindowExW(extended_style,                 /* window extended style */
-                             s_windowClassName,              /* pointer to registered class name */
+                             desktop_window ? L"BLUI_DesktopWindowClass" : s_windowClassName,
                              title_16,                       /* pointer to window name */
                              style,                          /* window style */
                              win_rect.left,                  /* horizontal position of window */
@@ -148,10 +161,14 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
     ::ReleaseDC(m_hWnd, m_hDC);
     ::DestroyWindow(m_hWnd);
     m_hWnd = NULL;
-    if (!parentwindow) {
+    if (!parentwindow && !shell_window) {
       exit(0);
     }
     return;
+  }
+
+  if (desktop_window && !createBluiDesktopCleanupSurface()) {
+    return;  /* Fail closed; never host a canvas whose GPU cleanup cannot survive parent loss. */
   }
 
   RegisterTouchWindow(m_hWnd, 0);
@@ -162,6 +179,18 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 
   /* Store a pointer to this class in the window structure. */
   ::SetWindowLongPtr(m_hWnd, GWLP_USERDATA, (LONG_PTR)this);
+  if (desktop_window) {
+    static std::atomic<uintptr_t> next_instance{0};
+    uintptr_t instance = next_instance.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (!instance) {
+      instance = next_instance.fetch_add(1, std::memory_order_relaxed) + 1;
+    }
+    if (!::SetPropW(m_hWnd, L"BLUI.DesktopInstance.v1", reinterpret_cast<HANDLE>(instance)) ||
+        !::SetPropW(m_hWnd, L"BLUI.DesktopHost.v1", reinterpret_cast<HANDLE>(1))) {
+      return;
+    }
+    m_bluiDesktopReady = true;
+  }
   if (taskbar_window) {
     m_bluiAppBarPreviousProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(
         m_hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(bluiAppBarWndProc)));
@@ -194,8 +223,11 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
   }
 
   ThemeRefresh();
-  if (taskbar_window) {
+  if (taskbar_window || passive_window) {
     nCmdShow = SW_SHOWNOACTIVATE;
+  }
+  if (desktop_window) {
+    nCmdShow = SW_HIDE;  /* Host helper explicitly shows only after verified attachment. */
   }
 
   ::ShowWindow(m_hWnd, nCmdShow);
@@ -227,9 +259,12 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
     loadWintab(GHOST_kWindowStateMinimized != state);
   }
 
-  /* Allow the showing of a progress bar on the taskbar. */
-  CoCreateInstance(
-      CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, (LPVOID *)&m_Bar);
+  /* Desktop children have no taskbar button/progress. Keep Explorer progress
+   * COM entirely out of their creation and teardown; normal windows retain it. */
+  if (!m_bluiDesktopWindow) {
+    CoCreateInstance(
+        CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, (LPVOID *)&m_Bar);
+  }
 
   /* Initialize Direct Manipulation. */
   m_directManipulationHelper = GHOST_DirectManipulationHelper::create(m_hWnd, getDPIHint());
@@ -271,7 +306,9 @@ GHOST_TTrackpadInfo GHOST_WindowWin32::getTrackpadInfo()
 GHOST_WindowWin32::~GHOST_WindowWin32()
 {
   if (m_Bar) {
-    m_Bar->SetProgressState(m_hWnd, TBPF_NOPROGRESS);
+    if (m_hWnd) {
+      m_Bar->SetProgressState(m_hWnd, TBPF_NOPROGRESS);
+    }
     m_Bar->Release();
     m_Bar = NULL;
   }
@@ -310,17 +347,16 @@ GHOST_WindowWin32::~GHOST_WindowWin32()
       }
     }
 
-    if (m_dropTarget) {
-      /* Disable DragDrop. */
-      RevokeDragDrop(m_hWnd);
-      /* Release our reference of the DropTarget and it will delete itself eventually. */
-      m_dropTarget->Release();
-      m_dropTarget = NULL;
-    }
+    releaseDropTarget();
+    ::RemovePropW(m_hWnd, L"BLUI.DesktopHost.v1");
+    ::RemovePropW(m_hWnd, L"BLUI.DesktopInstance.v1");
     ::SetWindowLongPtr(m_hWnd, GWLP_USERDATA, NULL);
     ::DestroyWindow(m_hWnd);
     m_hWnd = 0;
   }
+
+  releaseDropTarget();  /* Also release our COM reference after unexpected native destruction. */
+  releaseBluiDesktopCleanupSurface();
 
   delete m_directManipulationHelper;
   m_directManipulationHelper = NULL;
@@ -380,7 +416,7 @@ bool GHOST_WindowWin32::handleBluiAppBarMessage(UINT message, WPARAM wparam, LPA
     return true;
   }
   if (message == blui_appbar_callback) {
-    if (wparam == ABN_POSCHANGED) {
+    if (wparam == ABN_POSCHANGED || wparam == ABN_STATECHANGE) {
       /* Timer reads the generation. Never synchronously QUERY/SETPOS from WndProc. */
       blui_appbar_bump(m_hWnd, blui_appbar_generation);
     }
@@ -480,7 +516,91 @@ void GHOST_WindowWin32::adjustWindowRectForClosestMonitor(LPRECT win_rect,
 
 bool GHOST_WindowWin32::getValid() const
 {
-  return GHOST_Window::getValid() && m_hWnd != 0 && m_hDC != 0;
+  return GHOST_Window::getValid() && m_hWnd != 0 && m_hDC != 0 &&
+         (!m_bluiDesktopWindow || m_bluiDesktopReady);
+}
+
+bool GHOST_WindowWin32::createBluiDesktopCleanupSurface()
+{
+  RECT rect = {};
+  ::GetWindowRect(m_hWnd, &rect);
+  m_bluiDesktopCleanupHwnd = ::CreateWindowExW(WS_EX_TOOLWINDOW,
+                                             L"STATIC",
+                                             L"BLUI Desktop GPU Cleanup",
+                                             WS_POPUP,
+                                             rect.left,
+                                             rect.top,
+                                             1,
+                                             1,
+                                             nullptr,
+                                             nullptr,
+                                             ::GetModuleHandleW(nullptr),
+                                             nullptr);
+  if (!m_bluiDesktopCleanupHwnd) {
+    return false;
+  }
+  m_bluiDesktopCleanupDC = ::GetDC(m_bluiDesktopCleanupHwnd);
+  const int format = ::GetPixelFormat(m_hDC);
+  PIXELFORMATDESCRIPTOR descriptor = {};
+  return m_bluiDesktopCleanupDC && format &&
+         ::DescribePixelFormat(m_hDC, format, sizeof(descriptor), &descriptor) &&
+         ::SetPixelFormat(m_bluiDesktopCleanupDC, format, &descriptor);
+}
+
+void GHOST_WindowWin32::releaseBluiDesktopCleanupSurface()
+{
+  if (m_bluiDesktopCleanupDC) {
+    /* Only after queued WM GPU cleanup: detach the context from its parking DC. */
+    releaseNativeHandles();
+    ::ReleaseDC(m_bluiDesktopCleanupHwnd, m_bluiDesktopCleanupDC);
+    m_bluiDesktopCleanupDC = nullptr;
+  }
+  if (m_bluiDesktopCleanupHwnd) {
+    ::DestroyWindow(m_bluiDesktopCleanupHwnd);
+    m_bluiDesktopCleanupHwnd = nullptr;
+  }
+}
+
+void GHOST_WindowWin32::releaseDropTarget()
+{
+  if (m_dropTarget) {
+    if (m_hWnd) {
+      ::RevokeDragDrop(m_hWnd);
+    }
+    m_dropTarget->Release();
+    m_dropTarget = nullptr;
+  }
+}
+
+void GHOST_WindowWin32::invalidateBluiDesktopHandle()
+{
+  /* Keep the C++/GPU objects alive until the queued window-close event cancels
+   * native handlers and removes RNA. Never free them from WM_NCDESTROY. */
+  if (m_bluiDesktopWindow && m_hWnd) {
+    /* Rebind this exact HGLRC, not another normal window's GL context: VAO/FBO
+     * names are context-local. The private 1px surface is never shown or parented. */
+    static_cast<GHOST_ContextWGL *>(getContext())->setBluiDesktopCleanupHandles(
+        m_bluiDesktopCleanupHwnd, m_bluiDesktopCleanupDC);
+    releaseDropTarget();
+    closeWintab();
+    delete m_directManipulationHelper;
+    m_directManipulationHelper = nullptr;
+    ::ReleaseDC(m_hWnd, m_hDC);
+    m_hDC = nullptr;
+    m_hWnd = nullptr;
+    m_bluiDesktopReady = false;
+  }
+}
+
+GHOST_TSuccess GHOST_WindowWin32::swapBuffers()
+{
+  return m_bluiDesktopWindow && !getValid() ? GHOST_kFailure : GHOST_Window::swapBuffers();
+}
+
+GHOST_TSuccess GHOST_WindowWin32::activateDrawingContext()
+{
+  return m_bluiDesktopWindow && !getValid() ? GHOST_kFailure :
+                                            GHOST_Window::activateDrawingContext();
 }
 
 HWND GHOST_WindowWin32::getHWND() const
@@ -508,7 +628,7 @@ std::string GHOST_WindowWin32::getTitle() const
 
 void GHOST_WindowWin32::getWindowBounds(GHOST_Rect &bounds) const
 {
-  RECT rect;
+  RECT rect = {};
   ::GetWindowRect(m_hWnd, &rect);
   bounds.m_b = rect.bottom;
   bounds.m_l = rect.left;
@@ -518,9 +638,9 @@ void GHOST_WindowWin32::getWindowBounds(GHOST_Rect &bounds) const
 
 void GHOST_WindowWin32::getClientBounds(GHOST_Rect &bounds) const
 {
-  RECT rect;
+  RECT rect = {};
   POINT coord;
-  if (!IsIconic(m_hWnd)) {
+  if (m_hWnd && !IsIconic(m_hWnd)) {
     ::GetClientRect(m_hWnd, &rect);
 
     coord.x = rect.left;
@@ -547,6 +667,9 @@ void GHOST_WindowWin32::getClientBounds(GHOST_Rect &bounds) const
 
 GHOST_TSuccess GHOST_WindowWin32::setClientWidth(uint32_t width)
 {
+  if (!m_hWnd) {
+    return GHOST_kFailure;
+  }
   GHOST_TSuccess success;
   GHOST_Rect cBnds, wBnds;
   getClientBounds(cBnds);
@@ -566,6 +689,9 @@ GHOST_TSuccess GHOST_WindowWin32::setClientWidth(uint32_t width)
 
 GHOST_TSuccess GHOST_WindowWin32::setClientHeight(uint32_t height)
 {
+  if (!m_hWnd) {
+    return GHOST_kFailure;
+  }
   GHOST_TSuccess success;
   GHOST_Rect cBnds, wBnds;
   getClientBounds(cBnds);
@@ -585,6 +711,9 @@ GHOST_TSuccess GHOST_WindowWin32::setClientHeight(uint32_t height)
 
 GHOST_TSuccess GHOST_WindowWin32::setClientSize(uint32_t width, uint32_t height)
 {
+  if (!m_hWnd) {
+    return GHOST_kFailure;
+  }
   GHOST_TSuccess success;
   GHOST_Rect cBnds, wBnds;
   getClientBounds(cBnds);
@@ -638,6 +767,9 @@ void GHOST_WindowWin32::clientToScreen(int32_t inX,
 
 GHOST_TSuccess GHOST_WindowWin32::setState(GHOST_TWindowState state)
 {
+  if (!m_hWnd) {
+    return GHOST_kFailure;
+  }
   GHOST_TWindowState curstate = getState();
   LONG_PTR style = GetWindowLongPtr(m_hWnd, GWL_STYLE) | WS_CAPTION;
   WINDOWPLACEMENT wp;
@@ -681,6 +813,9 @@ GHOST_TSuccess GHOST_WindowWin32::setState(GHOST_TWindowState state)
 
 GHOST_TSuccess GHOST_WindowWin32::setOrder(GHOST_TWindowOrder order)
 {
+  if (!m_hWnd) {
+    return GHOST_kFailure;
+  }
   HWND hWndInsertAfter, hWndToRaise;
 
   if (order == GHOST_kWindowOrderBottom) {
@@ -807,6 +942,9 @@ bool GHOST_WindowWin32::isDialog() const
 
 void GHOST_WindowWin32::updateMouseCapture(GHOST_MouseCaptureEventWin32 event)
 {
+  if (!m_hWnd) {
+    return;
+  }
   switch (event) {
     case MousePressed:
       m_nPressedButtons++;
@@ -988,6 +1126,9 @@ GHOST_TSuccess GHOST_WindowWin32::setWindowCursorVisibility(bool visible)
 
 GHOST_TSuccess GHOST_WindowWin32::setWindowCursorGrab(GHOST_TGrabCursorMode mode)
 {
+  if (!m_hWnd) {
+    return GHOST_kFailure;
+  }
   if (mode != GHOST_kGrabDisable) {
     if (mode != GHOST_kGrabNormal) {
       m_system->getCursorPosition(m_cursorGrabInitPos[0], m_cursorGrabInitPos[1]);
@@ -1130,6 +1271,9 @@ GHOST_Wintab *GHOST_WindowWin32::getWintab() const
 
 void GHOST_WindowWin32::loadWintab(bool enable)
 {
+  if (!m_hWnd) {
+    return;
+  }
   if (!m_wintab) {
     WINTAB_PRINTF("Loading Wintab for window %p\n", m_hWnd);
     if (m_wintab = GHOST_Wintab::loadWintab(m_hWnd)) {
@@ -1189,6 +1333,9 @@ GHOST_TabletData GHOST_WindowWin32::getTabletData()
 
 void GHOST_WindowWin32::ThemeRefresh()
 {
+  if (!m_hWnd) {
+    return;
+  }
   const GHOST_ThemePaletteWin32 palette = GHOST_ThemeWin32_Palette(false);
   const BOOL dark = palette.dark && !palette.high_contrast;
   /* Use documented Windows 11 attribute 20, with the pre-2004 Windows 10 fallback.

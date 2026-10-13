@@ -326,6 +326,9 @@ static void screen_foreach_id(ID *id, LibraryForeachIDData *data)
 static void screen_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   bScreen *screen = (bScreen *)id;
+  if (screen->temp && (screen->flag & SCREEN_BLUI_DESKTOP_HOST)) {
+    return;  /* Process-local host screen; normal Node editors remain ordinary saved UI. */
+  }
 
   /* write LibData */
   /* in 2.50+ files, the file identifier for screens is patched, forward compatibility */

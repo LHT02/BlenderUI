@@ -553,6 +553,12 @@ struct wmEventHandler_Op *WM_event_add_modal_handler(struct bContext *C, struct 
  */
 bool WM_window_has_modal_interaction(const struct wmWindow *win);
 /**
+ * Desktop lifecycle only: distinguishes idle, unpressed button highlights from real edits.
+ * Do not substitute this for the conservative editor-data replacement gate above.
+ */
+bool WM_window_has_desktop_interaction(const struct wmWindowManager *wm,
+                                      const struct wmWindow *win);
+/**
  * Modal handlers store a pointer to an area which might be freed while the handler runs.
  * Use this function to NULL all handler pointers to \a old_area.
  */

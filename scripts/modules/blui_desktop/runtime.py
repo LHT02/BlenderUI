@@ -24,6 +24,7 @@ _last_monitors = 0.0
 _background_due = {}
 _preview_paths = {}
 _shell_retry_due = 0.0
+_reservation_state = None
 
 
 def identity(tree):
@@ -129,7 +130,7 @@ def shell_interaction_busy():
     # Private INFO/WM shell lists never mutate document/node RNA. An ordinary
     # hover in a NORMAL editor must not starve their async updates. Native shell
     # classification still protects editing, popups, dragging and held buttons.
-    return any(window.blui_shell_role != 'NORMAL' and window.blui_has_modal_interaction
+    return any(window.blui_shell_role not in {'NORMAL', 'DESKTOP'} and window.blui_has_modal_interaction
                for window in bpy.context.window_manager.windows)
 
 
@@ -139,6 +140,8 @@ def cancel_pending(_dummy=None):
     client.close_all()
     global _epoch
     _epoch += 1
+    from . import desktop_service
+    desktop_service.cancel_pending()  # Undo detaches safely without closing canvas RNA.
     _jobs.clear()
     _ready.clear()
     _origins.clear()
@@ -151,10 +154,14 @@ def cancel_pending(_dummy=None):
     _preview_paths.clear()
     from . import start_menu
     start_menu.close()
+    from . import power_state
+    power_state.close()
     from . import folder_panels
     folder_panels.close()
     from . import shell_hover, taskbar_previews, taskbar_appbar, taskbar_settings, notification_client
     shell_hover.close()
+    from . import notification_hover
+    notification_hover.close()
     taskbar_previews.close_all()
     taskbar_appbar.close_all()
     taskbar_settings.shutdown()
@@ -164,17 +171,20 @@ def cancel_pending(_dummy=None):
 
 
 def tick():
-    global _tasks, _task_error, _last_tasks, _monitors, _last_monitors, _shell_retry_due
+    global _tasks, _task_error, _last_tasks, _monitors, _last_monitors, _shell_retry_due, _reservation_state
     live = [(window, area) for window in bpy.context.window_manager.windows for area in window.screen.areas
             if area.type == 'NODE_EDITOR']
     shell = [(window, area) for window in bpy.context.window_manager.windows for area in window.screen.areas
-             if getattr(window, 'blui_shell_role', 'NORMAL') != 'NORMAL']
+             if getattr(window, 'blui_shell_role', 'NORMAL') not in {'NORMAL', 'DESKTOP'}]
     from . import taskbar_windows
-    service_live = live or shell or taskbar_windows.needs_service()
+    from . import desktop_service
+    service_live = live or shell or taskbar_windows.needs_service() or desktop_service.needs_service()
     from . import folder_panels
     folder_panels.tick(__import__(__name__, fromlist=['']), live)
     from . import start_menu
     start_menu.tick()
+    from . import power_state
+    power_state.tick(any(window.blui_shell_role == 'STARTMENU' for window in bpy.context.window_manager.windows))
     from . import taskbar_settings, taskbar_options_ui, notification_client, session
     if service_live:
         taskbar_settings.service_tick(session.storage_directory())
@@ -184,6 +194,12 @@ def tick():
     elif not taskbar_windows.role_windows('TASKBAR'):
         notification_client.close()
     notification_client.poll()
+    from . import taskbar
+    reservation = taskbar.snapshot()
+    reservation_key = (reservation.get('reservation_reclaimed'), reservation.get('reservation_pending'))
+    if reservation_key != _reservation_state:
+        _reservation_state, _last_monitors = reservation_key, 0.0
+        taskbar_windows._appbar.invalidate()
     if not bpy.context.window_manager.blui_has_path_drag:
         from .file_actions import clear_drag
         clear_drag()
@@ -336,13 +352,14 @@ def tick():
                         _background_due[key] = time.monotonic() + 30
                     except RuntimeError:
                         break
+    desktop_service.tick(_monitors)  # May close only its OWN DESKTOP, after all old live-area consumers.
     # Shell services may close a popup during this tick. Never dereference
     # areas captured before those closures (RNA Window/Screen may already be freed).
     for window in bpy.context.window_manager.windows:
         for area in window.screen.areas:
             if area.type == 'NODE_EDITOR' or window.blui_shell_role != 'NORMAL':
                 area.tag_redraw()
-    return .1 if shell or _jobs or _ready or start_menu.busy() else 1.0
+    return .1 if shell or _jobs or _ready or start_menu.busy() or desktop_service.needs_service() else 1.0
 
 
 def register():
@@ -352,6 +369,9 @@ def register():
     notification_ui.register_props()
     taskbar_windows.register()
     background.register(monitor_snapshot)
+    from . import desktop_service
+    if desktop_service.load_pre not in bpy.app.handlers.load_pre:
+        bpy.app.handlers.load_pre.append(desktop_service.load_pre)
     for handlers in (bpy.app.handlers.undo_pre, bpy.app.handlers.redo_pre, bpy.app.handlers.load_pre):
         if cancel_pending not in handlers:
             handlers.append(cancel_pending)
@@ -401,6 +421,10 @@ def register():
 
 
 def unregister():
+    from . import desktop_service
+    desktop_service.shutdown()
+    if desktop_service.load_pre in bpy.app.handlers.load_pre:
+        bpy.app.handlers.load_pre.remove(desktop_service.load_pre)
     from . import start_menu_ui, taskbar, taskbar_windows, taskbar_options_ui, notification_ui
     taskbar_windows.close()
     taskbar_windows.unregister()

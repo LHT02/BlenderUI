@@ -3,6 +3,31 @@
 import re
 
 _TEXT = {
+    'Windows Desktop': ('Windows 桌面', 'Windows 桌面'),
+    'Use BLUI as Windows Desktop': ('使用 BLUI 替换 Windows 桌面', '使用 BLUI 取代 Windows 桌面'),
+    'Restore Windows Desktop': ('恢复 Windows 桌面', '還原 Windows 桌面'),
+    'Desktop Connection Pending': ('正在连接桌面', '正在連接桌面'),
+    'Desktop Recovery Pending': ('正在恢复原桌面', '正在還原原桌面'),
+    'Windows Desktop Unchanged': ('原 Windows 桌面保持不变', '原 Windows 桌面保持不變'),
+    'BLUI Desktop Connected': ('BLUI 桌面已连接', 'BLUI 桌面已連接'),
+    'Windows Desktop Restored': ('Windows 桌面已恢复', 'Windows 桌面已還原'),
+    'Desktop Host Unavailable': ('桌面宿主不可用', '桌面宿主無法使用'),
+    'Desktop and BLUI DPI awareness differ': ('桌面与 BLUI 的 DPI 模式不兼容', '桌面與 BLUI 的 DPI 模式不相容'),
+    'Desktop and BLUI DPI awareness differ; Windows desktop is preserved': ('桌面与 BLUI 的 DPI 模式不兼容，原 Windows 桌面保持不变', '桌面與 BLUI 的 DPI 模式不相容，原 Windows 桌面保持不變'),
+    'Desktop canvas geometry restoration pending': ('正在恢复桌面窗口位置', '正在還原桌面視窗位置'),
+    'A desktop canvas was removed; reconnect the desktop canvases': ('桌面画布已移除，正在重新连接', '桌面畫布已移除，正在重新連接'),
+    'Desktop replacement is available only on Windows': ('桌面替换仅支持 Windows', '桌面取代僅支援 Windows'),
+    'Desktop replacement is off by default': ('默认不替换系统桌面，可随时恢复', '預設不取代系統桌面，可隨時還原'),
+    'Network': ('网络', '網路'),
+    'Volume': ('音量', '音量'),
+    'Power and Battery': ('电源与电池', '電源與電池'),
+    'Input Language': ('输入语言', '輸入語言'),
+    'Notifications': ('通知', '通知'),
+    'Calendar': ('日历', '行事曆'),
+    'Original Windows Notification Area': ('原 Windows 通知区域', '原 Windows 通知區域'),
+    'Historical icon: default action only': ('历史图标：仅支持默认操作', '歷史圖示：僅支援預設操作'),
+    'Historical icon: use Original Windows Notification Area': ('历史图标：请使用原 Windows 通知区域', '歷史圖示：請使用原 Windows 通知區域'),
+    'Some historical icons require the original Windows tray': ('部分历史图标需从原 Windows 托盘操作', '部分歷史圖示需從原 Windows 系統匣操作'),
     'Desktop groups only contain socket-free cards and panels': ('桌面组仅支持不含计算接口的卡片和面板', '桌面群組僅支援不含計算介面的卡片與面板'),
     'Editor Start': ('编辑器起始帧', '編輯器起始影格'),
     'Editor End': ('编辑器结束帧', '編輯器結束影格'),
@@ -400,6 +425,10 @@ _TEXT.update({
     'This notification icon changed or exited': ('此通知图标已更改或退出', '此通知圖示已變更或結束'),
     'Notification area is busy; try again': ('通知区域忙，请稍后重试', '通知區域忙碌，請稍後重試'),
     'Notification area host exited': ('通知区域宿主已退出', '通知區域宿主已結束'),
+    'Hibernate': ('休眠', '休眠'),
+    'Hibernate Windows': ('休眠 Windows', '休眠 Windows'),
+    'Hibernate Windows?': ('要进入休眠吗？', '要進入休眠嗎？'),
+    'Hibernation is not enabled on this system': ('系统未启用休眠功能', '系統未啟用休眠功能'),
 })
 
 

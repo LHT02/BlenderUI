@@ -72,7 +72,8 @@ class BLUI_PT_taskbar_chooser(Panel):
 
     @classmethod
     def poll(cls, context):
-        return bool(context.window and context.window.blui_shell_role == 'TASK_CHOOSER')
+        return bool(context.window and context.window.blui_shell_role == 'TASK_CHOOSER' and
+                    taskbar_windows.menu_state(context.window).get('kind') != 'NOTIFICATION_TIP')
 
     def draw(self, context):
         state = taskbar_windows.menu_state(context.window)
@@ -107,6 +108,9 @@ class BLUI_PT_taskbar_chooser(Panel):
                 op = layout.operator('wm.blui_windows_taskbar', text=iface(label), translate=False)
                 op.action = action
             layout.operator('wm.blui_taskbar_close', text=iface('Close BLUI Taskbar'), translate=False)
+            layout.separator()
+            from . import desktop_ui
+            desktop_ui.draw_settings(layout, context)
             layout.separator()
             layout.label(text=iface('Shift-click or Middle-click: New Instance'), icon='INFO', translate=False)
             layout.separator()

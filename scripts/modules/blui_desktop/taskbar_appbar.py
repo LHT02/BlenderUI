@@ -167,6 +167,11 @@ class AppBarController:
         return {device: list(entry['rect']) for device, entry in self._entries.items()
                 if entry['rect'] is not None}
 
+    def invalidate(self):
+        """RAM-only: request a fresh query after an isolated Explorer handoff."""
+        for entry in self._entries.values():
+            entry.pop('request', None)
+
     def position_changed(self, window):
         """Notify the shell after root moves a registered owned taskbar window."""
         user = _user_api()
@@ -244,7 +249,8 @@ class AppBarController:
                     if not self._send(user, entry, ABM_NEW, self._data(key[1])):
                         raise OSError('Windows could not restore the BLUI AppBar')
                     entry['restart'], entry['rect'] = restarted, None
-                geometry = (tuple(display['rect']), tuple(display['dpi']), desired_height_logical, key)
+                geometry = (tuple(display['rect']), tuple(display['work']), tuple(display['dpi']),
+                            desired_height_logical, key)
                 notification = (_property(user, key[1], GENERATION_PROPERTY), restarted,
                                 _property(user, key[1], FULLSCREEN_PROPERTY))
                 if entry['rect'] is not None and entry.get('request') == (geometry, notification):

@@ -6,7 +6,7 @@ import os
 import time
 import bpy
 from bpy.types import Operator, Panel
-from . import runtime, taskbar_actions, taskbar_windows
+from . import notification_hover, runtime, taskbar_actions, taskbar_windows
 from .taskbar_previews import PreviewController, _source
 from .taskbar_preview_layout import preview_layout
 from blui_explorer.localization import iface
@@ -44,6 +44,7 @@ def preview_window():
 
 def closed(window):
     global _shown, _geometry, _rows, _targets
+    notification_hover.closed(window)
     if window.blui_shell_role == 'TASK_PREVIEW':
         _controller.close()
         _shown, _geometry, _rows = None, None, ()
@@ -62,6 +63,7 @@ def close():
 
 def tick():
     global _candidate, _since, _leave_due, _shown, _geometry, _rows, _updated, _targets
+    notification_hover.tick(cursor)
     if runtime.shell_interaction_busy():
         return
     point, now = cursor(), time.monotonic()

@@ -1,5 +1,109 @@
 # BLUI 项目交接
 
+## 2026-10-13 桌面与系统栏集成发布（Win10 优先）
+
+- Release 最终编译成功；551 项纯回归全部通过（desktop-shell-pure-final.log）。本机 Windows 10 19045、双 2560×1440/96 DPI 为实机验收环境；Win11 分支保留，但没有 Win11/XAML 或混合 DPI 实机验收，历史自动隐藏托盘的 on-demand OVERFLOW 路由仍按兼容说明标记 PARTIAL，不宣传全系统完全替代。
+- 原任务栏预留回收真机 PASS：1400→1440，自有 AppBar 56px 单独预留到1384，正常恢复及仅终止 OWN helper 后第二守护均还原原位/两屏工作区/原任务栏可见性（taskbar-reclaim-native.log）。托盘真实 OWN 图标原 Explorer 回调、透明像素与独立 NOACTIVATE 提示真机 PASS；不存在公开可验证入口的历史图标回退原系统区，未操作第三方真实图标。
+- 最终包内桌面 service 双屏启用/恢复两轮、异步 OWN PNG 缩略图、board/layout 复用、普通窗口保持不变 PASS（package-desktop-service-gil-fixed.log）；原生父死亡回收及 save/open 不泄漏临时桌面 UI，在 PYTHONMALLOC=debug 下 PASS（package-desktop-lifecycle-gil-fixed.log）。DESKTOP-only DPI scope 保持原 UI thread/NORMAL18，仅新 DESKTOP 匹配真实 host34。
+- 本轮真实截图崩溃由 debug allocator 确认无 GIL 的 Python 内存访问，已修正旧持锁判断。相同真实 worker/绘制回调下，debugmalloc 连续8张与普通启动路径连续8张截图、原生 capture/框选守门、实际 Calculator 高亮、restore ack 后仅关自有桌面均 PASS（package-desktop-gil-stress-8.log、package-desktop-gil-normal-8.log）。此前无栈挂起未证明同一根因，不宣称绝对防崩。
+- 系统完整休眠能力只读检测、真实 helper 请求、任务栏设置 OWN 临时目录保存/读回 PASS（power-settings-real-ipc-final.log）；真实 bpy 菜单能力开/关及确认入口 PASS。零休眠/睡眠/关机操作，未修改系统电源配置。
+- 新便携包：D:/BlenderUI/dist/BLUI-1.0.0-windows-x64-20261013-desktop-shell-integration.zip；125816692 bytes，3855 entries 全量 CRC PASS，无 pyc/PDB/cache。源码与包内96 desktop/explorer模块及8文档 SHA 一致，改动103文件均 UTF-8 无 BOM，git diff --check PASS；旧发布包保留。只重建本轮尚未交付的草稿 ZIP，没有删除用户内容。
+- 最终 BLUI.exe SHA256：7291EB4A80BB87CB10E28C1F0020EFAD8FBE6B30CBEF392D2ED61E17B7E2F7F4；ZIP SHA256：2B1322BAB0A5574C7652C172C9FA786BBC42B68F54AD92FD172747CB66DEABE2。源码发布分支为 gh/blui（LHT02/BlenderUI），不推 origin 上游；check_navigation.py/.cmd 为用户未跟踪文件，不纳入本轮提交。
+- 使用：完整解压运行 BLUI-launcher.exe；任务栏设置或画布“显示器”菜单显式启用“使用 BLUI 替换 Windows 桌面”，随时可恢复。桌面接入默认关闭，有双守护及持久恢复日记，不改系统 Shell/注册表，不杀/重启 Explorer；完整边界见随包 README-BLUI.txt、DESKTOP_HOST.md、NOTIFICATION_COMPATIBILITY.md。
+
+## 2026-10-13 第二轮开发与验收记录（已收尾）
+
+- GIL修复编译PASS；相同包内hover夹具在PYTHONMALLOC=debug、真实worker并发下完整PASS（原生capture/框选守门、截图、实际高亮、restore ack、布局/普通窗口保留）。README补该稳定性修复；继续连续截图压力与native父死亡/save-load复核，不宣称绝对防崩。接口契约：https://docs.python.org/3.10/c-api/init.html#c.PyGILState_Check。
+
+- 加强诊断在OWN QA启用PYTHONMALLOC=debug后明确报“Python memory allocator called without holding the GIL”。查实旧PyC_IsInterpreterActive用PyThreadState_GetDict检查进程current threadstate，SCREENscreenshot pyop先释放GIL、其它worker运行时会误认为主线程持锁，CTX重绘的PyDict/Unicode操作跳过Ensure。现只改该工具判断为Py_IsInitialized && PyGILState_Check（CPython3.10官方当前线程持锁接口），不吞draw异常、不禁线程/截图、不改实际context；待编译/debugmalloc压力与普通路径实测。
+
+- 最终增量编译与543纯回归PASS，包内service双屏2cycles/真实缩略图/条件休眠PASS；但hover夹具phase3在screen.screenshot强制多窗重绘时真实EXCEPTION_ACCESS_VIOLATION，栈为Python enum转换/background._draw读取space.type，尚未进入RESTORE/关闭。暂停发布，保存完整native/Python栈并并行只读审计回调context/GIL及fixture ctypes ABI；不能归因已修复或把失败计为通过。独立guardian退出后无残留host helper，继续核验journal恢复。
+
+- 收尾编译发现新增进度COM守门的成员名笔误，已改用现有m_bluiDesktopWindow并同步回归；不改变DESKTOP隔离范围，重新编译和包内实机验收后再发布。
+
+- 最终诊断版hover恢复在原thread18/Normal18、Desk34/Host34下连续3次完整PASS，真实capture与框选仍阻塞、普通未按下按钮实际高亮已视检、ack后仅关闭own Desk并保持layout；保留已空的OWN诊断目录防guardian写入竞态。另一次无栈合成输入QA出现挂起，物理恢复日记已空后只结束精确OWN QA；未重现、未声称根因已确诊。只读原生审计指出Desktop无任务栏按钮却仍创建并释放ITaskbarList3，现仅DESKTOP跳过不需要的同步Explorer进度COM（普通窗/触控手势/OLE不改），作为有依据的隔离收尾；新增回归，待最终增量验收。
+
+- 最后生产路径审计发现旧host/service夹具在主线程构造helper后残留PMv2，早期DPI挂载PASS不代表原始GHOST PMv1路径；新fixture保留原thread后捕获错配且安全恢复。已实现DESKTOP-only原生DPI创建scope，核实实际Explorer父链、仅临时采用其context、RAII还原原thread，绝不改process或已有NORMAL窗口；动态解析系统API避免SDK目标guard。新编译PASS，原始DPI路径已真实挂载并保护capture/Node框选，继续更正hover夹具过严的old=True前提，不放宽真实交互守门。关键桌面状态/错配错误补简繁翻译。
+
+- 发布使用说明保存为blui/README-BLUI.txt（UTF-8无BOM），随源码与便携包提供：明确桌面启用/恢复、Win10双屏验收、Win11/历史托盘边界、条件休眠和不更换Shell；保留旧包。实际桌面service菜单操作/双次复用/缩略图与条件bpy电源菜单均PASS，悬停被动tip实际回调/截图/清理PASS；当前522纯回归PASS。
+
+- 发布allowlist补通知兼容边界说明NOTIFICATION_COMPATIBILITY.md，明确Win10真实Toolbar回调与Win11/XAML公开入口不同；不把DISPLAY-only历史项或纯mock称作全部系统兼容。
+
+- 当前520项纯回归全部PASS。桌面host真实双屏全部PASS（挂载/序号ack/正常restore/OWN helper死亡第二guardian恢复），不是DPI拒绝分支；原ListView本来hidden所以保持原状态，未擅自显示。任务栏真机完整reserve夹具PASS，确认原系统位与两屏work/visibility均恢复，任务栏最终40px原预留、BLUI56px不叠加。
+- 开始菜单文档补条件休眠/确认/清醒时间deadline；打包allowlist补DESKTOP_HOST.md。新包另起目录，保留所有旧发布包，不覆盖。
+
+- 休眠超时改用独立worker内QueryUnbiasedInterruptTime计量60秒清醒时间，避免长时间休眠后刚恢复就误杀自身helper；普通任务deadline保持原monotonic，UI/draw无系统API。参考Microsoft官方awake-time契约，纯mock测试不执行睡眠/休眠。
+
+- undo/load/unregister共用cancel路径补notification_hover.close，精确清理自有被动tip且真实LEAVE只发一次；vendor tooltip保持原文。桌面宿主恢复SetParent(NULL)中间WS_CHILD校验早退已由host子模块修复，最终style/owner/instance校验仍保留，待真机复验。
+
+- Reserve全生命周期夹具增加逐phase实际耗时诊断，90秒全流程上限（非UI等待，交互进程继续消息泵）；各PASS仍要求真实work/state/visible恢复，不以放宽断言替代恢复。上轮guardian退出后已确认两屏原工作区1400、两原栏visible=True、原state0，日记无剩余项。
+
+- 桌面原生实际7秒回归通过：初始隐藏/独立instance、真实子窗焦点与Node键盘选择、父窗死亡仅回收自有临时layout、正常Node保留、save/open不泄漏桌面UI；真实截图正常。首次键盘失败定位为夹具event_simulate默认(0,0)，修正为真实区域坐标，未改弱化原生守门。
+- 通知tooltip独立被动窗集成：普通任务选择Panel排除NOTIFICATION_TIP，防止提示和设置混绘/挤压；不改正常选择窗焦点。
+
+- 真机 reserve 首轮证实释放原Explorer预留后work=[0,0,2560,1440]，自有AppBar仅保留56px（底部1384）；explicit restore等待超时，退出独立guard后物理原栏状态/工作区完全恢复。夹具加入变更时诊断，继续定位等待，未记为整体通过。
+
+- 新增休眠菜单真实draw AST回归：开启/关闭能力的两支显示与INVOKE_DEFAULT确认路径；draw禁止任何Windows能力查询，只读异步RAM缓存。首次桌面宿主QA超时，但其独立守护恢复日记已确认为 shell=null/canvases=[]；继续修协议/实际UI交互，未把失败算通过。
+
+- 用户确认以本机 Win10 19045 为主要验收环境；Win11 分支只记录源码/协议回归，不冒充实机完成。只读真实托盘 bootstrap 修正 COM 激活上下文后 READY、44 UIA 条目、18 真实图标像素；继续核验非应用条目过滤与实际回调。
+- DESKTOP 进一步隔离：不允许任务栏 close/topmost/context helper 触碰桌面，保留 Node 原生右键/拖动；桌面替换设置入口与新增通知系统控制文本加入简体/繁体本地化。原生第一轮编译已启动。
+
+- 新DESKTOP原生角色与GHOST flag：独立borderless/tool但可交互的Node窗，不套INFO菜单、不NOACTIVATE；modal守门按正常Node窗口保守处理。仅桌面child的WM_SETFOCUS/KILLFOCUS转活跃事件，标记宿主被原父毁窗时原生handle置失效并排队关闭，禁止在WM_NCDESTROY直接释放GPU/Area。生命周期尚在集成/未构建验证。
+- AppBar原生ABN_STATECHANGE也递增generation，让隔离guard释放/恢复原reserve后立即重query；其它窗口和系统Z序不变。
+
+- 桌面宿主子系统开发：已核验 Lively 最新 core-separation 的 Win11 raised/24H2 层级与 Microsoft SetParent 契约。采用 interactive canvas 作为实际 Progman/WorkerW icon-host 的直系前置 child，仅暂隐原 SysListView32，不改 Shell/壁纸/Explorer 进程或外来 Z 序；不同 DPI awareness context 拒绝跨进程 parenting，原系统桌面保持可用。
+- 新 desktop_host_state 独立有界模型与 journal-before-mutation 全屏事务，保存原窗口样式/owner/physical rect 与原 ListView 可见性；恢复使用 PID/thread/start/class 和父链精确身份，显示器变更/窗口丢失回滚并标记需重新连接。原生 DESKTOP role5 / WM_NCDESTROY 安全清理由主代理接入；子代理不运行真实桌面接管。
+
+- desktop_host_native 新增 helper-only 正式 Explorer 路径/进程启动身份、Progman/WorkerW→DefView→SysListView32 直系且唯一链校验、DESKTOP 专属 marker、精确 DPI context 相等检查与 parent-client 物理坐标映射；只改本 BLUI canvas 的 parent/style/sibling Z，原图标已被用户隐藏时不擅自显示。Win11 raised 分支只为自身 child 增加 layered，需主代理原生验证，不能宣称 Win11 实测。
+
+- 新 desktop_host 非阻塞 RAM facade、desktop_host_watchdog 隔离 parenting 服务及 desktop_host_recovery 第二守护进程：副守护先 READY 才允许接管，EOF/owner death/UI 心跳丢失先恢复原图标、再恢复精确身份 canvas；主 helper 挂死或被终止时副守护通过独立心跳/内核 process handle 恢复 journal。每代 nonce 命名 abort event 和 journal 校验避免旧守护干扰新宿主；不强杀进程，UTF-8 协议，CLI 在恢复完成后才退出自身。
+
+- 副守护持有只读 SessionWitness mutex handle 直到恢复完成，防止主 helper 已退出而新宿主抢先覆盖 journal，与旧副守护产生代际写入竞争；guard 的 nonce 检查仍作为第二防线。native 专用 DESKTOP class/no-OWNDC 支持由 window_hover_previews 子代理接入，host allowlist 将同步其精确类名。
+
+- Native 子代理确认 DESKTOP 专用 `BLUI_DesktopWindowClass`（无 CS_OWNDC），host exact class allowlist 已同步，同时保留 GHOST legacy + marker 双约束。新增 test_desktop_host 纯事务/协议/native mock 夹具：日记前置/半挂载回滚/原隐藏状态/nonce隔离/监视器失效/重用HWND/父链改动/DPI不匹配拒绝；未启动任何 helper 或 GUI。
+
+- desktop_host 24 项纯回归已实际 PASS（2026-10-13）；DESKTOP_HOST.md 记录用户 opt-in、全显示器 descriptor API、原桌面恢复、Win11 raised 边界、DPI拒绝与 native parent-destroy 契约，链接 Microsoft/Lively primary references。子代理没有运行桌面宿主、接管原桌面或 GUI。
+
+- 与 native 子代理同步追加 `BLUI.DesktopInstance.v1` 每 ctor 单调非零 token：journal 记录且每个自有 canvas mutation/restore 均核对，覆盖同一 PID/thread/class 内 HWND 复用而 process-start 不变的风险。固定 role marker 仍=1；新增第25项 same-process recycled HWND/new-instance 禁止恢复测试，待复跑。
+
+- Host UI/服务协议补 `completed_serial` 实际 transaction ack：reconcile/restore 返回递增 serial，helper 仅执行完成后发布；初始 empty/restored 不代表新 restore 已完成。Root disable 需 ack+pending_restore=False 才销毁自有 DESKTOP。停止状态的 facade.restore 可按同目录新建 guardian 恢复 journal，但前代锁未释放时严格拒绝并不覆盖旧 journal；新增对应纯回归。
+
+- 最新 desktop_host 26 项纯回归已 PASS。新增主代理专属 check_desktop_host_native：必须显式 QA env opt-in / disposable CONFIG，创建全屏自有 DESKTOP、实际 helper ack+恢复、仅终止本夹具 kernel身份 child 以测第二守护；DPI不符必须证明原ListView未变并记录 fail-closed，不冒充 rendering PASS。不发Win+D影响用户窗口、不杀Explorer、不改普通Canvas。子代理未运行夹具。
+
+- Native 夹具 crash阶段不能等待已死亡 helper 的 RAM pending_restore 更新，清理改读本夹具精确 journal 已空且核验原ListView/自有canvas物理脱离；正常 restore 阶段仍严格使用 completed_serial ack，不跳过生产服务生命期断言。
+
+- Host review 补严格 Progman host 必须等于 GetShellWindow root、capture 完整记录后再次核对 canvas instance/role marker/host父链，拒绝快照期间更换窗口；新增第27项相应纯回归。
+
+- 最终宿主子模块纯回归 27/27 PASS，主代理 native 夹具 AST syntax PASS；仍未启动实际 desktop host 或执行桌面接管。验收必须区分实际已挂载与 DPI mismatch fail-closed，后者只证明原桌面不受损，不能代替桌面功能验证。
+
+- 桌面宿主接入胶水新增 desktop_service/desktop_ui：默认不启动接管；explicit ENABLE 先恢复前代 journal、等全显示器 fresh topology 与布局 profile restore，再建专属 DESKTOP Node 窗并复用 monitor board。disable 必须 serial实际ack + !enabled + !pending_restore 才关闭本 service 所有桌面窗口，普通 NORMAL Canvas 不动；拓扑变更先恢复、等待新隔离 monitor snapshot，再同步/重建。
+- runtime 仅新增 service生命周期小段：末尾在所有旧live-area消费者之后执行自有窗口开闭并fresh redraw；undo/redo cancel_pending 安全脱离且不关闭canvas，load_pre/unregister关闭独立host由双守护恢复。displays普通placement排除DESKTOP，显示器菜单和新operator给出显式连接/恢复入口，新增UI均iface本地化，词条由主代理接。
+
+- 主代理首轮 desktop-host 原生夹具50秒 timeout；只读审计唯一 retained QA journal已空、无残留desktop_host helper/recovery。当前原ListView IsWindowVisible=False，但首轮日志未记baseline，不能据此断言异常隐藏；未做恢复写操作。夹具补baseline、每窗DPI/context/token以及phase/issued/completed/status/helperpid/poll/stopped完整诊断，供主代理串行复跑定位，不隐藏timeout失败。
+
+- 夹具 review 发现 own-helper crash 恢复完成后，若client尚未观察EOF，cleanup可能向已死helper发送restore并等待永远不会有的serial ack；crash阶段现在明确以第二守护journal完成信号进入清理，不再给dead stdin发命令。接入service load_pre先shutdown、commoncancel随后执行时增加CLOSING防重启保护，关闭中RAM状态继续收尾，避免load预钩子意外重新接管。
+
+- 新 test_desktop_service 纯FakeHost/FakeAdapter夹具覆盖默认无接管、实际ack/fresh snapshot/profile等待、modal守门、undo不关窗、workarea/热插拔恢复先行、丢失native token仅重建缺失屏、半创建故障已记owned后恢复、DPI拒绝、load-pre与commoncancel顺序、防job admission满队列丢layout；未导入bpy或启动helper。DESKTOP_HOST.md补胶水生命周期和UI接口说明，待执行。
+
+- 主代理第二轮真实两屏 DPI context34相同，serial1 actual attached2，serial2已消费但restore pending。核对 Microsoft SetParent(NULL) 后需再清WS_CHILD的契约：中间GetParent可为Desktop HWND，旧 helper 误判早退而跳过样式恢复。修为NULL detach仅按API错误判断，清原style后最终精确owner/style/exstyle验证；重试仅允许原已验证host或官方GetDesktopWindow，不接受任何任意foreign parent，instance/PID/thread身份不放宽。追加2项纯回归及owned rollback详细读诊断，待主代理复跑。
+
+- 第三轮真实诊断 parent/style/exstyle/owner已复原，但rect仍挂载大小，怀疑跨进程GWLP_HWNDPARENT无变化写入拒绝并被catch吞掉。恢复现在跳过已完全相等style/exstyle/owner的写入，必要写失败记录具体WinError/index；最终仍精确验证所有原状态，并新增ASYNCPOS物理rect待消息循环完成的有界pending重试，journal不提前清空。主代理上一轮退出后的唯一journal已空；子代理仅只读检查，没有恢复写操作。
+
+- 主代理第四轮 desktop host 原生完整 PASS，5.85秒：真实双屏DPI34相等、attach2/serialack、原style/owner/geometry恢复、再接入、仅终止本QA helper后第二guardian恢复。baseline原ListView已隐藏且退出保持隐藏，未将Win10结果冒充Win11/Win+D实测。DESKTOP_HOST.md已记录，DESKTOP.md旧“无AppBar/不协调autohide/没托盘UWP”说明同步为当前机制与边界；酷呆仅公开README行为参考、自行原生Frame/文件服务，未声称源码移植。
+- 新主代理专属 check_desktop_service_native 真实UI胶水夹具：实际ENABLE/RESTORE Operator/Runtime，自己的两PNG目录走真实scan/缩略图worker，全屏树的monitor与Node保留/第二次启用复用、NORMAL窗口不改、ack后own关闭、原ListView恢复；另实际bpy Power Menu.draw只录制conditional Hibernate条目和保存警告、不执行电源动作。子代理未运行。Service追加restore后的异步最终布局save-tail（存储失败不阻挡Windows恢复），闲置时仅RAM heartbeat避免已启动guard误报失联，不启动默认接管。
+
+- 主代理 desktop_service 实际GUI全PASS，7.8秒：真实operator双屏两轮ENABLE/RESTORE、own PNG异步preview、每屏Node/monitor绑定、FakeUser board/layout复用、NORMAL screen/area/window不变、实际restore ack后关闭自有源、原ListView基线保留、Hibernate条件Menu/确认文本仅draw通过，无真实电源动作。Host纯30+service纯15 PASS；DESKTOP_HOST.md已同步实际验收。
+- 原生专用 `blui_has_desktop_interaction` getter与RNAWindows.busy唯一小段已交 window_hover_previews 子代理，解决普通hover导致接入/关闭误判永久忙；旧Node数据全局guard不放宽。我已冻结其他Python接入源码，不再重构；后续主代理串行复验/打包。
+
+- 用户授权继续完善并在验收后打包提交；保留旧shell-redesign发布包和所有用户运行进程，用户自有check_navigation.py/.cmd不纳入提交。
+- 本机只读确认Windows10 19045，Win11特有路径需要版本分支/mock与后续Win11实机验证，不能把Win10回归说成Win11全量实测。
+- 酷呆官方公开repo目前仅README，无实现代码可直接移植；行为参考盒子分组/文件夹映射，桌面宿主由BLUI自行接入，仍不换系统Shell/不杀Explorer。
+- 新worker-only SYSTEM_POWER_CAPABILITIES检测S4+完整hiberfile；Start后台30秒缓存，已开启休眠才显示“休眠”，确认后worker再次检测并调用SetSuspendState，不运行powercfg启用休眠、不关闭唤醒事件。GUI/实机检测待验证，测试禁止真实休眠/关机。
+- 发现上一轮client.Job admission表遗漏start_location和taskbar_settings load/save，虽worker和response已接但真实请求被拒；本轮补齐严格参数验证并补实际IPC回归，避免只mock持久化而遗漏入口。
+- 新power纯夹具验证SDK布局76字节、S4/hiberfile FULL条件组合、检测不执行电源动作、确认/保存提示、执行再校验与唤醒保留、缓存single-flight/失败隐藏与关闭取消；所有休眠/关机API均mock，待执行。
+- 9项power纯测试已PASS。新增READONLY真实helper power检测与OWN临时任务栏设置load/save/readback夹具，及client/worker admission表精确一致的AST回归，避免遗漏已实现请求。Hibernate job等待上限60秒，resume后先读result、不禁唤醒事件；实际电源动作仍禁QA执行。
+- 实际隔离power/settings IPC已PASS，本机hibernate=True、OWN临时JSON设置load/save/readback正确且无BOM，完全未执行休眠/改配置。Desktop从taskbar helper枚举/关闭和shell-only modal守门隔离，仍纳入正常Node守门；系统栏reservation状态变更触发monitor重读和RAM AppBar.invalidate。
+
 ## 当前验收：2026-10-13 shell-redesign
 
 - 原生 Release 构建通过；382 项纯回归通过，日志 `D:/BlenderUI/build/shell-redesign-unit-release.log`。
@@ -13,6 +117,82 @@
 - 兼容边界：原系统栏显式隐藏只改可见性、可能仍有预留空带；跨BLUI进程栏未全局去重；不响应TaskbarCreated的历史图标和部分Win11系统控件未镜像。保留系统栏恢复入口，不声称完整替代Explorer。
 
 下方“开发中/待实测”段落记录实现时序，以此验收段和后续成包记录为当前状态。
+
+## 2026-10-13 Win11 通知区兼容性补强（新轮，开发中）
+
+- 冻版文档同步 `NOTIFICATION_TRAY.md` 与新 compat 说明：移除“既有历史图标无法镜像”的旧结论，说明 bootstrap 不依赖重新登记、系统 controls/平台/能力协议兼容扩展、真实 RGBA/诚实降级与 on-demand 未实测边界；Win10 实机证据不作为 Win11 全量兼容承诺。
+
+- Root 最终 OWN 原 Explorer 夹具全 PASS（约9.8s）：真实 LEFT/RIGHT/DOUBLE/ENTER、LEAVE 原控件 delivery/不造 App callback、OWN icon 删除。安全收尾：OVERFLOW RIGHT/DOUBLE 不主动折叠，LEFT 也须打开后的 foreground HWND+创建身份未改变且无用户输入变化，避免关闭刚打开的 App 菜单/抢焦点。公开 auto-hidden on-demand 路径尚无实机 end-to-end 证据，文档保持 PARTIAL，源码/API/label 冻结。
+
+- Metadata bounded diagnostic 只旁路记录，不改变生产是否接纳 icon；debug map 达上限也不使新增真实项因 KeyError 被丢弃。
+
+- Root 最新 OWN 图标未进 bootstrap，新增 solely OWN `Shell_NotifyIconGetRect` SDK 只读登记确认与 bounded metadata stage（不传 wire、不输出别的 App 路径/像素），定位 owner/path/CopyIcon/缓存枚举过滤原因，不以时间重试或假回调掩盖失败。
+
+- 通知兼容性文档补入 Win10 OVERFLOW 明确点击语义与守门、恢复范围；协议新增 click-only Win10/no-guessed-callback 纯回归。仍保留 PARTIAL 标记，不把待验的 on-demand 路径写成全量兼容。
+
+- OVERFLOW 新增元数据/唯一目标守门纯回归；Root OWN 原生 fixture 支持显式测试自己的隐藏项（仅 OWN tip+当前身份）、公开 Chevron Invoke 后 fresh Toolbar hover 与恢复本次 dropdown 状态，UNSUPPORTED 仅输出小元数据、不输出 RGBA。
+
+- Root 只读证实 Win10 Chevron：实际 Button/AutomationId1502/原生ControlID1502/Invoke，非 ExpandCollapse。显式点击历史项才可走 OVERFLOW：逐项验证真实 App HWND+UID+GUID+创建身份/当前元数据，公开 Invoke 原 Chevron 后 fresh 枚举，只唯一精确 tooltip/原 Toolbar 目标才代理；不改偏好或长期显示原栏。只关闭本次打开的相同 dropdown，实际用户输入改变则保留用户状态；不猜 App callback/version。
+
+- 准备用户点击历史项才临时展示原 overflow 的安全方案，新增 Root 只读 `check_notification_controls.py` 获取实际 Chevron UIA/原生 class、AutomationId、ControlID 与 ExpandCollapse 语义，不先猜 Explorer 私有按钮 ID，不执行任何 Invoke。
+
+- Root 真机 OWN callback 证据：LEFT=[0x201,0x400]、RIGHT=[0x204]、DOUBLE=[0x203,0x400]、HOVER_ENTER=[0x200]；LEAVE 送达原 Toolbar 后 Explorer 无 App callback，是其实际语义，不伪造。夹具改验证原控件成功 delivery 并记录空 callback，文档明确与直接 NIM 的保证不同。
+
+- 只读 glyph probe 最新 24 项全有真实像素（23 个去重 digest；5 Toolbar/19 DISPLAY），无圆点。UIA 在验证过的通知根内改用 RawViewWalker 尝试读取已存在但隐藏的 overflow provider，仍受节点/深度/时间边界；不会开窗口或改图标设置，是否额外支持取决于真实 Explorer 暴露情况。
+
+- 正常 App 与固定系统入口去重仅在真实系统 GUID + 原 Explorer PID 可证明时执行，不猜 tooltip 所属 App。匹配到真实系统 Toolbar 时 LEFT 走该实际原控件；其他情况下保留固定系统 fallback，不按名字猜 callback。
+
+- Glyph fallback 的 RECT 比较显式逐字段，避免 ctypes Structure 误当 iterable；前景 HWND 非零但无法验证身份时拒绝抓取，保持 fail-closed。
+
+- 按 Root 许可新增原 Toolbar-only `PrintWindow` glyph fallback：只留存精确 UIA 按钮裁剪，Foreground/根/Toolbar/overflow 祖先/矩形前后核验；不读桌面或任意 App 内容、不移动/显示/激活窗口。真实 HICON 优先，无法确认统一背景或无实际 glyph 时拒绝，不将全黑/圆点算成功。原控件 16/24px fallback 不冒称复原 32px 原 HICON。
+
+- Root 真实 OWN Explorer fixture 已走到 hover-leave，前面 LEFT/RIGHT/DOUBLE/hover-enter 均收到实际 App callback。直接 WM_MOUSELEAVE 不产生 leave 回调，现先把原控件的逻辑 hot point 移到 client 外（普通 WM_MOUSEMOVE(-1,-1)，不动真实光标/不点击相邻项）再 leave，让 Explorer 自己清理 hot item/NIN_POPUPCLOSE；fixture 逐事件打印消息供 Root 再验。
+
+- Root path_failure 全量异常定位到 bounded LPWSTR 读函数：ctypes WCHAR 的 `\0` 在 Python 是非空字符串，不能用 truthiness 判断结束。已显式比较 NUL 并新增自有内存纯回归，避免越过 COM 字符串终止符；路径 native API 本身无需猜测或放宽 owner 校验。
+
+- Root OWN fixture 的原 Explorer ADD 被私有简化 wire 拒绝，已改用 SDK 原生 `NOTIFYICONDATAW` + `Shell_NotifyIconW`，不尝试未知多格式报文。调用前须验证第一 receiver 就是已核验原 Explorer，避免误投用户现有 BLUI host；x64/32 ABI 分别 976/956 字节，Shell32 自行负责跨进程签名与 WOW64 marshalling。
+
+- Bootstrap 可只读发现当前已存在、同 Explorer PID/创建时间的 Win10 `NotifyIconOverflowWindow`，不展开、不改变可见性；其 Toolbar 若公开有效 UIA 元素/矩形可走同样真实输入代理，额外逐条核验 overflow 容器身份与祖先关系。无窗口或未公开元素仍明确 DISPLAY-only，不改全局图标偏好。
+
+- 聚合 diagnostics 区分 known-folder/path API 失败与真实 exe 失配；bootstrap 包含 DISPLAY-only 或仅 default-action 项时明确标为 PARTIAL 并提示原系统通知区，防止把“可显示”冒充“全行为支持”。
+
+- Root 检出朴素 exe 路径比较误杀 38 项，新增独立只读路径适配：解析 Explorer `{KNOWNFOLDERID}\\relative.exe`、环境变量、NT prefix/本地 short path，再与当前 PID executable 比较。路径不成为命令、不查询任意 UNC，native probe 仅输出路径形式聚合统计，不输出用户安装路径。NOTIFYITEM x64 ABI 与 ManagedShell 定义一致（56 字节，guid offset40）。
+
+- 第二次只读 native probe 已取得真实 HICON（18 个去重 digest），也暴露 `ITrayNotify` 持久偏好/ghost 条目。COM 适配补充当前 HWND/PID executable 与 pszExeName 精确匹配，并仅保留有可复制 HICON 的活跃记录；零 HICON/失配路径/像素失败分类统计，native probe 输出 diagnostics，不把 ghost 圆点当成运行中 App。
+
+- 基于真实 Win10 probe 收紧历史 App 托盘范围：仅实际 Toolbar 或已识别 NotifyIconStack/NotifyIcon 子树，不把 V 形展开、原系统时钟、显示桌面等按钮当成普通 App 图标；固定系统入口单独处理，避免重叠时钟/通知按钮。
+
+- Root 只读 native probe 已读取 Win10 19045 的 13 个历史 provider，其中 5 个具真实 Toolbar 代理能力；像素为零且 COM 报 0x80040154。定位为 optional ITrayNotify 错用 UIA 的 INPROC 激活范围，已改为 Explorer LOCAL_SERVER（不启动任意 executable）；需 Root 重跑验证 HICON。
+
+- `blui/NOTIFICATION_COMPATIBILITY.md` 保存主流 Apache-2.0 源码与 MS/SDK 依据、真实 CALLBACK/Win10 Toolbar/UIA default/DISPLAY-only 能力区分、系统 fallback 和 Root 原生验证范围。不将 Win10 或纯 mock 证据说成 Win11 完全兼容。
+
+- 通知纯测试扩至 62 项通过；补强异常输入类型验证，避免 malformed JSON key/event 造成 helper TypeError；UIA COM 构造失败也进行对称 Release/CoUninitialize，不遗留 apartment 引用。
+
+- 系统按钮测试缓存 stub 跟随生产 RAM cache 规则：无 cache_key 的系统入口使用原生主题 glyph，不错误返回 App 自定义 preview ID。
+
+- 通知纯 UI fixture 加入独立本地化 stub，验证系统入口图标与宽度以及历史 provider 能力说明，不依赖终端加载 Blender `_bpy`。
+
+- 新增 Root 专用 `check_notification_history_native.py`：只向身份验证过的原 Explorer 注册一个唯一 OWN-PID 测试 icon，在其已存在后 bootstrap，尝试原 Toolbar 的 LEFT/RIGHT/DOUBLE/hover，再删除这个 OWN icon；不广播、不改 auto-tray、不猜 App 消息或触发别的应用。自动隐藏或未公开 provider 时输出 UNSUPPORTED，不伪造通过。系统入口与历史能力 tooltip 新增纯 UI 回归。
+
+- 新增回归后托盘 60 项纯测试通过。Toolbar 代理进一步要求快照与 action fresh 的完整按钮矩形、Toolbar HWND/thread 一致；输入前排除同 Toolbar 中心覆盖的歧义按钮，矩形变化则明确要求重试，不点击猜测位置。
+
+- 新增纯 bootstrap/版本/能力/SDK ABI 回归与 Root 专用只读 `check_notification_bootstrap.py`：读取真实 Explorer UIA/COM 元数据但不启动托盘 host、不加图标、不广播、不调用图标、不改系统任务栏或输入。原 43 项托盘纯测试已通过，新回归与 Win10 真实 bootstrap 结果待记。
+
+- 根据本轮“以 Win10 为主”补充原通知 Toolbar 的本地输入代理：只向实际 Explorer 托盘子树内 `ToolbarWindow32` 发送普通 mouse 消息，让 Explorer 使用自身真实 notification callback/version；Root/Toolbar 身份逐条重新核验，UIA fresh RuntimeId/名称/矩形与 client 内边界需匹配，超时 250ms。没有 TB_HITTEST 指针跨进程误用，没有鼠标移动或猜测 App callback；Win11 不启用该分支，尚待 Root 原生 fixture 验证。
+
+- 系统 LEFT 优先调用经身份与托盘子树验证的 UIA 系统按钮（控制中心/输入指示器/通知中心/时钟）；找不到提供者或版本失效时才使用固定 Windows 快捷键/设置页。POWER 的无提供者 fallback 是电源设置，INPUT 的 fallback 是 Win+Space 切换输入语言，不把 fallback 描述为完全等价的原生弹窗。
+
+- 通知 UI 增加可本地化的系统入口，尺寸仍由 `logical_width()` 统一预留；历史图标能力不足时在高窗显示恢复 Windows 通知区入口。恢复按钮只请求现有恢复服务，不向尚未显示的 Windows 托盘即时注入 Win+B。真实回调 hover-enter 改为 WM_MOUSEHOVER（与 NIN_POPUPOPEN 一起），不误充 WM_MOUSEMOVE。
+
+- 托盘 wire 保持旧 5 字段快照兼容，并新增 platform/controls/bootstrap 与 CALLBACK/UIA/DISPLAY 能力声明。UIA 行严格拒绝冒充真实 callback/version，RIGHT/DOUBLE/hover 不支持时明确失败。Host 接入后台 bootstrap 与固定系统入口，QA private 模式不扫描 Explorer、不暴露系统控制；Win11 已知系统图标 GUID 使用固定入口避开旧回调风险。
+
+- `notification_history` 增加有界、独立线程的 Explorer provider 扫描：RuntimeId token 绑定进程创建身份，仅在托盘子树读取可用按钮；LEFT 调用前重新扫描、核验根窗口与 RuntimeId。无 Invoke/default-action 的历史元数据明示 DISPLAY-only，不把同名图标当作操作身份；helper NIM 消息泵不执行 COM 查询。
+
+- 历史托盘读取新增 SDK ABI 最小 UIAutomation 客户端和可选只读 `ITrayNotify` 元数据适配，所有 COM 查询将限定在通知 helper 的后台线程；每个返回接口和 SAFEARRAY/BSTR 明确释放，UIA2 设置 300ms provider 超时。未调用全局 UIA 搜索、远程内存写入或 Explorer 显隐设置。COM 元数据只用于图标像素补充，绝不猜测其缺失的 callback/version。
+
+- 核验当前 ManagedShell / RetroBar 主源码：两项目均 Apache-2.0；历史 bootstrap 依赖旧 ToolbarWindow32 与远程内存，ITrayNotify 的 NOTIFYITEM 不含 callbackMessage/version，Win11 无 toolbar 时不能据此制造可靠回调。本轮仅独立重写机制，不复制或链接代码、不临时改变 EnableAutoTray。
+- 新增固定系统入口模型与 helper-only 执行器：网络、音量、电源、输入语言、通知、日历和原系统区；Win11 使用公开快捷键/URI，旧系统音量用绝对系统目录 sndvol；右键/双击入口转对应固定设置。系统快捷键注入前拒绝已按住的修饰键，部分失败仅释放本操作可能按下的键；私有测试禁止真实系统动作。
+- 本机实际 Win10 build19045；Win11 机制只能做源码/版本 mock 与边界验证，不声称 Win11 全量实机兼容。后续新增隔离 UIAutomation 历史桥，不将 Explorer HWND 传入任意应用激活接口。
 
 ## 原生 UI 悬停与真模态状态区分（2026-10-13，本轮实际GUI修复）
 
@@ -700,3 +880,41 @@
 - 新增仅主代理串行运行的 `check_notification_ui_native.py`：在自有 NORMAL HWND 上安装唯一注册消息回调并严格恢复，仅向本 client 的私有 helper PID/类/HWND 发送 NIM；8 项图标（含隐藏/溢出）、实际预览 ID/栏绘制、原生 LEFT/RIGHT 鼠标回调、独立通知区 UIList、DELETE/异步关闭与原布局保持。Fixture 禁用正常 runtime timer、自行 poll，绝不广播/隐藏系统栏/注册 AppBar/启动外部应用。客户端追加只读 helper_pid 供所有权核验。尚未由子代理运行 GUI。
 - 新增原生 UI fixture AST 与 `git diff --check` 通过；43 项通知区纯测试仍通过。已交主代理执行，不新增未验证 hover 功能。
 - 主代理原生通知区 UI 首跑已验证真实 8 项缓存与栏像素绘制，但原生 LEFT 回调未收到；fixture 增加不替代真实功能的 operator/poll/command/WNDPROC 诊断，并扫描按钮水平/垂直内部中心后点击，检查所选项 callback 与注册消息一致。等待主代理重跑。
+- 原系统任务栏预留区移交（开发中）：参考 ManagedShell ExplorerHelper 的 ABM_SETSTATE AUTOHIDE 协调，新增 helper-only `taskbar_reservation.py` 独立有界/原子 UTF-8 NoBOM 恢复日志；先保存原可见任务栏及原 auto-hide 位，再释放系统栏占位，不调用 SPI_WORKAREA、不注销外部 AppBar、不移动外部窗口。原来已 auto-hide 不取消，恢复仅撤销本次置位并保留后来其它状态位。
+- 主 guard 与第二 crash guardian 同时恢复 visibility 和 reservation，覆盖 hide 前崩溃、EOF/心跳超时/owner/helper 退出、新 Explorer epoch；每次写前复核真实 GetShellWindow PID/启动时间/线程/类及 Windows Explorer 路径，新 epoch 先写新身份，不用旧 HWND。外部 auto-hide 改动则停止隐藏并恢复自己记录的可见栏，不反复抢用户设置。
+- AppBar 缓存键包含真实 monitor work rect，并增加纯内存 invalidate()，系统栏移交后重新 QUERY/SETPOS，但仍从 full monitor rect 提出高度，避免重复扣除预留区；GUI/native 由主代理统一验证，新增纯 mock 恢复回归待执行。
+- reservation 首批 26 项与现有 AppBar 20 项纯回归 PASS；补充 workarea 移交/自身 work 变化无重复高度、显式 RAM invalidate 无 SETPOS 循环，以及 visibility 日志写失败也执行独立 auto-hide 回滚的回归。子代理未运行 GUI、未变更真实系统栏。
+- reservation 27 项 + AppBar 22 项 + 旧 visibility/placement 18 项纯回归全部 PASS；更新 TASKBAR_APPBAR.md 的移交/恢复与协议文档。新增仅主代理串行执行的 `check_taskbar_reservation_native.py`，真实 fixture-owned guard hide→reclaim→自有 AppBar 单次占位→显式恢复→仅结束自有 helper 验证第二 guardian，失败保留未完成恢复日志；子代理只写未运行。
+- Guard/第二 guardian 启动显式 `-X utf8`，避免 Windows CP936 错误信息破坏 UTF-8 status 协议；native crash 夹具在故意结束自有 helper 后允许正常 Pending 报告，并读取真实系统状态验证第二 guardian，而不是将期望的服务退出当成功恢复。
+- 第二恢复进程在 Explorer 同时重启、primary HWND 暂时缺失时独立有界重试最多30秒，保持原子恢复意图与 session lock，不阻塞 BLUI/UI；新增 delayed Explorer recovery mock，替代原1秒恢复窗过短的边界。
+- Desktop 原生生命周期（开发中）：新增仅 DESKTOP 使用的 BLUI_DesktopWindowClass（不含 OWNDC/CLASSDC），独立角色 marker+非零 atomic instance token；NCDESTROY/SETFOCUS fallthrough 均按精确 msg gate，意外父窗口销毁只置本窗失效并排队 force close，丢弃旧 size/paint/focus/key 事件，不触发 last-window quit。
+- 桌面原生 OpenGL 窗预建自身隐藏同 pixel-format cleanup surface，parent loss 保留该 HGLRC 迁移至私有 DC，仅用于 queued GPU teardown；不拿普通窗口 context 删除私有 VAO/FBO，DropTarget/DC/DM/Wintab 保持独立释放，禁止失效 HWND 激活/resize/swap/draw。其它 backend 暂 fail-closed，普通窗口行为不改；native 尚未构建/运行。
+- Desktop 临时 Node screen 增 SCREEN_BLUI_DESKTOP_HOST 精确位，orphan 清理要求 temp+标记+单 Node；已对该种私有 screen blend write 省略，普通 Node 不受影响，workspace layout writer 同步隔离待完成。未改进程 DPI awareness、不跨 awareness 强行 SetParent。
+- workspace writer 使用局部序列化副本，仅过滤 temp+Desktop marker 的 private layout，并跳过被滤布局的 prev/next；不修改实时 RNA/list/普通 Node、保留所有普通 workspace 布局。失效 Desktop Wintab/鼠标 capture/主题 HWND 写及 drawable reset 增空句柄守门；本轮 C/C++ 仍待主代理构建/原生父窗口销毁实测。
+- DESKTOP ctor 使用 SW_HIDE 初始创建、不将其设为 GHOST active window；只有 helper verified attach 后才 SHOWWINDOW，避免未挂载空白全屏 flash；normal/Taskbar/Start 的 ShowWindow/activation 保持不变。
+- 仅 interactive DESKTOP+WS_CHILD 的真实 ButtonDown 对自有 HWND SetFocus，随后 WM_SETFOCUS 精确事件激活 Blender 窗状态；不在 hover/SHOWWINDOW/普通位置消息抢焦点，不改变 NOACTIVATE taskbar。
+- 新增 `test_desktop_native_guards.py` 10 项源码守门，检查 exact msg/instance/hidden ctor/独立无 OWNDC class、只点击 child focus、保留 HGLRC 清理、丢弃非 Close 旧事件/禁止最后窗退出、失效 draw/swap 与 temp marked Node/layout 存档隔离；不替代主代理 native 编译/GUI。
+- 10 项 Desktop native source guard PASS；新增 `check_desktop_native_lifecycle.py` 仅主代理串行运行，假 parent/child 均 exact 本进程 HWND，验证初始隐藏/instance更新/NCPAINT不误关闭、Layered child/click focus/Node A事件、parent death排队独立清理及存档重读后普通 Node 保留、Desktop私有layout/窗消失。子代理只写不运行，不接触 Explorer/外部窗口/任务栏。
+- Native Desktop own-child QA 在安全销毁前存自有屏幕截图 `D:/BlenderUI/build/desktop-native-own-child.png` 供主代理验证真实渲染；SetWindowLongPtr/GetParent 明确 pointer-sized签名，所有 mutation前只读核验 own PID/thread/start/class/instance。夹具仍未由子代理运行。
+- Native Node 键盘夹具仅模拟自有 window 内 region-center MOUSEMOVE 来设置 Blender area routing，不移动系统光标；真实 native ButtonDown/child focus 独立校验，防测试光标原来在外部窗口导致 A键被送入空区域。
+- 主代理 native build PASS，Desktop own-child 首轮点击/真实GetFocus均通过，但A选择断言失败。源码定位是 fixture未给A键event_simulate传x/y：RNA每个事件无条件赋xy，默认0把键送到(0,0)边界而非Node region。夹具PRESS/RELEASE均显式传region-center坐标，断言前截图并打印native focus/actual event coords/region/select_all poll/selection；新增该API语义sourceguard，不直接执行select_all代替。等待主代理复跑，不把首轮失败计为PASS。
+- 更新旧 shell UI sourceguard 为精确匹配 NORMAL+DESKTOP 双role保守分支，仍断言二者在精确 UI状态helper前直接 busy；不弱化正常或宿主Node树的 pointer/modal 安全守门。
+- 主代理 Desktop own-child 原生复跑全部PASS（7.18秒）：真实focus+A选择、own-parent death清理/普通Node保留、save/open不泄露Desktop UI，截图确认实际canvas渲染。原焦点未改，仅修fixture键坐标。
+- 托盘hover被动窗新增最小 opt-in no_activate=False 创建参数，仅 TASK_CHOOSER 接受；复用DNA原padding同尺寸runtime int并读Blend归零，独立GHOST passive flag设置 NOACTIVATE/SW_SHOWNOACTIVATE且不置GHOST active，不借AppBar flag、默认普通chooser/其他role不变。taskbar_windows.create只加该参数，其它focus/draw集成主代理负责。
+- 新增 `notification_hover.py`：fresh taskbar native hover button读取真实通知key，RAM元数据身份+支持action精确验证，350ms debounce后ENTER、离开/关闭/cancel仅LEAVE一次；UIA/display不伪造Hover。Tip为独立no-activate TASK_CHOOSER/NOTIFICATION_TIP，native instance property+exact PID/thread/start/class与RAM owner共同守门，仅回收自己的提示，不关闭其它chooser/Start/context/Desktop/正常窗；existing菜单/preview期间不显示。draw只读已准备RAM行/图标，不做Win32或I/O，新UImsgid复用既有翻译。
+- hover稳态缓存几何，不随每帧mouse位置连续移动/重排提示 HWND；新增纯mock/sourceguard测试覆盖debounce/真实action allowlist/LEAVE once/切换icon/历史UIA+系统控制不伪造hover/身份复用/菜单接管/关闭取消/保守busy/Unicode/坐标协议上限/draw仅RAM/passive opt-in读档归零，待执行。
+- hover 17 项 mock/sourceguard PASS；新增主代理只跑的 `check_notification_hover_native.py`，仅 private OWN source/receiver真实NIM/version4协议，native hit-test+模拟自有窗口指针（不移动系统光标）→真实ENTER/NIN_POPUPOPEN→独立 NOACTIVATE Tip/截图→LEAVE/NIN_POPUPCLOSE恰一次→owned helper/窗口清理；不广播、不改Explorer/系统栏、不发送外部app回调。子代理只写未运行。
+- Desktop lifecycle 新增独立只读 `blui_has_desktop_interaction` getter，复用精确 UI 状态 helper，仅 unpressed HIGHLIGHT/EXIT 不阻塞；真实 modal OP、未知 modal handler、popup/text/numeric/wait/drag、管理器 drags、当前原生按键/capture/cursor grab 仍阻塞。旧 `blui_has_modal_interaction` 与 runtime Node/thumbnail/session 守门完全不改，未增加/改变 DNA 字段；RNAWindows.busy() 仅生命周期使用新 getter，旧二进制保守 fallback。待纯回归及主代理增量构建/真实 hover restore。
+- 新增 `test_desktop_interaction.py` 纯 AST adapter 与 native source guards：普通 NORMAL/DESKTOP hover 放行生命周期但旧 guard 保留；任何真实编辑/path drag/旧 binary fail-closed；精确 handler 类型、五类实时物理按键/capture/grab、只读 getter 与 runtime 原 Node gate 不变。原生源已交主代理增量构建，子代理不运行 GUI。
+- desktop 精确 getter 相关 24 项纯测试 PASS（新增8项+原shell5项+原生生命周期11项）。新增仅主代理运行 `check_desktop_hover_restore_native.py`：真实 OWN capture/Node box modal 必须 busy；自有 Calculator 的原生 HIGHLIGHT 必须旧 Node gate=True、新 lifecycle=False；实际 RESTORE ack后8秒内关闭私有DESKTOP、保留普通窗口/布局并恢复原icons；输入坐标全部显式且仅owned窗口，失败保留恢复journal。仅写未运行。
+- 真实 hover_restore 夹具保存原UI线程DPI后发现生产 DESKTOP 创建 PMv1 与 Explorer PMv2 不同，之前 host/service 夹具的 helper-only DesktopWindows 构造改变线程上下文掩盖了问题；先前兼容实测不作为生产 DPI 证据。新增独立 `GHOST_BluiDesktopDpiWin32.hh` creation-only RAII：只读验证 GetShellWindow 的真实 Windows Explorer 路径/PID/启动时间/线程/唯一 Progman或WorkerW→DefView→ListView链，用 verified host 的 window DPI context 创建 DESKTOP，ctor后始终还原旧线程context；普通窗口和 process DPI 不改，helper 严格比较不放宽。待主代理增量构建重测。
+- DPI scope 使用已加载系统 User32 的四个 DPI API（GetModuleHandle/GetProcAddress，有缺失 fail-closed），保持项目现有 Win8 API target 宏，不改全局SDK版本、不加载第三方Shell DLL；原生代码已完成交主代理编译，夹具正在补创建前后原thread/normal HWND context不变断言。
+- 新增私有夹具 helper `qa_desktop_dpi.py`：helper-only discovery/snapshot临时上下文始终恢复，记录并逐阶段断言原UI thread和所有NORMAL HWND context/身份原样；host/service/hover原生夹具全部接入，DESKTOP窗口创建必须从原UI context调用且与真实host context相同。own-parent lifecycle仅新建自有STATIC父窗时短暂匹配已创建Desktop context后恢复，解决同进程SetParent异DPI失败；不改变已有NORMAL/process DPI，夹具仅写待主代理执行。
+- DPI创建scope编译PASS；原始UI线程hover夹具已真实挂载、OWN capture+Node select_box守门PASS。源码确认 button_modal_state不含普通HIGHLIGHT，因此旧getter=True并非每次普通悬停的前提，修正此错误QA断言；夹具增加仅OWN child真实点击/focus、实际draw后view_all、view-space node bounds/target坐标诊断及悬停前后截图，新lifecycle必须False且RESTORE成功，旧严格gate由sourceguard保证不变。未mock getter/hover，待主代理复跑看图。
+- 新增 `test_desktop_dpi_scope.py` 只读 native source guards及私有fixture helper纯mock：DESKTOP-only scope/ctor后恢复/Win8 target API动态加载/Windows Explorer路径+epoch+唯一bounded父链/不放宽helper兼容/全部夹具恢复原UI context；另验证异常时worker context还原、仅自有新fakeparent可匹配、不掩盖已有NORMAL context改动。子代理不运行原生GUI。
+- 原始UI PMv1→新Desktop/Explorer PMv2且原UI/Normal原样的真实hover+RESTORE全部功能PASS，唯一QA退出失败为 temp目录cleanup与仍在发布空journal的独立guardian竞态。三个host/service/hover夹具结束前明确校验原icons、恢复ack/空journal（shell=None/canvases=[]），成功和失败都保留自身小型QA目录，禁删仍有guardian的目录；不忽略恢复状态、不删系统数据。新DPI mock修正其_identity双参数stub，待重跑。
+- DPI source/fixture新增11项与原native11项+interaction8项共30项纯回归全部PASS；主代理preserved-context service双屏两轮、host显式恢复+own-helper死亡独立恢复、own-parent focus/死亡/save-open全PASS（原UI/Normal context18、新Desktop/Host34）。DESKTOP_HOST文档补creation-only RAII及旧夹具DPI证据纠正，保留Win11/Win+D/真实Explorer restart未证实边界；hover功能已PASS并视检真实按钮灰高亮，保留诊断目录的最终exit0待主代理复跑。全部子代理源码冻结，无GUI/build/Git操作。
+- 主代理最后hover重跑停在actual RESTORE后，所属journal已空且helper存活；未按猜测改native。私有夹具补20秒重复faulthandler线程栈、RESTORE前后/timer return/runtime tick/最终状态与journal/native originals gate/close逐边界诊断，controller只读已发布RAM不加锁、不查询外窗用于打印。用于区分operator、own window close、timer外GHOST或测试收尾挂起；子代理不操作任何进程/GUI。
+- package hover原生堆栈明确phase3/4 screenshot→WM_redraw_windows→background._draw，不是close；PYTHONMALLOC=debug复现“allocator called without holding the GIL”。定位 legacy PyC_IsInterpreterActive 用PyThreadState_GetDict误当当前线程持锁，另一worker可让其误判且GetDict自身会分配；主代理正式修为Py_IsInitialized&&PyGILState_Check（CPython3.10原文及实现核验）。实际3处conditional消费者与generic诊断调用契约兼容，原pyop Save/RestoreThread及callback Ensure/Release保留、不关background回调、不弱化Node守门。
+- 新增 `test_python_gil_guard.py` focused source回归，检查真正持锁predicate/3锁consumer/allocator保护区间/pyop释放与draw重新获取GIL/真实screenshot+background保留；私有hover夹具新增BLUI_DESKTOP_QA_SCREENSHOTS=2默认、4或8有界真实截图总次数，用于主代理debugmalloc重测，子代理不运行GUI/build/进程操作。
+- GIL focused8项纯回归全部PASS，默认总2/压力4或8截图夹具AST PASS已冻结；主代理正式GIL修复编译、新stage在PYTHONMALLOC=debug下原hover/RESTORE与own-parent死亡/save-load完整PASS，正在压力8截图与普通路径复验。DESKTOP_HOST同步根因、CPython契约与真实已通过范围，不把此锁修复冒称消除所有graphics/外部shell-hook/COM挂起。

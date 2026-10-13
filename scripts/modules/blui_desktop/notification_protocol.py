@@ -63,7 +63,7 @@ def callback_messages(record, event, x, y):
         raise ValueError('Invalid notification anchor')
     version, uid = record['version'], record['uid']
     messages = {'LEFT': [0x201, 0x202], 'RIGHT': [0x204, 0x205],
-                'DOUBLE': [0x203, 0x202], 'HOVER_ENTER': [0x200], 'HOVER_LEAVE': [0x2a3]}[event]
+                'DOUBLE': [0x203, 0x202], 'HOVER_ENTER': [0x2a1], 'HOVER_LEAVE': [0x2a3]}[event]
     if version >= 3 and event in ('LEFT', 'DOUBLE', 'RIGHT'):
         messages.append(0x7b if event == 'RIGHT' else 0x400)
     if version >= 4 and event in ('HOVER_ENTER', 'HOVER_LEAVE'):

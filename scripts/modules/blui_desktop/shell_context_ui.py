@@ -14,7 +14,7 @@ class WM_OT_blui_shell_context_menu(Operator):
 
     @classmethod
     def poll(cls, context):
-        return bool(context.window and context.window.blui_shell_role != 'NORMAL')
+        return bool(context.window and context.window.blui_shell_role in taskbar_windows._SHELL_ROLES)
 
     def invoke(self, context, event):
         from . import shell_hover

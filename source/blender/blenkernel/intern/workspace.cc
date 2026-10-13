@@ -78,13 +78,40 @@ static void workspace_foreach_id(ID *id, LibraryForeachIDData *data)
   BKE_viewer_path_foreach_id(data, &workspace->viewer_path);
 }
 
+static bool workspace_layout_is_blui_desktop(const WorkSpaceLayout *layout)
+{
+  return layout->screen && layout->screen->temp &&
+         (layout->screen->flag & SCREEN_BLUI_DESKTOP_HOST);
+}
+
 static void workspace_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   WorkSpace *workspace = (WorkSpace *)id;
-
-  BLO_write_id_struct(writer, WorkSpace, id_address, &workspace->id);
+  WorkSpace serial_workspace = *workspace;
+  BLI_listbase_clear(&serial_workspace.layouts);
+  LISTBASE_FOREACH (WorkSpaceLayout *, layout, &workspace->layouts) {
+    if (!workspace_layout_is_blui_desktop(layout)) {
+      if (!serial_workspace.layouts.first) {
+        serial_workspace.layouts.first = layout;
+      }
+      serial_workspace.layouts.last = layout;
+    }
+  }
+  BLO_write_id_struct(writer, WorkSpace, id_address, &serial_workspace.id);
   BKE_id_blend_write(writer, &workspace->id);
-  BLO_write_struct_list(writer, WorkSpaceLayout, &workspace->layouts);
+  LISTBASE_FOREACH (WorkSpaceLayout *, layout, &workspace->layouts) {
+    if (workspace_layout_is_blui_desktop(layout)) {
+      continue;
+    }
+    WorkSpaceLayout serial_layout = *layout;
+    while (serial_layout.prev && workspace_layout_is_blui_desktop(serial_layout.prev)) {
+      serial_layout.prev = serial_layout.prev->prev;
+    }
+    while (serial_layout.next && workspace_layout_is_blui_desktop(serial_layout.next)) {
+      serial_layout.next = serial_layout.next->next;
+    }
+    BLO_write_struct_at_address(writer, WorkSpaceLayout, layout, &serial_layout);
+  }
   BLO_write_struct_list(writer, WorkSpaceDataRelation, &workspace->hook_layout_relations);
   BLO_write_struct_list(writer, wmOwnerID, &workspace->owner_ids);
   BLO_write_struct_list(writer, bToolRef, &workspace->tools);

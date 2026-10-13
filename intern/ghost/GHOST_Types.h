@@ -70,6 +70,10 @@ typedef enum {
   GHOST_glBluiShellWindow = (1 << 2),
   /** Taskbar buttons must not steal the target application's foreground focus. */
   GHOST_glBluiTaskbarWindow = (1 << 3),
+  /** Interactive desktop canvas, eligible only for the explicit desktop host. */
+  GHOST_glBluiDesktopWindow = (1 << 4),
+  /** Explicit passive shell tooltip, not an AppBar registration. */
+  GHOST_glBluiPassiveWindow = (1 << 5),
 } GHOST_GLFlags;
 
 typedef enum GHOST_DialogOptions {

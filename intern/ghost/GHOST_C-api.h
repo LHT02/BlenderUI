@@ -587,6 +587,10 @@ void GHOST_GetCursorGrabState(GHOST_WindowHandle windowhandle,
                               int r_bounds[4],
                               bool *r_use_software_cursor);
 
+/** Read-only desktop-lifecycle gate for live mouse buttons, capture and cursor grab. */
+bool GHOST_WindowHasHeldMouseInput(GHOST_SystemHandle systemhandle,
+                                  GHOST_WindowHandle windowhandle);
+
 /**
  * Grabs the cursor for a modal operation, to keep receiving
  * events when the mouse is outside the window. X11 only, others

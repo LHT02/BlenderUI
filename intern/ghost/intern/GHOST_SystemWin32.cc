@@ -6,6 +6,7 @@
  */
 
 #include "GHOST_SystemWin32.hh"
+#include "GHOST_BluiDesktopDpiWin32.hh"
 #include "GHOST_ContextD3D.hh"
 #include "GHOST_EventDragnDrop.hh"
 #include "GHOST_EventTrackpad.hh"
@@ -224,27 +225,46 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(const char *title,
                                                const bool is_dialog,
                                                const GHOST_IWindow *parentWindow)
 {
-  GHOST_WindowWin32 *window = new GHOST_WindowWin32(
-      this,
-      title,
-      left,
-      top,
-      width,
-      height,
-      state,
-      glSettings.context_type,
-      ((glSettings.flags & GHOST_glStereoVisual) != 0),
-      false,
-      (GHOST_WindowWin32 *)parentWindow,
-      ((glSettings.flags & GHOST_glDebugContext) != 0),
-      is_dialog,
-      ((glSettings.flags & GHOST_glBluiShellWindow) != 0),
-      ((glSettings.flags & GHOST_glBluiTaskbarWindow) != 0));
+  GHOST_WindowWin32 *window;
+  {
+    /* Only a newly-created DESKTOP adopts the verified icon host's context.
+     * The scope restores this thread before normal GHOST/WM work continues. */
+    GHOST_BluiDesktopDpiScope desktop_dpi((glSettings.flags & GHOST_glBluiDesktopWindow) != 0);
+    if (!desktop_dpi.ready()) {
+      fprintf(stderr, "BLUI Desktop creation refused: %s (%lu)\n", desktop_dpi.error(), GetLastError());
+      return nullptr;
+    }
+    window = new GHOST_WindowWin32(
+        this,
+        title,
+        left,
+        top,
+        width,
+        height,
+        state,
+        glSettings.context_type,
+        ((glSettings.flags & GHOST_glStereoVisual) != 0),
+        false,
+        (GHOST_WindowWin32 *)parentWindow,
+        ((glSettings.flags & GHOST_glDebugContext) != 0),
+        is_dialog,
+        ((glSettings.flags & GHOST_glBluiShellWindow) != 0),
+        ((glSettings.flags & GHOST_glBluiTaskbarWindow) != 0),
+        ((glSettings.flags & GHOST_glBluiDesktopWindow) != 0),
+        ((glSettings.flags & GHOST_glBluiPassiveWindow) != 0));
+    if (!desktop_dpi.window_matches(window->getHWND())) {
+      fprintf(stderr, "BLUI Desktop creation DPI changed before native window verification\n");
+      delete window;
+      return nullptr;
+    }
+  }
 
   if (window->getValid()) {
     /* Store the pointer to the window */
     m_windowManager->addWindow(window);
-    m_windowManager->setActiveWindow(window);
+    if (!(glSettings.flags & (GHOST_glBluiDesktopWindow | GHOST_glBluiPassiveWindow))) {
+      m_windowManager->setActiveWindow(window);
+    }
   }
   else {
     GHOST_PRINT("GHOST_SystemWin32::createWindow(): window invalid\n");
@@ -557,6 +577,15 @@ GHOST_TSuccess GHOST_SystemWin32::init()
     if (::RegisterClassW(&wc) == 0) {
       success = GHOST_kFailure;
     }
+    else {
+      /* Explicit desktop identity, no private/class DC: WS_EX_LAYERED must
+       * never change the class policy of ordinary editor/taskbar windows. */
+      wc.style &= ~(CS_OWNDC | CS_CLASSDC | CS_PARENTDC);
+      wc.lpszClassName = L"BLUI_DesktopWindowClass";
+      if (::RegisterClassW(&wc) == 0) {
+        success = GHOST_kFailure;
+      }
+    }
   }
 
   return success;
@@ -823,6 +852,12 @@ GHOST_EventButton *GHOST_SystemWin32::processButtonEvent(GHOST_TEventType type,
                                                          GHOST_TButton mask)
 {
   GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)getSystem();
+  if (type == GHOST_kEventButtonDown && window->isBluiDesktopWindow() &&
+      (::GetWindowLongPtrW(window->getHWND(), GWL_STYLE) & WS_CHILD)) {
+    /* A cross-process parent is activated instead of its child. Focus only our
+     * own interactive desktop on explicit input; taskbar remains NOACTIVATE. */
+    ::SetFocus(window->getHWND());
+  }
 
   GHOST_TabletData td = window->getTabletData();
 
@@ -1505,7 +1540,7 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, uint msg, WPARAM wParam, 
     }
 
     GHOST_WindowWin32 *window = (GHOST_WindowWin32 *)::GetWindowLongPtr(hwnd, GWLP_USERDATA);
-    if (window) {
+    if (window && window->getHWND() == hwnd) {
       switch (msg) {
         /* We need to check if new key layout has AltGr. */
         case WM_INPUTLANGCHANGE: {
@@ -2115,7 +2150,10 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, uint msg, WPARAM wParam, 
           /* The WM_KILLFOCUS message is sent to a window immediately before it loses the keyboard
            * focus. We want to prevent this if a window is still active and it loses focus to
            * nowhere. */
-          if (!wParam && hwnd == ::GetActiveWindow()) {
+          if (window->isBluiDesktopWindow()) {
+            event = processWindowEvent(GHOST_kEventWindowDeactivate, window);
+          }
+          else if (!wParam && hwnd == ::GetActiveWindow()) {
             ::SetFocus(hwnd);
           }
           break;
@@ -2166,6 +2204,16 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, uint msg, WPARAM wParam, 
            * following the WM_DESTROY message. WM_DESTROY is used to free the allocated memory
            * object associated with the window.
            */
+          if (msg == WM_NCDESTROY && window->isBluiDesktopWindow() &&
+              ::GetPropW(hwnd, L"BLUI.DesktopHost.v1") == reinterpret_cast<HANDLE>(1)) {
+            /* Explorer can destroy its cross-process child. Queue cleanup;
+             * normal GHOST disposal cleared GWLP_USERDATA before DestroyWindow. */
+            ::RemovePropW(hwnd, L"BLUI.DesktopHost.v1");
+            ::RemovePropW(hwnd, L"BLUI.DesktopInstance.v1");
+            ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+            window->invalidateBluiDesktopHandle();
+            event = processWindowEvent(GHOST_kEventWindowClose, window);
+          }
           break;
         }
         case WM_SHOWWINDOW:
@@ -2177,6 +2225,9 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, uint msg, WPARAM wParam, 
            * another window-management function. */
         case WM_SETFOCUS: {
           /* The WM_SETFOCUS message is sent to a window after it has gained the keyboard focus. */
+          if (msg == WM_SETFOCUS && window->isBluiDesktopWindow()) {
+            event = processWindowEvent(GHOST_kEventWindowActivate, window);
+          }
           break;
         }
         /* ============

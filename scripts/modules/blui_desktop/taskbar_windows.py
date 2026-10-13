@@ -19,6 +19,7 @@ _pending_menus = {}
 _keymaps = []
 _appbar = AppBarController()
 _reserve_due = 0.0
+_SHELL_ROLES = {'TASKBAR', 'STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'}
 
 
 def alignment():
@@ -91,7 +92,8 @@ def _identity(window):
 
 def role_windows(role=None):
     return [window for window in bpy.context.window_manager.windows
-            if window.blui_shell_role != 'NORMAL' and (role is None or window.blui_shell_role == role)]
+            if window.blui_shell_role in _SHELL_ROLES and (role is None or window.blui_shell_role == role)
+            and window.blui_native_handle != '0']
 
 
 def device(window):
@@ -99,7 +101,8 @@ def device(window):
 
 
 def native_handles():
-    return [window.blui_native_handle for window in role_windows()]
+    return [window.blui_native_handle for window in bpy.context.window_manager.windows
+            if window.blui_shell_role != 'NORMAL' and window.blui_native_handle != '0']
 
 
 def redraw():
@@ -108,11 +111,16 @@ def redraw():
             area.tag_redraw()
 
 
-def create(context, role, width, height):
+def create(context, role, width, height, *, no_activate=False):
     if role not in ('TASKBAR', 'STARTMENU', 'TASK_CHOOSER', 'TASK_PREVIEW'):
         raise ValueError('Invalid native shell window role')
+    if type(no_activate) is not bool or (no_activate and role != 'TASK_CHOOSER'):
+        raise ValueError('Only an explicit task chooser tooltip may be passive')
     before = {window.as_pointer() for window in context.window_manager.windows}
-    result = bpy.ops.wm.blui_shell_window_create(role=role, width=width, height=height)
+    arguments = {'role': role, 'width': width, 'height': height}
+    if no_activate:
+        arguments['no_activate'] = True  # Older binaries fail closed, never steal foreground focus.
+    result = bpy.ops.wm.blui_shell_window_create(**arguments)
     created = [window for window in context.window_manager.windows if window.as_pointer() not in before]
     if result != {'FINISHED'} or len(created) != 1 or created[0].blui_shell_role != role:
         raise RuntimeError(iface('Could not open a taskbar window'))
@@ -121,7 +129,7 @@ def create(context, role, width, height):
 
 def _topmost(window):
     # A fresh bpy role window is required, never an arbitrary/cached OS handle.
-    if os.name != 'nt' or window.blui_shell_role == 'NORMAL':
+    if os.name != 'nt' or window.blui_shell_role not in _SHELL_ROLES:
         return
     if window.blui_is_taskbar and is_fullscreen(window):
         return

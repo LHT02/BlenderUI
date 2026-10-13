@@ -8,6 +8,11 @@ from . import native_windows
 CLASSES = frozenset(('Shell_TrayWnd', 'Shell_SecondaryTrayWnd'))
 
 
+class _AppBarData(c.Structure):
+    _fields_ = [('size', w.DWORD), ('window', w.HWND), ('callback', w.UINT),
+                ('edge', w.UINT), ('rect', w.RECT), ('parameter', w.LPARAM)]
+
+
 def validate_record(row):
     if not isinstance(row, dict) or set(row) != {
             'handle', 'pid', 'thread_id', 'process_started', 'window_class', 'visible'}:
@@ -46,6 +51,11 @@ class WindowsBars:
                                                         c.POINTER(w.DWORD)]
         self.kernel.QueryFullProcessImageNameW.restype = w.BOOL
         self.kernel.CloseHandle.argtypes, self.kernel.CloseHandle.restype = [w.HANDLE], w.BOOL
+        self.kernel.GetWindowsDirectoryW.argtypes = [w.LPWSTR, w.UINT]
+        self.kernel.GetWindowsDirectoryW.restype = w.UINT
+        self.shell = c.WinDLL('shell32.dll', winmode=0x800, use_last_error=True)
+        self.shell.SHAppBarMessage.argtypes = [w.DWORD, c.POINTER(_AppBarData)]
+        self.shell.SHAppBarMessage.restype = c.c_size_t
 
     def _explorer(self, pid):
         handle = self.kernel.OpenProcess(0x1000, False, pid)
@@ -53,8 +63,12 @@ class WindowsBars:
             return False
         try:
             name, length = c.create_unicode_buffer(32768), w.DWORD(32768)
-            return bool(self.kernel.QueryFullProcessImageNameW(handle, 0, name, c.byref(length))
-                        and os.path.basename(name.value).casefold() == 'explorer.exe')
+            windows = c.create_unicode_buffer(32768)
+            count = self.kernel.GetWindowsDirectoryW(windows, len(windows))
+            return bool(count and count < len(windows) and
+                        self.kernel.QueryFullProcessImageNameW(handle, 0, name, c.byref(length)) and
+                        os.path.normcase(os.path.normpath(name.value)) ==
+                        os.path.normcase(os.path.join(windows.value, 'explorer.exe')))
         finally:
             self.kernel.CloseHandle(handle)
 
@@ -100,12 +114,43 @@ class WindowsBars:
         if not self.matches(row) or not self.matches(row):
             return False
         # Visibility-only, asynchronous and non-activating; do not move, resize,
-        # restack or alter the user's persistent automatic-hide/AppBar state.
+        # restack. The separate reservation transaction owns the auto-hide bit.
         flags = 0x4000 | 0x1 | 0x2 | 0x4 | 0x10 | 0x200 | (0x40 if visible else 0x80)
         return bool(self.user.SetWindowPos(int(row['handle']), None, 0, 0, 0, 0, flags))
 
     def visible(self, row):
         return bool(self.matches(row) and self.user.IsWindowVisible(int(row['handle'])))
+
+    def primary(self):
+        rows = [row for row in self.enumerate() if row['window_class'] == 'Shell_TrayWnd']
+        return rows[0] if len(rows) == 1 else None
+
+    def _reservation_data(self, row):
+        validate_record(row)
+        if row['window_class'] != 'Shell_TrayWnd' or not self.matches(row) or not self.matches(row):
+            return None
+        data = _AppBarData()
+        data.size, data.window = c.sizeof(data), int(row['handle'])
+        return data
+
+    def reservation_state(self, row):
+        data = self._reservation_data(row)
+        if data is None:
+            return None
+        state = int(self.shell.SHAppBarMessage(4, c.byref(data)))  # ABM_GETSTATE; 0 is valid.
+        return state if 0 <= state <= 3 and self.matches(row) else None
+
+    def set_reservation_state(self, row, state):
+        if type(state) is not int or not 0 <= state <= 3:
+            raise ValueError('Invalid Windows taskbar auto-hide state')
+        data = self._reservation_data(row)
+        if data is None:
+            return False
+        data.parameter = state
+        if not self.matches(row):
+            return False
+        # ABM_SETSTATE always returns TRUE: controller must verify GETSTATE later.
+        return bool(self.shell.SHAppBarMessage(10, c.byref(data)))
 
 
 class OwnerProcess:

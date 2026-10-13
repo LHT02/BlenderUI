@@ -80,7 +80,9 @@ class GHOST_WindowWin32 : public GHOST_Window {
                     bool is_debug = false,
                     bool dialog = false,
                     bool shell_window = false,
-                    bool taskbar_window = false);
+                    bool taskbar_window = false,
+                    bool desktop_window = false,
+                    bool passive_window = false);
 
   /**
    * Destructor.
@@ -101,6 +103,11 @@ class GHOST_WindowWin32 : public GHOST_Window {
    * \return The validity of the window.
    */
   bool getValid() const;
+  bool isBluiDesktopWindow() const { return m_bluiDesktopWindow; }
+  /** Called only after an unexpected native desktop-child destruction. */
+  void invalidateBluiDesktopHandle();
+  GHOST_TSuccess swapBuffers() override;
+  GHOST_TSuccess activateDrawingContext() override;
 
   /**
    * Access to the handle of the window.
@@ -331,6 +338,9 @@ class GHOST_WindowWin32 : public GHOST_Window {
   static LRESULT CALLBACK bluiAppBarWndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
   bool handleBluiAppBarMessage(UINT message, WPARAM wparam, LPARAM lparam);
   void releaseBluiAppBar();
+  bool createBluiDesktopCleanupSurface();
+  void releaseBluiDesktopCleanupSurface();
+  void releaseDropTarget();
 
   /**
    * \param type: The type of rendering context create.
@@ -378,6 +388,10 @@ class GHOST_WindowWin32 : public GHOST_Window {
   HWND m_hWnd;
   WNDPROC m_bluiAppBarPreviousProc;
   bool m_bluiAppBarNotifying;
+  bool m_bluiDesktopWindow;
+  bool m_bluiDesktopReady;
+  HWND m_bluiDesktopCleanupHwnd;
+  HDC m_bluiDesktopCleanupDC;
   /** Device context handle. */
   HDC m_hDC;
 

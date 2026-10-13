@@ -77,6 +77,25 @@ class AppBarTests(unittest.TestCase):
         self.snapshot['monitors'][0]['work'][3] = 656
         self.assertEqual(self.reconcile(64), {'DISPLAY1': [-1920, 644, 0, 740]})
 
+    def test_system_reclaim_work_change_requeries_without_double_height(self):
+        self.reconcile()
+        self.system_reserve = 0  # Explorer auto-hide releases only its reservation.
+        self.snapshot['monitors'][0]['work'][3] = 780
+        self.assertEqual(self.reconcile(), {'DISPLAY1': [-1920, 696, 0, 780]})
+        # Our SETPOS changes work area once: one query, no second deduction/SETPOS.
+        self.snapshot['monitors'][0]['work'][3] = 696
+        self.reconcile()
+        self.reconcile()
+        self.assertEqual([entry[0] for entry in self.messages], [0, 2, 3, 2, 3, 2])
+
+    def test_explicit_handoff_invalidation_only_requeries_once(self):
+        self.reconcile()
+        self.controller.invalidate()
+        self.assertEqual([entry[0] for entry in self.messages], [0, 2, 3])
+        self.reconcile()
+        self.reconcile()
+        self.assertEqual([entry[0] for entry in self.messages], [0, 2, 3, 2])
+
     def test_shell_final_adjustment_is_used(self):
         self.set_shift = 10
         self.assertEqual(self.reconcile(), {'DISPLAY1': [-1920, 646, 0, 730]})

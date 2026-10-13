@@ -93,6 +93,11 @@
 
 /* the global to talk to ghost */
 static GHOST_SystemHandle g_system = NULL;
+
+bool wm_window_has_held_mouse_input(const wmWindow *win)
+{
+  return win && win->ghostwin && GHOST_WindowHasHeldMouseInput(g_system, win->ghostwin);
+}
 #if !(defined(WIN32) || defined(__APPLE__))
 static const char *g_system_backend_id = NULL;
 #endif
@@ -212,7 +217,15 @@ static void wm_ghostwindow_destroy(wmWindowManager *wm, wmWindow *win)
   }
 
   /* We need this window's opengl context active to discard it. */
-  GHOST_ActivateWindowDrawingContext(win->ghostwin);
+  if (win->blui_shell_role == WM_BLUI_SHELL_DESKTOP && !GHOST_GetValid(win->ghostwin)) {
+    /* Native parent loss parked the exact HGLRC on a private cleanup surface.
+     * Never activate/draw the destroyed HWND or delete context-local names in
+     * another normal window's context. */
+    GHOST_ActivateOpenGLContext(GHOST_GetDrawingContext(win->ghostwin));
+  }
+  else {
+    GHOST_ActivateWindowDrawingContext(win->ghostwin);
+  }
   GPU_context_active_set(win->gpuctx);
 
   /* Delete local GPU context. */
@@ -437,7 +450,7 @@ void wm_window_close_force(bContext *C, wmWindowManager *wm, wmWindow *win)
     }
   }
 
-  if (win->parent == NULL && win_other == NULL) {
+  if (win->parent == NULL && win_other == NULL && win->blui_shell_role != WM_BLUI_SHELL_DESKTOP) {
     /* BLUI: with a tray icon installed, closing the last window only closes the
      * window. Quitting would take the tray with it, and being able to close
      * every window and still reach BLUI is the entire point of the tray. Quit
@@ -777,6 +790,12 @@ static void wm_window_ghostwindow_add(wmWindowManager *wm,
   if (ELEM(win->blui_shell_role, WM_BLUI_SHELL_TASKBAR, WM_BLUI_SHELL_TASK_PREVIEW)) {
     glSettings.flags |= GHOST_glBluiTaskbarWindow;
   }
+  if (win->blui_shell_role == WM_BLUI_SHELL_DESKTOP) {
+    glSettings.flags |= GHOST_glBluiDesktopWindow;
+  }
+  if (win->blui_shell_role == WM_BLUI_SHELL_TASK_CHOOSER && win->blui_shell_no_activate) {
+    glSettings.flags |= GHOST_glBluiPassiveWindow;
+  }
 
   eGPUBackendType gpu_backend = GPU_backend_type_selection_get();
   glSettings.context_type = wm_ghost_drawing_context_type(gpu_backend);
@@ -882,7 +901,8 @@ static void wm_window_ghostwindow_ensure(wmWindowManager *wm, wmWindow *win, boo
     wm_window_ghostwindow_add(wm, BLUI_PRODUCT_NAME, win, is_dialog);
   }
 
-  if (win->ghostwin != NULL) {
+  if (win->ghostwin != NULL &&
+      (win->blui_shell_role != WM_BLUI_SHELL_DESKTOP || GHOST_GetValid(win->ghostwin))) {
     /* If we have no `ghostwin` this is a buggy window that should be removed.
      * However we still need to initialize it correctly so the screen doesn't hang. */
 
@@ -1306,6 +1326,8 @@ int wm_blui_shell_window_create_exec(bContext *C, wmOperator *op)
   }
   wmWindow *win = wm_window_new(bmain, wm, NULL, false);
   win->blui_shell_role = RNA_enum_get(op->ptr, "role");
+  win->blui_shell_no_activate = win->blui_shell_role == WM_BLUI_SHELL_TASK_CHOOSER &&
+                                 RNA_boolean_get(op->ptr, "no_activate");
   win->scene = scene;
   ViewLayer *view_layer = BKE_view_layer_default_view(scene);
   STRNCPY(win->view_layer_name, view_layer->name);
@@ -1315,10 +1337,15 @@ int wm_blui_shell_window_create_exec(bContext *C, wmOperator *op)
   BKE_workspace_active_set(win->workspace_hook, workspace);
   /* Append a private temporary screen, never retype/share a component screen and
    * never introduce a seventh default workspace. Closing removes this layout. */
-  WorkSpaceLayout *layout = ED_workspace_layout_add(bmain, workspace, win, "BLUI Shell UI");
+  const bool desktop = win->blui_shell_role == WM_BLUI_SHELL_DESKTOP;
+  WorkSpaceLayout *layout = ED_workspace_layout_add(
+      bmain, workspace, win, desktop ? "BLUI Desktop Host" : "BLUI Shell UI");
   BKE_workspace_active_layout_set(win->workspace_hook, win->winid, workspace, layout);
   bScreen *screen = BKE_workspace_layout_screen_get(layout);
   screen->temp = true;
+  if (desktop) {
+    screen->flag |= SCREEN_BLUI_DESKTOP_HOST;
+  }
   CTX_wm_window_set(C, win);
   CTX_wm_area_set(C, NULL);
   CTX_wm_region_set(C, NULL);
@@ -1326,8 +1353,10 @@ int wm_blui_shell_window_create_exec(bContext *C, wmOperator *op)
   WM_check(C);
   ScrArea *area = screen->areabase.first;
   CTX_wm_area_set(C, area);
-  ED_area_newspace(C, area, SPACE_INFO, false);
-  ((SpaceInfo *)area->spacedata.first)->blui_shell_ui = true;
+  ED_area_newspace(C, area, desktop ? SPACE_NODE : SPACE_INFO, false);
+  if (!desktop) {
+    ((SpaceInfo *)area->spacedata.first)->blui_shell_ui = true;
+  }
   LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
     if (region->regiontype == RGN_TYPE_HEADER) {
       region->flag |= RGN_FLAG_HIDDEN;
@@ -1337,7 +1366,7 @@ int wm_blui_shell_window_create_exec(bContext *C, wmOperator *op)
   ED_screen_refresh(wm, win);
   const bool success = win->ghostwin != NULL;
   if (success) {
-    GHOST_SetTitle(win->ghostwin, "BLUI Shell UI");
+    GHOST_SetTitle(win->ghostwin, desktop ? "BLUI Desktop Host" : "BLUI Shell UI");
     ED_area_tag_redraw(area);
   }
   else {
@@ -1461,6 +1490,10 @@ void wm_window_clear_drawable(wmWindowManager *wm)
 
 void wm_window_make_drawable(wmWindowManager *wm, wmWindow *win)
 {
+  if (win->blui_shell_role == WM_BLUI_SHELL_DESKTOP && win->ghostwin &&
+      !GHOST_GetValid(win->ghostwin)) {
+    return;
+  }
   BLI_assert(GPU_framebuffer_active_get() == GPU_framebuffer_back_get());
 
   if (win != wm->windrawable && win->ghostwin) {
@@ -1491,7 +1524,8 @@ void wm_window_reset_drawable(void)
   }
   wmWindow *win = wm->windrawable;
 
-  if (win && win->ghostwin) {
+  if (win && win->ghostwin &&
+      (win->blui_shell_role != WM_BLUI_SHELL_DESKTOP || GHOST_GetValid(win->ghostwin))) {
     wm_window_clear_drawable(wm);
     wm_window_set_drawable(wm, win, true);
   }
@@ -1637,6 +1671,14 @@ static bool ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr C_void_pt
       return true;
     }
     wmWindow *win = GHOST_GetWindowUserData(ghostwin);
+    if (!win || win->ghostwin != ghostwin) {
+      return true;
+    }
+    const bool desktop_native_lost = win->blui_shell_role == WM_BLUI_SHELL_DESKTOP &&
+                                     !GHOST_GetValid(ghostwin);
+    if (desktop_native_lost && type != GHOST_kEventWindowClose) {
+      return true;  /* Drop queued size/paint/focus/key events for the dead native handle. */
+    }
 
     switch (type) {
       case GHOST_kEventWindowDeactivate: {
@@ -1685,7 +1727,12 @@ static bool ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr C_void_pt
         break;
       }
       case GHOST_kEventWindowClose: {
-        wm_window_close(C, wm, win);
+        if (desktop_native_lost) {
+          wm_window_close_force(C, wm, win);
+        }
+        else {
+          wm_window_close(C, wm, win);
+        }
         break;
       }
       case GHOST_kEventWindowUpdate: {

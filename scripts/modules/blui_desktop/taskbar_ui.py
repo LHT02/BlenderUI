@@ -32,6 +32,7 @@ from .taskbar_options_ui import classes as options_classes
 from .shell_context_ui import classes as context_classes
 from .shell_hover import classes as hover_classes
 from .notification_ui import classes as notification_classes
+from .notification_hover import classes as notification_hover_classes
 
 classes = ((WM_OT_blui_windows_taskbar,) + options_classes + action_classes + draw_classes +
-           context_classes + hover_classes + notification_classes)
+           context_classes + hover_classes + notification_classes + notification_hover_classes)

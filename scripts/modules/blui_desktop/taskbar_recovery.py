@@ -7,6 +7,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from blui_desktop.taskbar_native import OwnerProcess, SessionLock, WindowsBars
 from blui_desktop.taskbar_state import Guard, Journal
+from blui_desktop.taskbar_reservation import ReservationController, ReservationJournal
 
 
 def run(directory, owner_pid, owner_started, helper_pid, helper_started):
@@ -30,11 +31,16 @@ def run(directory, owner_pid, owner_started, helper_pid, helper_started):
             # A new guard always replays the old journal BEFORE enabling hiding.
             # Never compete with another active guard for taskbar ownership.
             return
-        guard = Guard(WindowsBars(), Journal(directory))
-        for _ in range(10):
+        backend = WindowsBars()
+        guard = Guard(backend, Journal(directory),
+                      ReservationController(backend, ReservationJournal(directory)))
+        # Explorer may be recreating its primary HWND during the same crash.
+        # Wait boundedly in this independent helper, never on Blender's UI; a
+        # failed attempt keeps the durable intent for a subsequent guard.
+        for _ in range(120):
             if guard.restore():
                 break
-            time.sleep(.1)
+            time.sleep(.25)
     finally:
         for resource in (owner, helper, lock):
             if resource:

@@ -309,6 +309,14 @@ def start_system(action):
         user.LockWorkStation.argtypes = []
         if not user.LockWorkStation():
             raise ctypes.WinError(ctypes.get_last_error())
+    elif action == 'HIBERNATE':
+        from . import system_power
+        return system_power.hibernate()
     else:
         _shutdown(action == 'RESTART')
     return True
+
+
+def start_capabilities():
+    from . import system_power
+    return system_power.capabilities()

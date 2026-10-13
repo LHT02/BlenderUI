@@ -725,6 +725,48 @@ GHOST_TSuccess GHOST_GetModifierKeyState(GHOST_SystemHandle systemhandle,
   return result;
 }
 
+bool GHOST_WindowHasHeldMouseInput(GHOST_SystemHandle systemhandle,
+                                  GHOST_WindowHandle windowhandle)
+{
+  if (!systemhandle || !windowhandle) {
+    return false;
+  }
+  GHOST_IWindow *window = (GHOST_IWindow *)windowhandle;
+  GHOST_TGrabCursorMode mode;
+  GHOST_TAxisFlag axis;
+  GHOST_Rect bounds;
+  bool software_cursor;
+  window->getCursorGrabState(mode, axis, bounds, software_cursor);
+  if (mode != GHOST_kGrabDisable) {
+    return true;
+  }
+#ifdef WIN32
+  const HWND hwnd = ((GHOST_WindowWin32 *)window)->getHWND();
+  if (hwnd && GetCapture() == hwnd) {
+    return true;
+  }
+  /* Current native state, not a possibly stale queued PRESS after hiding/focus loss. */
+  for (const int button : {VK_LBUTTON, VK_MBUTTON, VK_RBUTTON, VK_XBUTTON1, VK_XBUTTON2}) {
+    if (GetAsyncKeyState(button) & 0x8000) {
+      return true;
+    }
+  }
+#else
+  GHOST_ISystem *system = (GHOST_ISystem *)systemhandle;
+  for (const GHOST_TButton button : {GHOST_kButtonMaskLeft,
+                                     GHOST_kButtonMaskMiddle,
+                                     GHOST_kButtonMaskRight,
+                                     GHOST_kButtonMaskButton4,
+                                     GHOST_kButtonMaskButton5}) {
+    bool down = false;
+    if (system->getButtonState(button, down) == GHOST_kSuccess && down) {
+      return true;
+    }
+  }
+#endif
+  return false;
+}
+
 GHOST_TSuccess GHOST_GetButtonState(GHOST_SystemHandle systemhandle,
                                     GHOST_TButton mask,
                                     bool *r_is_down)

@@ -1494,6 +1494,10 @@ void wm_draw_update(bContext *C)
 
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
 #ifdef WIN32
+    if (win->blui_shell_role == WM_BLUI_SHELL_DESKTOP && win->ghostwin &&
+        !GHOST_GetValid(win->ghostwin)) {
+      continue;  /* Queued close will clean the parked GL context, never paint a dead desktop. */
+    }
     GHOST_TWindowState state = GHOST_GetWindowState(win->ghostwin);
 
     if (state == GHOST_kWindowStateMinimized) {

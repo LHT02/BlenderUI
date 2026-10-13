@@ -20,6 +20,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from blui_desktop import native_windows, notification_pixels, notification_protocol as protocol
 from blui_desktop.taskbar_native import OwnerProcess
+from blui_desktop import notification_history, notification_system, notification_system_native
 
 MAX_COMMAND = 8192
 WM_COPYDATA, WM_USER = 0x4a, 0x400
@@ -72,6 +73,8 @@ class Host:
         self.classes = []
         self.next_check = 0
         self.store = protocol.Store(lambda handle: native_windows._identity(self.user, handle), notification_pixels.extract)
+        self.history = None
+        self.build = notification_system.build_number()
         self._wndproc_type = c.WINFUNCTYPE(c.c_ssize_t, w.HWND, w.UINT, w.WPARAM, w.LPARAM)
         self._wndproc = self._wndproc_type(self._message)
 
@@ -146,6 +149,10 @@ class Host:
         if not self.private:
             if self.user.FindWindowW('Shell_TrayWnd', None) != self.tray:
                 raise RuntimeError('Windows did not select the BLUI notification receiver')
+            # Bootstrap does not require applications to re-register; UIA/COM
+            # operations are confined to a dedicated helper-owned thread.
+            self.history = notification_history.Service(self._find_explorer,
+                lambda handle: native_windows._identity(self.user, handle))
             self._broadcast()
             self.broadcasted = True
 
@@ -201,18 +208,53 @@ class Host:
         return self.user.DefWindowProcW(handle, message, wparam, lparam)
 
     def command(self, value):
-        if not isinstance(value, dict) or value.get('command') not in ('activate', 'shutdown', 'snapshot', 'heartbeat'):
+        if not isinstance(value, dict) or value.get('command') not in ('activate', 'system', 'shutdown', 'snapshot', 'heartbeat'):
             raise ValueError('Invalid notification command')
         command = value['command']
+        if command == 'system':
+            if set(value) != {'command', 'key', 'event'}:
+                raise ValueError('Invalid Windows system notification command')
+            if self.private:
+                raise ValueError('System UI actions are unavailable in a private notification test')
+            notification_system.request(value['key'], value['event'], self.build)
+            if self.history and self.history.thread.is_alive():
+                self.history.system(value['key'], value['event'])
+            else:
+                notification_system_native.action(value['key'], value['event'])
         if command == 'activate':
+            if set(value) != {'command', 'key', 'event', 'x', 'y'}:
+                raise ValueError('Invalid notification activation command')
             token = value.get('key')
             if not isinstance(token, str) or len(token) > 128:
                 raise ValueError('Invalid notification identity')
-            self.store.action(token, value.get('event'), value.get('x'), value.get('y'),
-                              self.user.PostMessageW, self.user.AllowSetForegroundWindow)
+            historical = next((row for row in self.history.rows if row['key'] == token), None) if self.history else None
+            if token.startswith('uia:') or historical and historical['backend'] == 'OVERFLOW' and token not in self.store.rows:
+                if self.private or self.history is None:
+                    raise ValueError('Historical Windows notification provider is unavailable')
+                self.history.action(token, value.get('event'))
+            else:
+                icon = self.store.rows.get(token)
+                system = notification_system.GUID_ACTIONS.get(icon['guid']) if icon else None
+                if system and self.build >= 22000 and value.get('event') in {'LEFT', 'RIGHT', 'DOUBLE'}:
+                    # ManagedShell records old Win11 system callbacks that can
+                    # crash Explorer. Use fixed system entry points, not guessed
+                    # flyout messages or activation of a foreign Shell_TrayWnd.
+                    if self.private:
+                        raise ValueError('System UI actions are unavailable in a private notification test')
+                    if self.history and self.history.thread.is_alive():
+                        self.history.system(system, value['event'])
+                    else:
+                        notification_system_native.action(system, value['event'])
+                else:
+                    self.store.action(token, value.get('event'), value.get('x'), value.get('y'),
+                                      self.user.PostMessageW, self.user.AllowSetForegroundWindow)
         return command != 'shutdown'
 
     def pump(self, now):
+        if self.history:
+            error = self.history.poll()
+            if error:
+                self.error = error
         message = w.MSG()
         for _ in range(128):
             if not self.user.PeekMessageW(c.byref(message), None, 0, 0, 1):
@@ -226,10 +268,23 @@ class Host:
             self.next_check = now + 2
 
     def snapshot(self, enabled=True):
-        return {'enabled': bool(enabled), 'error': self.error, 'revision': self.store.revision,
-                'icons': self.store.snapshot() if enabled else [], 'host_handle': str(self.tray or 0)}
+        live = self.store.snapshot()
+        if self.original and not self.private:
+            live = [row for row in live if not (row['guid'] in notification_system.GUID_ACTIONS and
+                    row['pid'] == self.original[1][0])]
+        rows = notification_history.merge_rows(live, self.history.rows if self.history else [])
+        return {'enabled': bool(enabled), 'error': self.error,
+                'revision': self.store.revision + (self.history.revision if self.history else 0),
+                'icons': rows if enabled else [], 'host_handle': str(self.tray or 0),
+                'platform': self.build,
+                'controls': notification_system.controls(self.build, private=self.private) if enabled else [],
+                'bootstrap': self.history.status if self.history and enabled else
+                    {'state': 'DISABLED', 'count': 0, 'error': ''}}
 
     def close(self):
+        if self.history:
+            self.history.close()
+            self.history = None
         # Only handles created by this helper are ever destroyed or restacked.
         if self.notify:
             self.user.DestroyWindow(self.notify)
@@ -316,9 +371,10 @@ def run(pid, started, *, private=False):
                         break
                 except (ValueError, OSError) as exc:
                     host.error = str(exc)[:1024]
-            if revision != host.store.revision or now - last_emit > 2:
+            current_revision = host.store.revision + (host.history.revision if host.history else 0)
+            if revision != current_revision or now - last_emit > 2:
                 publish(host.snapshot())
-                revision, last_emit = host.store.revision, now
+                revision, last_emit = current_revision, now
             time.sleep(.02)  # Only this disposable helper, never Blender's UI thread.
     except (OSError, ValueError, RuntimeError) as exc:
         if host:

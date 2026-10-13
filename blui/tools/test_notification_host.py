@@ -31,6 +31,7 @@ class HostTests(unittest.TestCase):
             PostMessageW=mock.Mock(return_value=True), AllowSetForegroundWindow=mock.Mock(return_value=True))
         self.host.kernel = SimpleNamespace(CloseHandle=mock.Mock(return_value=True))
         self.host.store = mock.Mock()
+        self.host.history, self.host.build = None, 19045
 
     def test_restoration_after_owned_windows_destroyed_only(self):
         events = []

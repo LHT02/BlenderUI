@@ -82,6 +82,8 @@ void wm_window_ghostwindows_ensure(wmWindowManager *wm);
  */
 void wm_window_ghostwindows_remove_invalid(bContext *C, wmWindowManager *wm);
 void wm_window_process_events(const bContext *C);
+/** Live native held/captured input; does not use stale queued event-state values. */
+bool wm_window_has_held_mouse_input(const wmWindow *win);
 
 void wm_window_clear_drawable(wmWindowManager *wm);
 void wm_window_make_drawable(wmWindowManager *wm, wmWindow *win);

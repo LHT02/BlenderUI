@@ -36,7 +36,7 @@ generation/restart/fullscreen flags from a freshly validated Window;
 detects a restart epoch and sends NEW again before restoring the reservation.
 Per-registration tokens prevent same-process HWND/RNA reuse from unregistering
 the new owner. Destruction has an additional native unregister fallback.
-Reconcile caches the full-monitor geometry, logical height, exact window
+Reconcile caches the full-monitor geometry/work rectangle, logical height, exact window
 identity and native generation/restart/fullscreen state: unchanged passes do not
 send even a QUERYPOS IPC to Explorer. A native notification or setting/topology
 change invalidates the cache, then the post-SETPOS generation is remembered to
@@ -50,9 +50,22 @@ by Windows. `snapshot()` is RAM-only. Only trusted system `shell32.dll` is loade
 with `LOAD_LIBRARY_SEARCH_SYSTEM32`; this path does not enumerate or load any
 third-party context-menu extension.
 
-The original Windows taskbar's explicit hide operation changes visibility only:
-it does not unregister Explorer's AppBar or reclaim its reserved strip. BLUI
-honors that reservation, so an invisible original strip may remain below it.
+Explicitly hiding the original Windows taskbar now coordinates its reservation
+through the isolated visibility guard, following ManagedShell's temporary
+`ABM_SETSTATE` AUTOHIDE approach (not copied code). Before changing anything,
+separate atomic journals remember originally visible bars and the original
+auto-hide bit. Only the fresh verified Explorer primary taskbar can change that
+bit; existing auto-hide is never disabled on restoration. The guard preserves
+current other state bits, relinquishes hiding after an external auto-hide change,
+and both primary and crash-recovery guardians restore the transaction even when
+no visibility hide occurred yet. Explorer replacement identities are journalled
+before any new write. Other AppBars are never unregistered or manually resized;
+Windows remains responsible for their reservations. No SPI work-area write is used.
+Native ABN_STATECHANGE notifications, a changed monitor work rectangle, or
+RAM-only `AppBarController.invalidate()` trigger re-query from the **full** monitor
+rectangle, never from the already-reserved work area. This avoids double deduction.
+The guard status exposes `reservation_reclaimed`, `reservation_pending`, and
+`reservation_error`; pending recovery retains its journal for the next guard.
 Multiple BLUI processes also get separate standard Windows AppBar reservations;
 there is no global cross-process single-bar ownership yet.
 
@@ -66,7 +79,17 @@ Primary API contracts:
   [ABM_QUERYPOS](https://learn.microsoft.com/en-us/windows/win32/shell/abm-querypos),
   [ABM_SETPOS](https://learn.microsoft.com/en-us/windows/win32/shell/abm-setpos),
   [ABM_REMOVE](https://learn.microsoft.com/en-us/windows/win32/shell/abm-remove).
+- [ABM_GETSTATE](https://learn.microsoft.com/en-us/windows/win32/shell/abm-getstate),
+  [ABM_SETSTATE](https://learn.microsoft.com/en-us/windows/win32/shell/abm-setstate):
+  zero is a valid state, and SETSTATE's always-TRUE result requires GETSTATE readback.
+- [ManagedShell ExplorerHelper](https://github.com/cairoshell/ManagedShell/blob/master/src/ManagedShell.AppBar/ExplorerHelper.cs):
+  original taskbar auto-hide/reservation and visibility coordination reference.
 
 Mock tests never register a real AppBar or alter the user's current work area.
 Only root's owned native UI fixture may exercise a real registration and must
 remove it immediately afterward.
+`check_taskbar_reservation_native.py` is root-only serial QA: it temporarily hides
+the real system taskbar through a fixture-owned guard, tests reclaimed AppBar
+placement and explicit restoration, then terminates only that owned helper to
+verify the second guardian. It restores original work areas/state/visibility and
+keeps recovery journals if restoration cannot be confirmed.

@@ -10,6 +10,15 @@ ICON_SLOT = 24
 _fingerprint = None
 
 
+def _system_rows(value):
+    return [dict(item, key='system:' + item['key'], tip=iface(item['label']),
+                 hidden=False, cache_key='', control=True) for item in value.get('controls', [])]
+
+
+def _actionable(icon):
+    return bool(icon.get('actions', icon.get('callback', False)))
+
+
 def _partition(maxicons):
     if type(maxicons) is not int or not 0 <= maxicons <= 16:
         raise ValueError('Invalid notification inline icon count')
@@ -19,7 +28,7 @@ def _partition(maxicons):
     visible = [row for row in value['icons'] if not row['hidden']]
     inline = visible[:maxicons]
     keys = {row['key'] for row in inline}
-    return inline, [row for row in value['icons'] if row['key'] not in keys]
+    return inline + _system_rows(value), [row for row in value['icons'] if row['key'] not in keys]
 
 
 def logical_width(maxicons=6):
@@ -35,9 +44,9 @@ def draw_icons(layout, _context, maxicons=6, button_height=40):
         button = row.row(align=True)
         button.ui_units_x = ICON_SLOT / 20
         button.scale_y = button_height / 20
-        button.enabled = bool(icon['callback'])
+        button.enabled = _actionable(icon)
         value = client.icon_value(icon)
-        kwargs = {'icon_value': value} if value else {'icon': 'DOT'}
+        kwargs = {'icon_value': value} if value else {'icon': icon.get('icon', 'DOT')}
         button.operator('wm.blui_notification_action', text='', **kwargs).key = icon['key']
     if overflow:
         button = row.row(align=True)
@@ -65,13 +74,22 @@ class WM_OT_blui_notification_action(Operator):
 
     @classmethod
     def description(cls, _context, properties):
-        icon = next((row for row in client.snapshot()['icons'] if row['key'] == properties.key), None)
+        value = client.snapshot()
+        icon = next((row for row in value['icons'] + _system_rows(value) if row['key'] == properties.key), None)
+        if icon and icon.get('backend') == 'UIA':
+            return icon['tip'] + '\n' + iface('Historical icon: default action only')
+        if icon and icon.get('backend') in {'DISPLAY', 'OVERFLOW'}:
+            return icon['tip'] + '\n' + iface('Historical icon: use Original Windows Notification Area')
         return icon['tip'] if icon and icon['tip'] else iface('Notification Icon')
 
     def _action(self, context, event=None):
         action = ('RIGHT' if event and event.type == 'RIGHTMOUSE' else
                   'DOUBLE' if event and event.value == 'DOUBLE_CLICK' else 'LEFT')
         try:
+            if self.key == 'system:ORIGINAL_TRAY' and action == 'LEFT':
+                # Restoring is asynchronous in the existing crash-safe owner
+                # service. Do not immediately send Win+B to an invisible tray.
+                return bpy.ops.wm.blui_windows_taskbar(action='restore')
             client.command(self.key, action, *_position(context, event))
         except (OSError, RuntimeError, ValueError) as exc:
             self.report({'WARNING'}, str(exc))
@@ -92,6 +110,8 @@ class BLUI_NotificationItem(PropertyGroup):
     key: StringProperty(options={'SKIP_SAVE'})
     label: StringProperty(options={'SKIP_SAVE'})
     cache_key: StringProperty(options={'SKIP_SAVE'})
+    icon: StringProperty(default='DOT', options={'SKIP_SAVE'})
+    actionable: IntProperty(default=0, min=0, max=1, options={'SKIP_SAVE'})
 
 
 class BLUI_NotificationSettings(PropertyGroup):
@@ -103,7 +123,8 @@ class BLUI_UL_notification_icons(UIList):
     def draw_item(self, _context, layout, _data, item, _icon, _active_data, _active_propname):
         layout.operator_context = 'INVOKE_DEFAULT'
         value = client.icon_value({'cache_key': item.cache_key})
-        kwargs = {'icon_value': value} if value else {'icon': 'DOT'}
+        kwargs = {'icon_value': value} if value else {'icon': item.icon}
+        layout.enabled = bool(item.actionable)
         op = layout.operator('wm.blui_notification_action', text=item.label or iface('Notification Icon'),
                              emboss=False, translate=False, **kwargs)
         op.key = item.key
@@ -120,14 +141,17 @@ def sync(context=None):
     settings = getattr(wm, 'blui_notification_settings', None) if wm else None
     if settings is None:
         return False
-    rows = client.snapshot()['icons']
-    fingerprint = (settings.as_pointer(), tuple((row['key'], row['tip'], row['cache_key']) for row in rows))
+    value = client.snapshot()
+    rows = value['icons'] + _system_rows(value)
+    fingerprint = (settings.as_pointer(), tuple((row['key'], row['tip'], row['cache_key'],
+                    row.get('icon', 'DOT'), _actionable(row)) for row in rows))
     if fingerprint == _fingerprint and len(settings.items) == len(rows):
         return False
     settings.items.clear()
     for row in rows:
         item = settings.items.add()
         item.key, item.label, item.cache_key = row['key'], row['tip'].replace('\n', ' '), row['cache_key']
+        item.icon, item.actionable = row.get('icon', 'DOT'), int(_actionable(row))
     settings.active = -1
     _fingerprint = fingerprint
     return True
@@ -157,7 +181,12 @@ def draw_notification(layout, context):
     header.operator('wm.window_close', text='', icon='X').force_close = True
     if value['error']:
         layout.label(text=iface('Notification area is unavailable'), icon='ERROR', translate=False)
-    if not value['icons']:
+    bootstrap = value.get('bootstrap', {})
+    if bootstrap.get('state') in {'PARTIAL', 'UNAVAILABLE'}:
+        layout.label(text=iface('Some historical icons require the original Windows tray'), icon='INFO', translate=False)
+        layout.operator('wm.blui_windows_taskbar', text=iface('Original Windows Notification Area'),
+                        icon='WINDOW', translate=False).action = 'restore'
+    if not value['icons'] and not value.get('controls'):
         layout.label(text=iface('No Notification Icons'), translate=False)
         return
     settings = context.window_manager.blui_notification_settings

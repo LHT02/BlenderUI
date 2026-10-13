@@ -18,7 +18,9 @@ def open_display(context, device):
     if display is None:
         raise ValueError(iface('Display is no longer connected'))
     tree = next((tree for tree in session.roots() if tree.monitor == device), None)
-    existing = next((window for window in context.window_manager.windows for area in window.screen.areas
+    existing = next((window for window in context.window_manager.windows
+                     if window.blui_shell_role == 'NORMAL' and window.blui_native_handle != '0'
+                     for area in window.screen.areas
                      if area.type == 'NODE_EDITOR' and area.spaces.active.node_tree == tree and tree), None)
     if existing:
         window_placement.place(existing.blui_native_handle, display['work'], snapshot, preferred=device)
@@ -47,6 +49,8 @@ def topology_changed(snapshot):
     rows = snapshot['monitors']
     primary = next((row['device'] for row in rows if row['primary']), '')
     for window in bpy.context.window_manager.windows:
+        if window.blui_shell_role != 'NORMAL' or window.blui_native_handle == '0':
+            continue  # Embedded DESKTOP uses parent-client coordinates, never normal placement.
         trees = [area.spaces.active.node_tree for area in window.screen.areas if area.type == 'NODE_EDITOR']
         tree = next((tree for tree in trees if tree and tree.board_id), None)
         if not tree:
@@ -108,6 +112,9 @@ class BLUI_MT_displays(Menu):
     bl_label = 'Displays'
 
     def draw(self, _context):
+        from .desktop_ui import draw_settings
+        draw_settings(self.layout, _context)
+        self.layout.separator()
         self.layout.operator('wm.blui_displays_open', text=iface('Open Desktops on All Displays'), translate=False)
         for display in runtime.monitor_snapshot()['monitors']:
             op = self.layout.operator('wm.blui_display_open', text=display['device'], icon='WINDOW', translate=False)

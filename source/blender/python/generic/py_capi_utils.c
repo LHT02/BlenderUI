@@ -1144,8 +1144,11 @@ void PyC_MainModule_Restore(PyObject *main_mod)
 
 bool PyC_IsInterpreterActive(void)
 {
-  /* instead of PyThreadState_Get, which calls Py_FatalError */
-  return (PyThreadState_GetDict() != NULL);
+  /* Operators may release the GIL while background service threads run. The
+   * process-wide current thread state can then belong to another thread;
+   * PyThreadState_GetDict is neither a lock check nor safe without the GIL.
+   * Only skip PyGILState_Ensure when this calling thread actually holds it. */
+  return Py_IsInitialized() && PyGILState_Check();
 }
 
 /** \} */

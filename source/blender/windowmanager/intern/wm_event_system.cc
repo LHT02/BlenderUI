@@ -4518,7 +4518,7 @@ bool WM_window_has_modal_interaction(const wmWindow *win)
     }
     else if (handler->type == WM_HANDLER_TYPE_UI) {
       /* Active text fields and popups can retain node RNA pointers as well as transforms. */
-      if (win->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
+      if (ELEM(win->blui_shell_role, WM_BLUI_SHELL_NORMAL, WM_BLUI_SHELL_DESKTOP)) {
         /* Keep the original conservative Node/Canvas/normal editor guard. */
         return true;
       }
@@ -4526,6 +4526,36 @@ bool WM_window_has_modal_interaction(const wmWindow *win)
       if (UI_handler_has_modal_interaction(ui_handler, win)) {
         return true;
       }
+    }
+  }
+  return false;
+}
+
+bool WM_window_has_desktop_interaction(const wmWindowManager *wm, const wmWindow *win)
+{
+  if (!win) {
+    return false;
+  }
+  if ((wm && !BLI_listbase_is_empty(&wm->drags)) || wm_window_has_held_mouse_input(win)) {
+    return true;
+  }
+  LISTBASE_FOREACH (const wmEventHandler *, handler, &win->modalhandlers) {
+    if (handler->type == WM_HANDLER_TYPE_OP) {
+      const wmEventHandler_Op *operator_handler =
+          reinterpret_cast<const wmEventHandler_Op *>(handler);
+      if (operator_handler->op) {
+        return true;
+      }
+    }
+    else if (handler->type == WM_HANDLER_TYPE_UI) {
+      const wmEventHandler_UI *ui_handler = reinterpret_cast<const wmEventHandler_UI *>(handler);
+      if (UI_handler_has_modal_interaction(ui_handler, win)) {
+        return true;
+      }
+    }
+    else if (handler->type != WM_HANDLER_TYPE_KEYMAP) {
+      /* Permanent screen keymaps are idle; unknown modal handler ownership is not. */
+      return true;
     }
   }
   return false;

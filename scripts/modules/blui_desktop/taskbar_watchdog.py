@@ -13,6 +13,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from blui_desktop.taskbar_native import OwnerProcess, SessionLock, WindowsBars
 from blui_desktop.taskbar_state import Guard, Journal
+from blui_desktop.taskbar_reservation import ReservationController, ReservationJournal
 from blui_desktop.native_windows import _process_start
 
 
@@ -86,12 +87,14 @@ def run(directory, pid, started):
     try:
         lock = SessionLock()
         owner = OwnerProcess(pid, started)
-        guard = Guard(WindowsBars(), Journal(directory))
+        backend = WindowsBars()
+        guard = Guard(backend, Journal(directory),
+                      ReservationController(backend, ReservationJournal(directory)))
         guard.restore()  # Recover only identities recorded by a previous BLUI guard.
         # Start a second minimal process BEFORE any future hide. It retains kernel
         # identities for both BLUI and this helper; it cannot accidentally follow
         # a recycled PID. Neither helper imports bpy or runs in Blender's UI loop.
-        recovery = subprocess.Popen([sys.executable, '-I', '-B', '-u',
+        recovery = subprocess.Popen([sys.executable, '-I', '-B', '-u', '-X', 'utf8',
             os.path.join(os.path.dirname(__file__), 'taskbar_recovery.py'), directory,
             str(pid), started, str(os.getpid()), _process_start(os.getpid())],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -169,7 +172,7 @@ def run(directory, pid, started):
                 final_status.update(tasks_revision=0, events_available=False)
                 if failure:
                     final_status['error'] = failure
-                if final_status['hidden_count']:
+                if final_status['hidden_count'] or final_status.get('reservation_pending'):
                     final_status['error'] = 'Taskbar recovery is pending; use Restore Windows Taskbar'
                 emit(final_status)
             except (BrokenPipeError, OSError, ValueError):

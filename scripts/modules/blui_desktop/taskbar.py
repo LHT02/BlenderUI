@@ -3,7 +3,8 @@
 # Design reference, not copied implementation:
 # https://github.com/dremin/RetroBar (Apache-2.0, WPF + ManagedShell)
 # https://github.com/cairoshell/ManagedShell/blob/master/src/ManagedShell.AppBar/ExplorerHelper.cs
-# This recovery guard preserves Explorer's AppBar/autohide/workarea settings.
+# The guard temporarily releases Explorer's reservation using its auto-hide bit,
+# then restores the original bit without changing other AppBars or writing SPI.
 # The independent BLUI bar now reserves its own AppBar space via taskbar_appbar,
 # and notification_client owns the separate notification receiver.
 import atexit
@@ -16,7 +17,8 @@ import time
 
 _controller = None
 _default = {'enabled': False, 'hidden_count': 0, 'state': 'Windows Taskbar Unchanged',
-            'error': '', 'tasks_revision': 0, 'events_available': False}
+            'error': '', 'tasks_revision': 0, 'events_available': False,
+            'reservation_reclaimed': False, 'reservation_pending': False, 'reservation_error': ''}
 
 
 class Controller:
@@ -72,7 +74,12 @@ class Controller:
                         type(value.get('tasks_revision')) is not int or not 0 <= value['tasks_revision'] < 1 << 63 or
                         type(value.get('events_available')) is not bool or
                         any(not isinstance(value.get(field), str) or len(value[field]) > 2048
-                            for field in ('state', 'error'))):
+                            for field in ('state', 'error')) or
+                        any(field in value and type(value[field]) is not bool
+                            for field in ('reservation_reclaimed', 'reservation_pending')) or
+                        ('reservation_error' in value and
+                         (not isinstance(value['reservation_error'], str) or
+                          len(value['reservation_error']) > 2048))):
                     raise ValueError('Invalid taskbar service response')
                 with self._lock:
                     self._state = value
@@ -90,7 +97,7 @@ class Controller:
             started = _process_start(os.getpid())
             if not started:
                 raise RuntimeError('Unable to verify the BLUI taskbar owner')
-            process = subprocess.Popen([python_executable(), '-I', '-B', '-u',
+            process = subprocess.Popen([python_executable(), '-I', '-B', '-u', '-X', 'utf8',
                 os.path.join(os.path.dirname(__file__), 'taskbar_watchdog.py'), self.directory,
                 str(os.getpid()), started], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -132,9 +139,11 @@ class Controller:
                     # NEVER kill a guard that may still be restoring shellbars.
                     pass
             with self._lock:
-                if self._state.get('enabled') or self._state.get('hidden_count'):
+                if (self._state.get('enabled') or self._state.get('hidden_count') or
+                        self._state.get('reservation_pending')):
                     self._state = dict(_default, state='Taskbar Recovery Pending',
-                                       error='Taskbar guard exited; use Restore Windows Taskbar')
+                                       error='Taskbar guard exited; use Restore Windows Taskbar',
+                                       reservation_pending=True)
                 elif not self._state.get('error'):
                     self._state = dict(_default, state='Windows Taskbar Restored')
             self._stopping.set()

@@ -54,9 +54,9 @@ class ShellUiGuardSourceTests(unittest.TestCase):
         for state in ('TEXT_EDITING', 'TEXT_SELECTING', 'NUM_EDITING', 'WAIT_RELEASE', 'WAIT_DRAG', 'MENU_OPEN'):
             self.assertIn('static_assert(ui_button_state_has_modal_interaction(BUTTON_STATE_' + state + '));', self.ui)
 
-    def test_normal_node_canvas_guard_stays_conservative(self):
+    def test_normal_and_desktop_node_canvas_guard_stays_conservative(self):
         modal = body(self.wm, 'WM_window_has_modal_interaction')
-        gate = modal.index('win->blui_shell_role == WM_BLUI_SHELL_NORMAL')
+        gate = modal.index('ELEM(win->blui_shell_role, WM_BLUI_SHELL_NORMAL, WM_BLUI_SHELL_DESKTOP)')
         helper = modal.index('UI_handler_has_modal_interaction(ui_handler, win)')
         self.assertLess(gate, helper)
         self.assertIn('return true;', modal[gate:helper])

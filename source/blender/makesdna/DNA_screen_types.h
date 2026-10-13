@@ -553,6 +553,8 @@ enum {
 enum {
   SCREEN_DEPRECATED = 1,
   SCREEN_COLLAPSE_STATUSBAR = 2,
+  /** Exact private temporary Node layout for a process-local desktop host. */
+  SCREEN_BLUI_DESKTOP_HOST = (1 << 2),
 };
 
 /** #bScreen.state */

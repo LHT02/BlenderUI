@@ -74,7 +74,11 @@ def system_action(action):
         raise ValueError('Unsupported Start menu system action')
     if any(kind == 'start_system' for _, kind, _, _ in _jobs):
         raise RuntimeError('A system action is still pending')
-    _jobs.append((client.Job('start_system', action, timeout=8), 'start_system', action, _generation))
+    # The suspend API can return after resume. Replies are consumed before the
+    # timeout check; its bounded worker clock excludes system sleep/hibernation.
+    # Wake events are never disabled to enforce this deadline.
+    timeout = 60 if action == 'HIBERNATE' else 8
+    _jobs.append((client.Job('start_system', action, timeout=timeout), 'start_system', action, _generation))
 
 
 def open_location(identity):

@@ -176,6 +176,15 @@ class WindowTests(unittest.TestCase):
         self.assertFalse(self.module.close_window(self.windows[0]))
         self.assertEqual(self.closed, [])
 
+    def test_desktop_host_is_not_a_taskbar_menu_or_close_target(self):
+        desktop = Window('DESKTOP')
+        self.windows.append(desktop)
+        self.assertNotIn(desktop, self.module.role_windows())
+        self.assertIn(desktop.blui_native_handle, self.module.native_handles())
+        self.assertFalse(self.module.close_window(desktop))
+        self.module.close()
+        self.assertIn(desktop, self.windows)
+
     def test_normal_window_cannot_be_repurposed_as_menu(self):
         with self.assertRaises(ValueError):
             self.module.place_menu(self.windows[0], self.windows[0], 500, 600)

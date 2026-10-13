@@ -55,11 +55,13 @@ class Journal:
 
 
 class Guard:
-    def __init__(self, backend, journal):
+    def __init__(self, backend, journal, reservation=None):
         self.backend, self.journal = backend, journal
+        self.reservation = reservation
         self.rows = journal.read()
         self._durable_keys = {identity_key(row) for row in self.rows}
         self.enabled = False
+        self.error = ''
 
     def restore(self):
         self.enabled = False
@@ -70,17 +72,22 @@ class Guard:
                 if not self.backend.visible(row):
                     pending.append(row)
         self.rows = pending
-        self.journal.write(self.rows)
-        self._durable_keys = {identity_key(row) for row in self.rows}
-        return not pending
+        try:
+            self.journal.write(self.rows)
+            self._durable_keys = {identity_key(row) for row in self.rows}
+        finally:
+            # A filesystem failure must not skip the independent state rollback.
+            reservation_restored = self.reservation.restore() if self.reservation else True
+        return not pending and reservation_restored
 
     def hide(self):
         self.enabled = True
+        self.error = ''
         return self.refresh()
 
     def refresh(self):
         if not self.enabled:
-            return self.restore() if self.rows else True
+            return self.restore() if self.rows or (self.reservation and self.reservation.pending) else True
         # Drop vanished identities. Never apply a stale HWND to a replacement window.
         previous = [row for row in self.rows if self.backend.matches(row)]
         keys = {identity_key(row) for row in previous}
@@ -97,12 +104,25 @@ class Guard:
         if changed:
             self.journal.write(self.rows)
             self._durable_keys = keys
+        if self.reservation:
+            # Capture originally visible bars BEFORE auto-hide can change their
+            # visibility. Both intents must survive a crash between state/hide.
+            reclaimed = self.reservation.ensure()
+            if reclaimed is False:
+                self.error = self.reservation.error
+                self.restore()
+                return False
+            if reclaimed is None:
+                return False  # Do not hide before the durable reclaim is confirmed.
         for row in self.rows:
             self.backend.set_visible(row, False)
         return all(not self.backend.visible(row) for row in self.rows)
 
     def status(self):
         count = sum(self.backend.matches(row) and not self.backend.visible(row) for row in self.rows)
-        return {'enabled': self.enabled, 'hidden_count': count,
+        value = {'enabled': self.enabled, 'hidden_count': count,
                 'state': 'Windows Taskbar Hidden' if self.enabled else 'Windows Taskbar Restored',
-                'error': ''}
+                'error': self.error}
+        if self.reservation:
+            value.update(self.reservation.status())
+        return value

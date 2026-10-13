@@ -2053,6 +2053,7 @@ static void WM_OT_blui_shell_window_create(wmOperatorType *ot)
       {WM_BLUI_SHELL_STARTMENU, "STARTMENU", 0, "Start Menu", "Independent start menu"},
       {WM_BLUI_SHELL_TASK_CHOOSER, "TASK_CHOOSER", 0, "Task Windows", "Application window chooser"},
       {WM_BLUI_SHELL_TASK_PREVIEW, "TASK_PREVIEW", 0, "Window Previews", "Non-activating live window previews"},
+      {WM_BLUI_SHELL_DESKTOP, "DESKTOP", 0, "Desktop Host", "Interactive desktop canvas host"},
       {0, NULL, 0, NULL, NULL},
   };
   ot->name = "Create Shell UI Window";
@@ -2064,6 +2065,8 @@ static void WM_OT_blui_shell_window_create(wmOperatorType *ot)
   RNA_def_enum(ot->srna, "role", roles, WM_BLUI_SHELL_TASKBAR, "Role", "Native shell UI role");
   RNA_def_int(ot->srna, "width", 900, 160, 32760, "Width", "Physical window width", 160, 4096);
   RNA_def_int(ot->srna, "height", 48, 24, 2048, "Height", "Physical window height", 24, 1024);
+  RNA_def_boolean(ot->srna, "no_activate", false, "Passive Tooltip",
+                  "Do not take keyboard focus; only available for task chooser tooltips");
 }
 
 static void WM_OT_window_new_main(wmOperatorType *ot)

@@ -55,8 +55,9 @@ class NotificationUITests(unittest.TestCase):
             self.adapter = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(self.adapter)
         self.value = {'enabled': True, 'error': '', 'icons': [icon('one'), icon('two'), icon('hidden', True)]}
-        self.client = SimpleNamespace(snapshot=lambda: self.value, icon_value=lambda _row: 77)
+        self.client = SimpleNamespace(snapshot=lambda: self.value, icon_value=lambda row: 77 if row.get('cache_key') else 0)
         self.adapter.client = self.client
+        self.adapter.iface = lambda text: text
 
     def test_width_counts_visible_and_overflow_slots_separately(self):
         self.assertEqual(self.adapter.logical_width(), 72)
@@ -103,6 +104,22 @@ class NotificationUITests(unittest.TestCase):
     def test_tooltip_reads_current_ram_not_paths(self):
         self.assertEqual(self.adapter.WM_OT_blui_notification_action.description(
             None, SimpleNamespace(key='one')), 'one title')
+
+    def test_system_controls_have_theme_glyphs_and_independent_reserve(self):
+        from blui_desktop.notification_system import controls
+        self.value['controls'] = controls(19045)
+        self.assertEqual(self.adapter.logical_width(maxicons=1), 9 * 24)
+        layout = Layout()
+        self.adapter.draw_icons(layout, self.context, maxicons=1)
+        system_calls = [call for call in layout.calls if getattr(call[2], 'key', '').startswith('system:')]
+        self.assertEqual(len(system_calls), 7)
+        self.assertEqual(system_calls[0][2].key, 'system:NETWORK')
+        self.assertEqual(system_calls[0][1]['icon'], 'NETWORK_DRIVE')
+
+    def test_history_tooltip_discloses_default_action_boundary(self):
+        self.value['icons'][0]['backend'] = 'UIA'
+        value = self.adapter.WM_OT_blui_notification_action.description(None, SimpleNamespace(key='one'))
+        self.assertIn('default action only', value)
 
 
 if __name__ == '__main__':

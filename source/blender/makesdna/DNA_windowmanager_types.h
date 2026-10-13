@@ -267,7 +267,8 @@ typedef struct wmWindow {
   int winid;
   /** BLUI's explicit auxiliary window role; never inferred from an HWND or title. */
   int blui_shell_role;
-  int _pad_blui_shell_role;
+  /** Runtime-only passive notification tooltip; accepted only for TASK_CHOOSER. */
+  int blui_shell_no_activate;
   /** Window coords. */
   short posx, posy, sizex, sizey;
   /** Borderless, full. */
@@ -371,6 +372,7 @@ typedef enum eWMBluiShellRole {
   WM_BLUI_SHELL_STARTMENU = 2,
   WM_BLUI_SHELL_TASK_CHOOSER = 3,
   WM_BLUI_SHELL_TASK_PREVIEW = 4,
+  WM_BLUI_SHELL_DESKTOP = 5,
 } eWMBluiShellRole;
 
 #ifdef ime_data

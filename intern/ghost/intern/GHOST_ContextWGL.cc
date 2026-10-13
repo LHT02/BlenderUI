@@ -671,3 +671,13 @@ GHOST_TSuccess GHOST_ContextWGL::releaseNativeHandles()
 
   return success;
 }
+
+void GHOST_ContextWGL::setBluiDesktopCleanupHandles(HWND window, HDC dc)
+{
+  assert(window && dc && ::GetPixelFormat(dc) == ::GetPixelFormat(m_hDC));
+  m_hWnd = window;
+  m_hDC = dc;
+  if (::wglGetCurrentContext() == m_hGLRC) {
+    WIN32_CHK(::wglMakeCurrent(m_hDC, m_hGLRC));
+  }
+}

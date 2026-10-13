@@ -199,6 +199,7 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
 
     win->active = 0;
     win->blui_shell_role = WM_BLUI_SHELL_NORMAL;
+    win->blui_shell_no_activate = 0;
 
     win->cursor = 0;
     win->lastcursor = 0;
@@ -512,8 +513,13 @@ static void wm_blui_orphan_shell_layouts_remove(Main *bmain)
         continue;
       }
       const ScrArea *area = screen->areabase.first;
-      const SpaceInfo *info = area->spacedata.first;
-      if (area->spacetype != SPACE_INFO || !info || !info->blui_shell_ui) {
+      const SpaceLink *space = area->spacedata.first;
+      const bool shell_info = area->spacetype == SPACE_INFO && space &&
+                              ((const SpaceInfo *)space)->blui_shell_ui;
+      const bool desktop_node = screen->temp && (screen->flag & SCREEN_BLUI_DESKTOP_HOST) &&
+                                area->spacetype == SPACE_NODE && space &&
+                                space->spacetype == SPACE_NODE;
+      if (!shell_info && !desktop_node) {
         continue;
       }
       bool used = false;

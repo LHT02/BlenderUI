@@ -70,6 +70,8 @@ class GHOST_ContextWGL : public GHOST_Context {
    * GHOST_kFailure if releasing the handles will interfere with sharing
    */
   GHOST_TSuccess releaseNativeHandles();
+  /** Desktop-only surface loss: preserve this HGLRC on an owned same-format cleanup DC. */
+  void setBluiDesktopCleanupHandles(HWND window, HDC dc);
 
   /**
    * Sets the swap interval for #swapBuffers.

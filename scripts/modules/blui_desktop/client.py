@@ -54,6 +54,9 @@ def _validate_value(action, value):
     elif action == 'start_index':
         from . import start_menu_model
         start_menu_model.validate_index(value)
+    elif action == 'start_capabilities':
+        from . import system_power
+        system_power.validate(value)
     elif action == 'board_load':
         boards.validate(value)
     elif action == 'board_save':
@@ -106,7 +109,9 @@ class Job:
         arity = {'scan': 1, 'paths': 1, 'save': 2, 'load': 1, 'tasks': 0, 'open': 1,
                  'board_save': 2, 'board_load': 1, 'monitors': 0, 'weather': 1, 'icons': 1,
                  'background': 1, 'recycle': 1, 'previews': 1, 'task_launch': 1,
-                 'start_index': 1, 'start_state': 2, 'start_launch': 1, 'start_system': 1}
+                 'start_index': 1, 'start_state': 2, 'start_launch': 1, 'start_system': 1,
+                 'start_capabilities': 0, 'start_location': 1,
+                 'taskbar_settings_load': 1, 'taskbar_settings_save': 2}
         if not isinstance(action, str) or action not in arity or len(args) != arity[action]:
             raise ValueError('Unsupported desktop request')
         if action == 'open' and (os.name != 'nt' or not isinstance(args[0], str) or
@@ -129,14 +134,17 @@ class Job:
                 raise ValueError('Invalid desktop preview paths')
         if action == 'task_launch':
             _validate_value('tasks', [args[0]])
-        if action in {'start_index', 'start_state'} and (not isinstance(args[0], str) or not args[0] or
+        if action in {'start_index', 'start_state', 'taskbar_settings_load', 'taskbar_settings_save'} and (not isinstance(args[0], str) or not args[0] or
                 len(args[0]) > 32768 or '\x00' in args[0]):
             raise ValueError('Invalid start menu storage directory')
-        if action in {'start_state', 'start_launch', 'start_system'}:
+        if action == 'taskbar_settings_save':
+            from . import taskbar_settings
+            taskbar_settings.validate(args[1])
+        if action in {'start_state', 'start_launch', 'start_location', 'start_system'}:
             from . import start_menu_model
             if action == 'start_state':
                 start_menu_model.state(args[1])
-            elif action == 'start_launch':
+            elif action in {'start_launch', 'start_location'}:
                 start_menu_model.program(args[0])
             elif not isinstance(args[0], str) or args[0] not in start_menu_model.SYSTEM_ACTIONS:
                 raise ValueError('Unsupported Start menu system action')
@@ -181,6 +189,11 @@ class Job:
     def _run(self):
         """All filesystem access and process work is confined to this bounded thread."""
         try:
+            clock, started = time.monotonic, self.started
+            if self.action == 'start_system' and self._request['args'] == ['HIBERNATE']:
+                from .power_clock import active_clock
+                clock = active_clock()
+                started = clock()
             if self._cancel.is_set():
                 return
             self.directory = tempfile.mkdtemp(prefix='blui_desktop_job_')
@@ -213,7 +226,7 @@ class Job:
                         _validate_value(self.action, reply['value'])
                     self._finish(reply)
                     return
-                if time.monotonic() - self.started > self.timeout:
+                if clock() - started > self.timeout:
                     self._finish({'ok': False, 'error': 'Desktop service timed out; the UI is still available'})
                     return
                 if self.process.poll() is not None:
