@@ -2053,6 +2053,8 @@ enum {
   UI_ITEM_R_FORCE_BLANK_DECORATE = 1 << 13,
   /* Even create the property split layout if there's no name to show there. */
   UI_ITEM_R_SPLIT_EMPTY_NAME = 1 << 14,
+  /** Double-size icon-only operator using the high-resolution preview image. */
+  UI_ITEM_O_ICON_PREVIEW = 1 << 15,
 };
 
 #define UI_HEADER_OFFSET ((void)0, 0.4f * UI_UNIT_X)

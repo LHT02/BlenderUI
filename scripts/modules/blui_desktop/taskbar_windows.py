@@ -48,7 +48,15 @@ def _system_hidden():
 
 
 def _geometry_key(snapshot):
-    return monitors.topology_key(snapshot) + ('#hidden' if _system_hidden() else '#visible')
+    return (monitors.topology_key(snapshot) + ('#hidden' if _system_hidden() else '#visible') +
+            '#ui-scale:' + str(bpy.context.preferences.view.ui_scale))
+
+
+def bar_rect(display, *, system_hidden=False):
+    # Monitor DPI is applied by the pure geometry helper; add only the user's
+    # Blender display multiplier here, not system.ui_scale (which includes DPI).
+    height = taskbar_groups.BAR_HEIGHT * bpy.context.preferences.view.ui_scale
+    return taskbar_groups.bar_rect(display, height=height, system_hidden=system_hidden)
 
 
 def _screen_bar_place(window, rect):
@@ -149,7 +157,7 @@ def open_for_displays(context, snapshot=None, *, all_displays=True):
     for row in rows:
         window = next((window for window in role_windows('TASKBAR') if device(window) == row['device']), None)
         hidden = _system_hidden()
-        rect = taskbar_groups.bar_rect(row, system_hidden=hidden)
+        rect = bar_rect(row, system_hidden=hidden)
         created = window is None
         if created:
             window = create(context, 'TASKBAR', rect[2] - rect[0], rect[3] - rect[1])
@@ -223,7 +231,7 @@ def place_menu(window, source_window, width, height):
     source_device = device(source_window) if source_window else ''
     display = next((row for row in rows if row['device'] == source_device),
                    next((row for row in rows if row['primary']), rows[0]))
-    bar = taskbar_groups.bar_rect(display, system_hidden=_system_hidden())
+    bar = bar_rect(display, system_hidden=_system_hidden())
     anchor = [bar[0], bar[1]]
     if _alignment == 'CENTER':
         anchor[0] = (bar[0] + bar[2]) // 2 - round(width * display['dpi'][0] / 192)
@@ -282,6 +290,10 @@ def register():
         return
     keymap = configuration.keymaps.new(name='BLUI Taskbar', space_type='INFO', region_type='WINDOW')
     item = keymap.keymap_items.new('wm.blui_taskbar_middle', 'MIDDLEMOUSE', 'PRESS')
+    _keymaps.append((keymap, item))
+    # Capture Shift on press, before UI's deferred button callback can see a
+    # later modifier state (or the default Info/View2D maps consume the event).
+    item = keymap.keymap_items.new('wm.blui_taskbar_middle', 'LEFTMOUSE', 'PRESS', shift=True)
     _keymaps.append((keymap, item))
     popup = configuration.keymaps.new(name='BLUI Shell Popup', space_type='INFO', region_type='WINDOW')
     item = popup.keymap_items.new('wm.blui_shell_popup_close', 'ESC', 'PRESS')

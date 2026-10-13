@@ -1231,7 +1231,10 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
   UI_block_layout_set_current(block, layout);
   ui_block_new_button_group(block, uiButtonGroupFlag(0));
 
-  const int w = ui_text_icon_width(layout, name, icon, false);
+  /* Opt-in only: ordinary operators keep their original size and icon slot. */
+  const bool icon_preview = (flag & UI_ITEM_O_ICON_PREVIEW) && icon && !name[0];
+  const int w = icon_preview ? 2 * UI_UNIT_X : ui_text_icon_width(layout, name, icon, false);
+  const int h = icon_preview ? 2 * UI_UNIT_Y : UI_UNIT_Y;
 
   const eUIEmbossType prev_emboss = layout->emboss;
   if (flag & UI_ITEM_R_NO_BG) {
@@ -1243,10 +1246,10 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
   if (icon) {
     if (name[0]) {
       but = uiDefIconTextButO_ptr(
-          block, UI_BTYPE_BUT, ot, context, icon, name, 0, 0, w, UI_UNIT_Y, nullptr);
+          block, UI_BTYPE_BUT, ot, context, icon, name, 0, 0, w, h, nullptr);
     }
     else {
-      but = uiDefIconButO_ptr(block, UI_BTYPE_BUT, ot, context, icon, 0, 0, w, UI_UNIT_Y, nullptr);
+      but = uiDefIconButO_ptr(block, UI_BTYPE_BUT, ot, context, icon, 0, 0, w, h, nullptr);
     }
   }
   else {
@@ -1254,6 +1257,11 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
   }
 
   BLI_assert(but->optype != nullptr);
+
+  if (icon_preview) {
+    ui_def_but_icon(but, icon, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
+    UI_but_drawflag_disable(but, UI_BUT_ICON_LEFT);
+  }
 
   if (flag & UI_ITEM_R_NO_BG) {
     layout->emboss = prev_emboss;

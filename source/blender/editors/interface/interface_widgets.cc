@@ -1315,7 +1315,7 @@ static float widget_alpha_factor(const uiWidgetStateInfo *state)
   return 1.0f;
 }
 
-static void widget_draw_preview(BIFIconID icon, float alpha, const rcti *rect)
+static void widget_draw_preview(BIFIconID icon, float alpha, const rcti *rect, int padding = PREVIEW_PAD)
 {
   if (icon == ICON_NONE) {
     return;
@@ -1323,7 +1323,7 @@ static void widget_draw_preview(BIFIconID icon, float alpha, const rcti *rect)
 
   const int w = BLI_rcti_size_x(rect);
   const int h = BLI_rcti_size_y(rect);
-  const int size = MIN2(w, h) - PREVIEW_PAD * 2;
+  const int size = MIN2(w, h) - padding * 2;
 
   if (size > 0) {
     const int x = rect->xmin + w / 2 - size / 2;
@@ -1344,8 +1344,17 @@ static void widget_draw_icon(
     const uiBut *but, BIFIconID icon, float alpha, const rcti *rect, const uchar mono_color[4])
 {
   if (but->flag & UI_BUT_ICON_PREVIEW) {
+    int padding = PREVIEW_PAD;
+    if (but->type == UI_BTYPE_BUT) {
+      uiWidgetStateInfo state = {0};
+      state.but_flag = but->flag;
+      state.but_drawflag = but->drawflag;
+      alpha *= widget_alpha_factor(&state);
+      /* Match the logical padding at every DPI; only opt-in operators change. */
+      padding = round_fl_to_int(PREVIEW_PAD * UI_SCALE_FAC / but->block->aspect);
+    }
     GPU_blend(GPU_BLEND_ALPHA);
-    widget_draw_preview(icon, alpha, rect);
+    widget_draw_preview(icon, alpha, rect, padding);
     GPU_blend(GPU_BLEND_NONE);
     return;
   }

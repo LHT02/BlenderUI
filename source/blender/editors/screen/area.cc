@@ -3337,7 +3337,12 @@ void ED_region_header_layout(const bContext *C, ARegion *region)
 
   /* Vertically center buttons. */
   int xco = UI_HEADER_OFFSET;
-  int yco = buttony + (region->winy - buttony) / 2;
+  const wmWindow *window = CTX_wm_window(C);
+  const bool taskbar = window && window->blui_shell_role == WM_BLUI_SHELL_TASKBAR &&
+                       region->regiontype == RGN_TYPE_WINDOW;
+  /* The standalone bar uses double-size native icon buttons, not a 20px header. */
+  const int centered_height = taskbar ? 2 * buttony : buttony;
+  int yco = centered_height + (region->winy - centered_height) / 2;
   int maxco = xco;
 
   /* XXX workaround for 1 px alignment issue. Not sure what causes it...

@@ -25,6 +25,7 @@
 
 #include "RNA_access.h"
 
+#include "UI_interface.h"
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
@@ -107,7 +108,8 @@ static void info_main_region_init(wmWindowManager *wm, ARegion *region)
         if (window->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
           ED_region_header_init(region);
           keymap = WM_keymap_ensure(wm->defaultconf, "BLUI Taskbar", SPACE_INFO, RGN_TYPE_WINDOW);
-          WM_event_add_keymap_handler(&region->handlers, keymap);
+          /* Handle taskbar middle clicks before the inherited View2D pan map. */
+          WM_event_add_keymap_handler_priority(&region->handlers, keymap, 0);
         }
         else {
           ED_region_panels_init(wm, region);
@@ -136,6 +138,34 @@ static void info_textview_update_rect(const bContext *C, ARegion *region)
 
   UI_view2d_totRect_set(
       v2d, region->winx - 1, info_textview_height(sinfo, region, CTX_wm_reports(C)));
+}
+
+static int info_context(const bContext *C, const char *member, bContextDataResult *result)
+{
+  if (!CTX_data_equals(member, "blui_taskbar_button")) {
+    return CTX_RESULT_MEMBER_NOT_FOUND;
+  }
+  const wmWindow *window = CTX_wm_window(C);
+  const ARegion *region = CTX_wm_region(C);
+  if (!window || window->blui_shell_role != WM_BLUI_SHELL_TASKBAR || !window->eventstate ||
+      !region || region->regiontype != RGN_TYPE_WINDOW)
+  {
+    return CTX_RESULT_NO_DATA;
+  }
+  /* Context-menu button_operator is not populated for ordinary region keymaps.
+   * Hit-test live UI blocks instead of reusing a previously clicked button. */
+  /* eventstate may already contain a later queued mouse move. Use the press
+   * being handled, so a quick move after clicking cannot launch another app. */
+  const wmEvent *event = window->event_queue.first;
+  const int *xy = event ? event->xy : window->eventstate->xy;
+  const rcti point = {xy[0], xy[0] + 1, xy[1], xy[1] + 1};
+  uiBut *button = UI_region_but_find_rect_over(region, &point);
+  PointerRNA *properties = button ? UI_but_operator_ptr_get(button) : NULL;
+  if (!properties || !properties->data) {
+    return CTX_RESULT_NO_DATA;
+  }
+  CTX_data_pointer_set_ptr(result, properties);
+  return CTX_RESULT_OK;
 }
 
 static void info_main_region_draw(const bContext *C, ARegion *region)
@@ -302,6 +332,7 @@ void ED_spacetype_info(void)
   st->operatortypes = info_operatortypes;
   st->keymap = info_keymap;
   st->blend_write = info_space_blend_write;
+  st->context = info_context;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype info region");

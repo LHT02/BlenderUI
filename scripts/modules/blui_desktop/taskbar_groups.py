@@ -2,6 +2,7 @@
 """Pure application identity, stable task grouping and monitor geometry."""
 import hashlib
 import ntpath
+from .taskbar_metrics import BAR_HEIGHT
 
 MAX_TASKS = 256
 BROKERS = frozenset(('applicationframehost.exe', 'shellexperiencehost.exe'))
@@ -59,7 +60,7 @@ def can_launch(row):
             and not row.get('app_id'))
 
 
-def bar_rect(display, height=48, *, system_hidden=False):
+def bar_rect(display, height=BAR_HEIGHT, *, system_hidden=False):
     rect, dpi = display['rect' if system_hidden else 'work'], display['dpi']
     pixels = max(24, min(rect[3] - rect[1], round(height * dpi[1] / 96)))
     return [rect[0], rect[3] - pixels, rect[2], rect[3]]

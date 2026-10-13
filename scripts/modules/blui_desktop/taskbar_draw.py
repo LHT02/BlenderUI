@@ -2,7 +2,7 @@
 """Blender-native INFO Header/Panel content for independent taskbar and chooser windows."""
 from datetime import datetime
 from bpy.types import Header, Panel
-from . import icon_cache, runtime, taskbar_groups, taskbar_windows
+from . import icon_cache, runtime, taskbar_groups, taskbar_metrics, taskbar_windows
 from .taskbar_actions import current_groups, find_group
 from blui_explorer.localization import iface
 
@@ -19,31 +19,34 @@ class BLUI_HT_standalone_taskbar(Header):
         centered = taskbar_windows.alignment() == 'CENTER'
         if centered:
             balance = layout.row(align=True)
-            balance.ui_units_x = 4.8
+            balance.ui_units_x = taskbar_metrics.SIDE_UNITS
             balance.label(text='')
             layout.separator_spacer()
         body = layout.row(align=True)
-        body.scale_y = 1.35
-        body.operator('wm.blui_start_menu', text='', icon='BLENDER')
+        body.operator('wm.blui_start_menu', text='', icon='BLENDER', icon_preview=True)
         rows = current_groups(context.window)
         # A bounded native row never balloons a thin window into a screen-wide
         # text list. Overflow opens a full-height native chooser, not a clipped menu.
-        unit = max(20, 26 * context.preferences.system.ui_scale)
-        capacity = max(1, min(64, int(max(80, context.region.width - 190) / unit)))
+        capacity = taskbar_metrics.icon_capacity(context.region.width, context.preferences.system.ui_scale)
         for group in rows[:capacity]:
             icon = icon_cache.value(group['executable'])
             entry = body.row(align=True)
             entry.enabled = any(task.get('actionable') for task in group['tasks'])
             if icon:
-                op = entry.operator('wm.blui_taskbar_group', text='', icon_value=icon, depress=group['active'])
+                op = entry.operator('wm.blui_taskbar_group', text='', icon_value=icon,
+                                    depress=group['active'], icon_preview=True)
             else:
-                op = entry.operator('wm.blui_taskbar_group', text='', icon='WINDOW', depress=group['active'])
+                op = entry.operator('wm.blui_taskbar_group', text='', icon='WINDOW',
+                                    depress=group['active'], icon_preview=True)
             op.key = group['key']
         if len(rows) > capacity:
-            op = body.operator('wm.blui_taskbar_settings', text='…')
+            overflow = body.row(align=True)
+            overflow.scale_y = 2
+            overflow.operator('wm.blui_taskbar_settings', text='…')
         layout.separator_spacer()
         right = layout.row(align=True)
-        right.ui_units_x = 4.8
+        right.ui_units_x = taskbar_metrics.SIDE_UNITS
+        right.scale_y = 2
         right.operator_context = 'EXEC_DEFAULT'
         right.operator('wm.blui_taskbar_settings', text='', icon='PREFERENCES')
         right.operator('wm.blui_taskbar_settings', text=datetime.now().strftime('%H:%M'), emboss=False, translate=False)

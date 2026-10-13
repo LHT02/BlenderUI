@@ -36,6 +36,7 @@ class WindowTests(unittest.TestCase):
     def setUp(self):
         self.windows = [Window('NORMAL')]
         context = SimpleNamespace(window_manager=SimpleNamespace(windows=self.windows), window=self.windows[0])
+        context.preferences = SimpleNamespace(view=SimpleNamespace(ui_scale=1.0))
         test = self
         class Override:
             def __init__(self, **values):
@@ -207,6 +208,20 @@ class WindowTests(unittest.TestCase):
             self.module.set_alignment('UNKNOWN')
         self.assertEqual(len(self.created), 2)
         self.assertEqual(self.closed, [])
+
+    def test_custom_ui_scale_combines_with_monitor_dpi_once(self):
+        self.context.preferences.view.ui_scale = 2.0
+        self.assertEqual(self.module.bar_rect(display('RIGHT', 0, True, 144)),
+                         [0, 872, 1920, 1040])
+
+    def test_custom_ui_scale_change_resizes_existing_bars(self):
+        original = self.module.open_for_displays(self.context)
+        self.place.reset_mock()
+        self.context.preferences.view.ui_scale = 1.5
+        self.module.tick(self.snapshot)
+        self.assertEqual(self.created, original)
+        self.assertEqual(self.place.call_count, 2)
+        self.assertEqual(self.place.call_args.args[1], [0, 914, 1920, 1040])
 
 
 if __name__ == '__main__':

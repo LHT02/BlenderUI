@@ -309,7 +309,8 @@ static PointerRNA rna_uiItemO(uiLayout *layout,
                               int icon,
                               bool emboss,
                               bool depress,
-                              int icon_value)
+                              int icon_value,
+                              bool icon_preview)
 {
   wmOperatorType *ot;
 
@@ -327,6 +328,7 @@ static PointerRNA rna_uiItemO(uiLayout *layout,
   }
   int flag = (emboss) ? 0 : UI_ITEM_R_NO_BG;
   flag |= (depress) ? UI_ITEM_O_DEPRESS : 0;
+  flag |= (icon_preview) ? UI_ITEM_O_ICON_PREVIEW : 0;
 
   PointerRNA opptr;
   uiItemFullO_ptr(layout, ot, name, icon, NULL, uiLayoutGetOperatorContext(layout), flag, &opptr);
@@ -1179,6 +1181,13 @@ void RNA_api_ui_layout(StructRNA *srna)
     if (is_menu_hold) {
       parm = RNA_def_string(func, "menu", NULL, 0, "", "Identifier of the menu");
       RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+    }
+    else {
+      RNA_def_boolean(func,
+                      "icon_preview",
+                      false,
+                      "Large Icon",
+                      "Draw a high-resolution icon in a double-size icon-only button");
     }
     parm = RNA_def_pointer(
         func, "properties", "OperatorProperties", "", "Operator properties to fill in");

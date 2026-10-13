@@ -133,9 +133,11 @@ class WM_OT_blui_taskbar_middle(Operator):
         return bool(context.window and context.window.blui_is_taskbar)
 
     def invoke(self, context, _event):
-        hovered = context.button_operator
+        hovered = getattr(context, 'blui_taskbar_button', None)
         if not hovered or hovered.bl_rna.identifier != 'WM_OT_blui_taskbar_group':
-            return {'PASS_THROUGH'}
+            # A static taskbar must not pass empty-space middle clicks to Info's
+            # inherited View2D panning handler or reuse a previously clicked app.
+            return {'CANCELLED'} if _event.type == 'MIDDLEMOUSE' else {'PASS_THROUGH'}
         group = find_group(hovered.key, context.window)
         if not group:
             return {'CANCELLED'}

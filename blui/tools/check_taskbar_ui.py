@@ -24,6 +24,9 @@ source = bpy.context.window
 source_pointer = source.as_pointer()
 original_workspaces = {workspace.name for workspace in bpy.data.workspaces}
 started = time.monotonic()
+qa_ui_scale = float(os.environ.get('BLUI_QA_UI_SCALE', '1'))
+assert qa_ui_scale in (1, 1.5, 2), 'only explicit disposable QA UI scales are allowed'
+bpy.context.preferences.view.ui_scale = qa_ui_scale
 state = {'phase': 0, 'due': 0, 'bar': None, 'second': None, 'group': None}
 user = native_windows._api()
 
@@ -51,6 +54,14 @@ def new_component(window):
     added = [item for item in bpy.context.window_manager.windows if item.as_pointer() not in before]
     assert len(added) == 1
     return added[0]
+
+
+def click_group(button='LEFTMOUSE', *, shift=False, point=None):
+    x, y = point or state['icon_center']
+    bar = state['bar']
+    bar.event_simulate(type='MOUSEMOVE', value='NOTHING', x=x, y=y)
+    for value in ('PRESS', 'RELEASE'):
+        bar.event_simulate(type=button, value=value, x=x, y=y, shift=shift)
 
 
 def finish(code):
@@ -89,7 +100,13 @@ def tick():
             assert not style & 0x00C00000, 'standalone taskbar must not have a caption'
             assert extended & 0x08000000, 'taskbar must be NOACTIVATE'
             assert extended & 0x80, 'shell UI must not be an application task'
-            assert 24 <= bar.height <= 150 and bar.width >= 500
+            assert 24 <= bar.height <= 300 and bar.width >= 500
+            display = next(row for row in runtime.monitor_snapshot()['monitors']
+                           if row['device'] == taskbar_windows.device(bar))
+            expected = taskbar_windows.bar_rect(display)
+            assert bar.height == expected[3] - expected[1], ('bar DPI height', bar.height, expected)
+            preview_api = bpy.types.UILayout.bl_rna.functions['operator'].parameters['icon_preview']
+            assert preview_api.default is False, 'ordinary operator icons must not change by default'
             assert {workspace.name for workspace in bpy.data.workspaces} == original_workspaces
             execute(source, 'blui_taskbar_open', all_displays=False)
             assert taskbar_windows.role_windows('TASKBAR') == [bar]
@@ -125,13 +142,40 @@ def tick():
                 return .05
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             from qa_shell_pixels import verify
-            verify(bar, 'taskbar')
-            execute(bar, 'blui_taskbar_group', key=state['group'])
+            bounds = verify(bar, 'taskbar', large_taskbar_icons=True)
+            state['icon_center'] = ((bounds[0] + bounds[2]) // 2, (bounds[1] + bounds[3]) // 2)
+            click_group()
+            state['phase'], state['due'] = 2.1, time.monotonic() + .4
+        elif phase == 2.1:
+            bar = state['bar']
             menus = taskbar_windows.role_windows('TASK_CHOOSER')
-            assert len(menus) == 1 and menus[0].height >= 160
+            assert len(menus) == 1 and menus[0].height >= 160, 'native large-icon left click must open group'
             assert menus[0].screen.as_pointer() not in (bar.screen.as_pointer(), source.screen.as_pointer())
             execute(menus[0], 'blui_shell_popup_close')
             assert not taskbar_windows.role_windows('TASK_CHOOSER')
+            state['launches'] = []
+            state['launch_mock'] = mock.patch.object(taskbar_actions, 'launch_group',
+                                                    side_effect=lambda group: state['launches'].append(group['key']))
+            state['launch_mock'].start()
+            click_group('MIDDLEMOUSE')
+            bar.event_simulate(type='MOUSEMOVE', value='NOTHING', x=bar.width // 5, y=bar.height // 2)
+            state['phase'], state['due'] = 2.2, time.monotonic() + .4
+        elif phase == 2.2:
+            assert state['launches'] == [state['group']], ('native large-icon middle click must use hovered group', state['launches'])
+            state['launches'].clear()
+            click_group('MIDDLEMOUSE', point=(state['bar'].width // 5, state['bar'].height // 2))
+            state['phase'], state['due'] = 2.25, time.monotonic() + .4
+        elif phase == 2.25:
+            assert not state['launches'], 'middle click on blank taskbar must not reuse previous application'
+            click_group(shift=True)
+            bar = state['bar']
+            bar.event_simulate(type='MOUSEMOVE', value='NOTHING', x=bar.width // 5, y=bar.height // 2)
+            state['phase'], state['due'] = 2.3, time.monotonic() + .4
+        elif phase == 2.3:
+            bar = state['bar']
+            assert state['launches'] == [state['group']], 'native large-icon Shift click must request new instance'
+            state.pop('launch_mock').stop()
+            print('PASS Native large-icon left/middle/Shift clicks; launch requests intercepted, zero app launches', flush=True)
             runtime._tasks = [own_row(state['second'], active=True)]
             if user.SetForegroundWindow(int(state['second'].blui_native_handle)):
                 execute(bar, 'blui_taskbar_group', key=state['group'])

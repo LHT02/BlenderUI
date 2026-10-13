@@ -20,8 +20,8 @@ def task(handle='10', *, executable='C:\\Program Files\\App\\App.exe', app_id=''
 class GroupTests(unittest.TestCase):
     def test_hidden_system_bar_uses_physical_edge_without_changing_snapshot(self):
         display = {'rect': [-1920, 0, 0, 1080], 'work': [-1920, 0, 0, 1040], 'dpi': [96, 96]}
-        self.assertEqual(groups.bar_rect(display, system_hidden=True), [-1920, 1032, 0, 1080])
-        self.assertEqual(groups.bar_rect(display), [-1920, 992, 0, 1040])
+        self.assertEqual(groups.bar_rect(display, system_hidden=True), [-1920, 1024, 0, 1080])
+        self.assertEqual(groups.bar_rect(display), [-1920, 984, 0, 1040])
         self.assertEqual(display['work'], [-1920, 0, 0, 1040])
     def test_same_executable_has_one_icon_many_windows(self):
         result = groups.groups([task(), task('11', active=True)])
@@ -73,7 +73,7 @@ class GroupTests(unittest.TestCase):
 
     def test_bar_negative_monitor_origin_and_dpi(self):
         display = {'work': [-2560, -300, -640, 780], 'dpi': [144, 144]}
-        self.assertEqual(groups.bar_rect(display), [-2560, 708, -640, 780])
+        self.assertEqual(groups.bar_rect(display), [-2560, 696, -640, 780])
 
     def test_menu_is_clamped_to_source_display(self):
         display = {'work': [-1920, 0, 0, 1040], 'dpi': [96, 96]}
