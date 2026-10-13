@@ -748,6 +748,9 @@ static bool actionzone_area_poll(bContext *C)
 
       LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
         LISTBASE_FOREACH (AZone *, az, &area->actionzones) {
+          if (az->type == AZONE_REGION && region_is_blui_shell_header(win, az->region)) {
+            continue;
+          }
           if (BLI_rcti_isect_pt_v(&az->rect, xy)) {
             return true;
           }
@@ -1041,6 +1044,9 @@ static int actionzone_invoke(bContext *C, wmOperator *op, const wmEvent *event)
    * they have their own handling. */
   if (az == NULL || ELEM(az->type, AZONE_REGION_SCROLL)) {
     return OPERATOR_PASS_THROUGH;
+  }
+  if (az->type == AZONE_REGION && region_is_blui_shell_header(CTX_wm_window(C), az->region)) {
+    return OPERATOR_CANCELLED;
   }
 
   /* ok we do the action-zone */
@@ -3914,6 +3920,9 @@ static int region_toggle_exec(bContext *C, wmOperator *op)
   }
 
   if (region && (region->alignment != RGN_ALIGN_NONE)) {
+    if (region_is_blui_shell_header(CTX_wm_window(C), region)) {
+      return OPERATOR_CANCELLED;
+    }
     ED_region_toggle_hidden(C, region);
   }
   ED_region_tag_redraw(region);
@@ -4104,6 +4113,10 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 {
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
+  if (region_is_blui_shell_header(CTX_wm_window(C),
+                                BKE_area_find_region_type(area, RGN_TYPE_HEADER))) {
+    return;
+  }
   const char *but_flip_str = (RGN_ALIGN_ENUM_FROM_MASK(region->alignment) == RGN_ALIGN_TOP) ?
                                  IFACE_("Flip to Bottom") :
                                  IFACE_("Flip to Top");

@@ -1,5 +1,19 @@
 # BLUI 项目交接
 
+## 2026-10-13 专用系统面板标题栏入口隐藏（已完成）
+
+- 用户本轮明确要求提交GH；本次源码、两项回归夹具与交接记录共6文件提交目标为gh/blui（LHT02/BlenderUI），不推origin上游、不纳入check_navigation.py/.cmd；本次不重新打包或覆盖已交付ZIP。
+
+- Release编译成功；565项全量纯回归PASS（shell-header-entry-pure.log），其中新增14项source守门。真实factory隔离CONFIG/PYTHONMALLOC=debug下四类专用窗operator取消、直接RNA开启被还原、resize后header高度不超过1、原箭头处无header动作均PASS；StartMenu仍有滚动azone，真实invoke仅PASS_THROUGH，未误禁滚动条。NORMAL文件管理器和未接管DESKTOP原生header切换对照PASS（shell-header-entry-native.log）。Taskbar/StartMenu/NORMAL截图已视检，专用展开小三角消失、内容内按钮/电源展开等正常控件保留。仅关闭夹具自有窗，不触碰用户窗/系统桌面/原任务栏。
+- 新程序在D:/BlenderUI/build/bin/BLUI.exe，SHA256=41B243DFC0EF3C6E47064D2766805549735FE9B909E21AC07C45850FAE031B76；可运行同目录BLUI-launcher.exe。本轮6个任务文件UTF-8无BOM、git diff --check PASS；原交付ZIP不覆盖，用户未跟踪check_navigation.py/.cmd未改动。
+
+- 首轮native任务栏PASS；StartMenu的actionzone.poll为true，不能把所有azone都当header，因为滚动条必须保留。夹具改为有poll时真实INVOKE要求仅PASS_THROUGH（原滚动条分支），header FINISHED/modal或旧header CANCELLED一律失败，再通过实际截图检查小三角消失；未改生产守门或关闭滚动条。
+
+- 新增ROOT-only check_shell_header_entry_native：独立factory CONFIG，仅自有4类shell窗口及未挂载DESKTOP；真实operator/RNA拒绝、SetWindowPos尺寸重建、旧箭头坐标actionzone poll和截图，NORMAL/DESKTOP标题栏控制对照。禁desktop接管/AppBar/原任务栏/真实托盘/外部行为，不保存用户偏好。第一轮native编译已成功，继续实测。
+
+- 用户要求任务栏及弹出菜单不提供原生标题栏展开入口。已按TASKBAR/STARTMENU/TASK_CHOOSER/TASK_PREVIEW与HEADER/TOOL_HEADER精确筛选：不生成azone，不绘制残留arrow、不响应旧命中；禁原生region_toggle，init与动态尺寸刷新强制隐藏并保护RNA直接开关旁路。原生header工具菜单不再提供Show Header入口；NORMAL文件管理器/编辑器和DESKTOP画布保持原控制，不改全局区域偏好/滚动条/画布节点标题。新增守门共用小型internal predicate，不增加DNA/RNA属性或本地化词条。待编译与native实测。
+- 新增 `test_shell_header_entry.py` 14 项纯源码守门：精确4角色/2标题类型与null短路、C/C++共享internal声明、生成/绘制/旧命中及modal入口、两处geometry前强制隐藏保护RNA旁路、原生header菜单与ctor隐藏、普通区域缩放/滚动条/全局偏好不变。初跑13项通过、1项为测试仅接受局部win而实现使用等价CTX_wm_window(C)的匹配过窄，修正以仍要求当前窗口参数；最终14项全部PASS（0.037秒）。此检查只验证源码约束，不能替代主代理编译、真实鼠标/RNA/resize与NORMAL/DESKTOP保留行为实测。子代理未运行GUI、未构建或修改Git，测试源码冻结。
+
 ## 2026-10-13 桌面与系统栏集成发布（Win10 优先）
 
 - Release 最终编译成功；551 项纯回归全部通过（desktop-shell-pure-final.log）。本机 Windows 10 19045、双 2560×1440/96 DPI 为实机验收环境；Win11 分支保留，但没有 Win11/XAML 或混合 DPI 实机验收，历史自动隐藏托盘的 on-demand OVERFLOW 路由仍按兼容说明标记 PARTIAL，不宣传全系统完全替代。

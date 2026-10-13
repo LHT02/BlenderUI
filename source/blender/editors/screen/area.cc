@@ -67,6 +67,17 @@ enum RegionEmbossSide {
 
 /* general area and region code */
 
+bool region_is_blui_shell_header(const wmWindow *win, const ARegion *region)
+{
+  return win && region &&
+         ELEM(win->blui_shell_role,
+              WM_BLUI_SHELL_TASKBAR,
+              WM_BLUI_SHELL_STARTMENU,
+              WM_BLUI_SHELL_TASK_CHOOSER,
+              WM_BLUI_SHELL_TASK_PREVIEW) &&
+         ELEM(region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER);
+}
+
 static void region_draw_emboss(const ARegion *region, const rcti *scirct, int sides)
 {
   /* translate scissor rect to region space */
@@ -295,7 +306,7 @@ static void area_azone_tag_update(ScrArea *area)
   area->flag |= AREA_FLAG_ACTIONZONES_UPDATE;
 }
 
-static void region_draw_azones(ScrArea *area, ARegion *region)
+static void region_draw_azones(const wmWindow *win, ScrArea *area, ARegion *region)
 {
   if (!area) {
     return;
@@ -308,6 +319,9 @@ static void region_draw_azones(ScrArea *area, ARegion *region)
   GPU_matrix_translate_2f(-region->winrct.xmin, -region->winrct.ymin);
 
   LISTBASE_FOREACH (AZone *, az, &area->actionzones) {
+    if (az->type == AZONE_REGION && region_is_blui_shell_header(win, az->region)) {
+      continue;
+    }
     /* test if action zone is over this region */
     rcti azrct;
     BLI_rcti_init(&azrct, az->x1, az->x2, az->y1, az->y2);
@@ -546,7 +560,7 @@ void ED_region_do_draw(bContext *C, ARegion *region)
 
   ED_region_draw_cb_draw(C, region, REGION_DRAW_POST_PIXEL);
 
-  region_draw_azones(area, region);
+  region_draw_azones(CTX_wm_window(C), area, region);
 
   /* for debugging unneeded area redraws and partial redraw */
   if (G.debug_value == 888) {
@@ -1112,8 +1126,15 @@ static void region_azones_add_edge(ScrArea *area,
   }
 }
 
-static void region_azones_add(const bScreen *screen, ScrArea *area, ARegion *region)
+static void region_azones_add(const wmWindow *win,
+                             const bScreen *screen,
+                             ScrArea *area,
+                             ARegion *region)
 {
+  /* Remove the hit target as well as its arrow, without hiding normal editor controls. */
+  if (region_is_blui_shell_header(win, region)) {
+    return;
+  }
   const bool is_fullscreen = screen->state == SCREENFULL;
 
   /* Only display tab or icons when the header region is hidden
@@ -1865,6 +1886,12 @@ void ED_area_update_region_sizes(wmWindowManager *wm, wmWindow *win, ScrArea *ar
   WM_window_rect_calc(win, &window_rect);
   area_calc_totrct(area, &window_rect);
 
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    if (region_is_blui_shell_header(win, region)) {
+      region->flag |= RGN_FLAG_HIDDEN;
+    }
+  }
+
   /* region rect sizes */
   rcti rect = area->totrct;
   rcti overlap_rect = rect;
@@ -1883,7 +1910,7 @@ void ED_area_update_region_sizes(wmWindowManager *wm, wmWindow *win, ScrArea *ar
     }
 
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
-    region_azones_add(screen, area, region);
+    region_azones_add(win, screen, area, region);
   }
   ED_area_azones_update(area, win->eventstate->xy);
 
@@ -1922,6 +1949,9 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
 
   LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
     region->type = BKE_regiontype_from_id(area->type, region->regiontype);
+    if (region_is_blui_shell_header(win, region)) {
+      region->flag |= RGN_FLAG_HIDDEN;
+    }
     /* Invalid region types may be stored in files (e.g. for new files), but they should be handled
      * on file read already, see #BKE_screen_area_blend_read_lib(). */
     BLI_assert_msg(region->type != nullptr, "Region type not valid for this space type");
@@ -1965,7 +1995,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
     }
 
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
-    region_azones_add(screen, area, region);
+    region_azones_add(win, screen, area, region);
   }
 
   /* Avoid re-initializing tools while resizing the window. */
@@ -2108,6 +2138,9 @@ void ED_region_visibility_change_update(bContext *C, ScrArea *area, ARegion *reg
 
 void region_toggle_hidden(bContext *C, ARegion *region, const bool do_fade)
 {
+  if (region_is_blui_shell_header(CTX_wm_window(C), region)) {
+    return;
+  }
   ScrArea *area = CTX_wm_area(C);
 
   region->flag ^= RGN_FLAG_HIDDEN;

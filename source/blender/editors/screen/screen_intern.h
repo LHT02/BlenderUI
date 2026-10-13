@@ -10,6 +10,8 @@
 struct Main;
 struct bContext;
 struct bContextDataResult;
+struct ARegion;
+struct wmWindow;
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,6 +65,9 @@ typedef enum eScreenAxis {
 #define BORDERPADDING ((2.0f * UI_SCALE_FAC) + U.pixelsize)
 
 /* area.cc */
+
+/** Auxiliary shell headers are not user-expandable; normal and desktop editors remain editable. */
+bool region_is_blui_shell_header(const struct wmWindow *win, const struct ARegion *region);
 
 /**
  * We swap spaces for full-screen to keep all allocated data area vertices were set.
