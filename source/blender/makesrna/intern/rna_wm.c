@@ -741,6 +741,11 @@ static bool rna_Window_blui_has_modal_interaction_get(PointerRNA *ptr)
   return WM_window_has_modal_interaction((const wmWindow *)ptr->data);
 }
 
+static bool rna_Window_blui_is_taskbar_get(PointerRNA *ptr)
+{
+  return ((const wmWindow *)ptr->data)->blui_shell_role == WM_BLUI_SHELL_TASKBAR;
+}
+
 static bool rna_WindowManager_blui_has_path_drag_get(PointerRNA *ptr)
 {
   wmWindowManager *manager = ptr->data;
@@ -2423,6 +2428,22 @@ static void rna_def_window(BlenderRNA *brna)
   RNA_def_property_boolean_funcs(prop, "rna_Window_blui_has_modal_interaction_get", NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Modal Interaction Active", "Running modal operator or temporary editor interaction");
+  static const EnumPropertyItem shell_roles[] = {
+      {WM_BLUI_SHELL_NORMAL, "NORMAL", 0, "Normal", "Normal component window"},
+      {WM_BLUI_SHELL_TASKBAR, "TASKBAR", 0, "Taskbar", "Independent BLUI taskbar"},
+      {WM_BLUI_SHELL_STARTMENU, "STARTMENU", 0, "Start Menu", "Independent start menu"},
+      {WM_BLUI_SHELL_TASK_CHOOSER, "TASK_CHOOSER", 0, "Task Windows", "Application window chooser"},
+      {0, NULL, 0, NULL, NULL},
+  };
+  prop = RNA_def_property(srna, "blui_shell_role", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "blui_shell_role");
+  RNA_def_property_enum_items(prop, shell_roles);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Shell Window Role", "Explicit native auxiliary window role");
+  prop = RNA_def_property(srna, "blui_is_taskbar", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop, "rna_Window_blui_is_taskbar_get", NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Taskbar Window", "This is an independent BLUI taskbar window");
   prop = RNA_def_property(srna, "blui_native_handle", PROP_STRING, PROP_NONE);
   RNA_def_property_string_funcs(prop, "rna_Window_blui_native_handle_get", "rna_Window_blui_native_handle_length", NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

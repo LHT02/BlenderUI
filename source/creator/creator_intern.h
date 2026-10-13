@@ -22,6 +22,10 @@ extern "C" {
 void main_args_setup(struct bContext *C, struct bArgs *ba);
 void main_args_setup_post(struct bContext *C, struct bArgs *ba);
 
+/* creator_file_preview.cc: isolated early headless entry point, before WM/Python startup. */
+void main_blui_file_preview_prepare(void);
+int main_blui_file_preview(const char *filepath, const char *result_path);
+
 /* creator_signals.c */
 
 void main_signal_setup(void);

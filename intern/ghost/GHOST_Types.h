@@ -66,6 +66,10 @@ typedef struct {
 typedef enum {
   GHOST_glStereoVisual = (1 << 0),
   GHOST_glDebugContext = (1 << 1),
+  /** BLUI auxiliary shell UI: borderless tool window, not an application task. */
+  GHOST_glBluiShellWindow = (1 << 2),
+  /** Taskbar buttons must not steal the target application's foreground focus. */
+  GHOST_glBluiTaskbarWindow = (1 << 3),
 } GHOST_GLFlags;
 
 typedef enum GHOST_DialogOptions {

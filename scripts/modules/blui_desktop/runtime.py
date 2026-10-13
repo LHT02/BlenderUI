@@ -7,7 +7,7 @@ import time
 import uuid
 import bpy
 from bpy.app.handlers import persistent
-from . import background, client, model, serialization, icon_cache, session, weather_runtime
+from . import background, client, model, serialization, icon_cache, thumbnail_cache, session, weather_runtime
 from blui_explorer.localization import iface
 
 _jobs = []
@@ -22,6 +22,8 @@ _epoch = 0
 _monitors = {'coordinate_space': 'physical', 'monitors': []}
 _last_monitors = 0.0
 _background_due = {}
+_preview_paths = {}
+_shell_retry_due = 0.0
 
 
 def identity(tree):
@@ -86,6 +88,8 @@ def submit(action, tree=None, *args):
         generation = tree.background_generation
     job = client.Job(action, *args)
     _jobs.append((job, action, token, generation))
+    if action == 'previews':
+        _preview_paths[id(job)] = list(args[0])
     if action == 'paths' and tree:
         space = bpy.context.space_data
         _origins[id(job)] = tuple(space.cursor_location) if space and space.type == 'NODE_EDITOR' else (0, 0)
@@ -135,14 +139,28 @@ def cancel_pending(_dummy=None):
     weather_runtime.reset()
     _background_due.clear()
     background.clear()
+    thumbnail_cache.cancel_pending()
+    _preview_paths.clear()
+    from . import start_menu
+    start_menu.close()
+    from . import folder_panels
+    folder_panels.close()
     from .file_actions import clear_drag
     clear_drag()
 
 
 def tick():
-    global _tasks, _task_error, _last_tasks, _monitors, _last_monitors
+    global _tasks, _task_error, _last_tasks, _monitors, _last_monitors, _shell_retry_due
     live = [(window, area) for window in bpy.context.window_manager.windows for area in window.screen.areas
             if area.type == 'NODE_EDITOR']
+    shell = [(window, area) for window in bpy.context.window_manager.windows for area in window.screen.areas
+             if getattr(window, 'blui_shell_role', 'NORMAL') != 'NORMAL']
+    from . import taskbar_windows
+    service_live = live or shell or taskbar_windows.needs_service()
+    from . import folder_panels
+    folder_panels.tick(__import__(__name__, fromlist=['']), live)
+    from . import start_menu
+    start_menu.tick()
     if not bpy.context.window_manager.blui_has_path_drag:
         from .file_actions import clear_drag
         clear_drag()
@@ -155,12 +173,16 @@ def tick():
             value = job.result()
             if action == 'tasks':
                 _tasks, _task_error = value, ''
+            elif action == 'task_launch':
+                _task_error, _last_tasks = '', 0.0
             elif action == 'monitors':
                 _monitors = value
             elif action == 'board_load':
                 session.receive(value)
             elif action == 'icons':
                 icon_cache.apply(value)
+            elif action == 'previews':
+                thumbnail_cache.apply(value)
             elif action == 'background' and tree:
                 if tree.background_generation == generation:
                     _ready.append((action, token, generation, value, (0, 0), ''))
@@ -172,7 +194,7 @@ def tick():
                 else:
                     tree.service_status = iface('Canvas layout saved')
         except (RuntimeError, OSError, ValueError) as exc:
-            if action == 'tasks':
+            if action in {'tasks', 'task_launch'}:
                 _task_error = str(exc)
             elif action == 'board_load':
                 session.missing()
@@ -184,11 +206,14 @@ def tick():
                             pass
             elif action == 'weather':
                 weather_runtime.failed(__import__(__name__, fromlist=['']), job, str(exc))
+            elif action == 'previews':
+                thumbnail_cache.fail(_preview_paths.get(id(job), ()))
             elif tree:
                 tree.service_status = str(exc)
         finally:
             _origins.pop(id(job), None)
             _expected.pop(id(job), None)
+            _preview_paths.pop(id(job), None)
     for item in list(_ready):
         action, token, generation, value, origin, expected = item
         tree = resolve_tree(token)
@@ -221,13 +246,13 @@ def tick():
             current = resolve_tree(token)
             if current:
                 current.service_status = str(exc)
-    if live and os.name == 'nt' and time.monotonic() - _last_tasks > 3 and not any(action == 'tasks' for _job, action, _id, _generation in _jobs):
+    if service_live and os.name == 'nt' and time.monotonic() - _last_tasks > 3 and not any(action == 'tasks' for _job, action, _id, _generation in _jobs):
         try:
             submit('tasks')
         except (RuntimeError, OSError) as exc:
             _task_error = str(exc)
         _last_tasks = time.monotonic()
-    if live:
+    if service_live:
         module = __import__(__name__, fromlist=[''])
         if session.roots():
             try:
@@ -236,8 +261,15 @@ def tick():
                 pass
         session.tick(module)
         weather_runtime.tick(module)
-        from . import displays, taskbar
+        from . import displays, taskbar, taskbar_windows
         displays.topology_changed(_monitors)
+        if time.monotonic() >= _shell_retry_due:
+            try:
+                taskbar_windows.tick(_monitors)
+                _shell_retry_due = 0.0
+            except (RuntimeError, OSError, ValueError, ReferenceError) as exc:
+                _task_error = str(exc)
+                _shell_retry_due = time.monotonic() + 3.0
         state = taskbar.tick()
         if state.get('tasks_revision', 0) != globals().get('_task_revision', 0):
             globals()['_task_revision'] = state['tasks_revision']
@@ -254,7 +286,14 @@ def tick():
                 try:
                     submit('icons', None, paths)
                 except RuntimeError:
-                    pass
+                    icon_cache.retry(paths)
+        if not interaction_busy(None) and not any(action == 'previews' for _job, action, _id, _gen in _jobs):
+            paths = thumbnail_cache.pending()
+            if paths:
+                try:
+                    submit('previews', None, paths)
+                except RuntimeError:
+                    thumbnail_cache.retry(paths)
         if not interaction_busy(None):
             for root in session.roots():
                 key = (identity(root), root.background_path)
@@ -264,12 +303,15 @@ def tick():
                         _background_due[key] = time.monotonic() + 30
                     except RuntimeError:
                         break
-    for _window, area in live:
+    for _window, area in live + shell:
         area.tag_redraw()
-    return .1 if _jobs or _ready else 1.0
+    return .1 if _jobs or _ready or start_menu.busy() else 1.0
 
 
 def register():
+    from . import start_menu_ui, taskbar_windows
+    start_menu_ui.register_props()
+    taskbar_windows.register()
     background.register(monitor_snapshot)
     for handlers in (bpy.app.handlers.undo_pre, bpy.app.handlers.redo_pre, bpy.app.handlers.load_pre):
         if cancel_pending not in handlers:
@@ -291,6 +333,7 @@ def register():
     for operator, key, value, modifiers, properties in (
         ('node.group_make', 'G', 'PRESS', {'ctrl': True}, {}),
         ('node.group_ungroup', 'G', 'PRESS', {'alt': True}, {}),
+        ('wm.blui_canvas_frame_selected', 'P', 'PRESS', {'shift': True}, {}),
         ('node.group_edit', 'TAB', 'PRESS', {}, {}),
         ('node.group_edit', 'TAB', 'PRESS', {'ctrl': True}, {'exit': True}),
         ('wm.blui_canvas_open_active', 'LEFTMOUSE', 'DOUBLE_CLICK', {}, {}),
@@ -319,7 +362,10 @@ def register():
 
 
 def unregister():
-    from . import taskbar
+    from . import start_menu_ui, taskbar, taskbar_windows
+    taskbar_windows.close()
+    taskbar_windows.unregister()
+    start_menu_ui.unregister_props()
     taskbar.close()
     background.unregister()
     if bpy.app.timers.is_registered(tick):
@@ -332,3 +378,4 @@ def unregister():
             handlers.remove(cancel_pending)
     cancel_pending()
     icon_cache.close()
+    thumbnail_cache.close()

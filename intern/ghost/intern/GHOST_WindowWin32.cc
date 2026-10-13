@@ -52,7 +52,9 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
                                      bool alphaBackground,
                                      GHOST_WindowWin32 *parentwindow,
                                      bool is_debug,
-                                     bool dialog)
+                                     bool dialog,
+                                     bool shell_window,
+                                     bool taskbar_window)
     : GHOST_Window(width, height, state, wantStereoVisual, false),
       m_mousePresent(false),
       m_inLiveResize(false),
@@ -78,6 +80,9 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
   DWORD style = parentwindow ?
                     WS_POPUPWINDOW | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX :
                     WS_OVERLAPPEDWINDOW;
+  if (shell_window) {
+    style = WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+  }
 
   if (state == GHOST_kWindowStateFullScreen) {
     style |= WS_MAXIMIZE;
@@ -85,6 +90,12 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 
   /* Forces owned windows onto taskbar and allows minimization. */
   DWORD extended_style = parentwindow ? WS_EX_APPWINDOW : 0;
+  if (shell_window) {
+    extended_style = WS_EX_TOOLWINDOW;
+    if (taskbar_window) {
+      extended_style |= WS_EX_NOACTIVATE;
+    }
+  }
 
   if (dialog) {
     /* When we are ready to make windows of this type:
@@ -176,6 +187,9 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
   }
 
   ThemeRefresh();
+  if (taskbar_window) {
+    nCmdShow = SW_SHOWNOACTIVATE;
+  }
 
   ::ShowWindow(m_hWnd, nCmdShow);
 

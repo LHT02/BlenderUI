@@ -146,6 +146,20 @@ def validate(payload):
             if type(props.get('shrink', True)) is not bool:
                 raise ValueError('Invalid panel flag')
             item['props']['shrink'] = props.get('shrink', True)
+            item['props']['folder_path'] = _text(props.get('folder_path', ''))
+            if type(props.get('use_custom_color', False)) is not bool:
+                raise ValueError('Invalid panel color flag')
+            item['props']['use_custom_color'] = props.get('use_custom_color', False)
+            color = props.get('color', [0.608, 0.608, 0.608])
+            if not isinstance(color, (list, tuple)) or len(color) != 3:
+                raise ValueError('Invalid panel color')
+            item['props']['color'] = [_number(component, 0, 1) for component in color]
+        elif row['kind'] == FILE:
+            owner = props.get('portal_owner', '')
+            if owner and (not isinstance(owner, str) or len(owner) != 32 or
+                          any(char not in '0123456789abcdef' for char in owner)):
+                raise ValueError('Invalid folder panel identity')
+            item['props']['portal_owner'] = _text(owner, 32)
         elif row['kind'] == CLOCK:
             for key, default in (('clock_format', '%H:%M:%S'), ('date_format', '%Y-%m-%d')):
                 item['props'][key] = _text(props.get(key, default), 64)

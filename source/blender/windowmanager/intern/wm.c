@@ -19,6 +19,8 @@
 #include "BLI_sys_types.h"
 
 #include "DNA_windowmanager_types.h"
+#include "DNA_space_types.h"
+#include "DNA_workspace_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -106,16 +108,39 @@ static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
 static void window_manager_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   wmWindowManager *wm = (wmWindowManager *)id;
-
-  BLO_write_id_struct(writer, wmWindowManager, id_address, &wm->id);
+  /* Auxiliary taskbar/menu windows are process-local UI, not startup documents.
+   * Filter the written linked list without mutating any live RNA/window list. */
+  wmWindowManager serial_wm = *wm;
+  BLI_listbase_clear(&serial_wm.windows);
+  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    if (win->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
+      if (!serial_wm.windows.first) {
+        serial_wm.windows.first = win;
+      }
+      serial_wm.windows.last = win;
+    }
+  }
+  BLO_write_id_struct(writer, wmWindowManager, id_address, &serial_wm.id);
   BKE_id_blend_write(writer, &wm->id);
   write_wm_xr_data(writer, &wm->xr);
 
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    if (win->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
+      continue;
+    }
     /* update deprecated screen member (for so loading in 2.7x uses the correct screen) */
     win->screen = BKE_workspace_active_screen_get(win->workspace_hook);
 
-    BLO_write_struct(writer, wmWindow, win);
+    wmWindow serial_win = *win;
+    serial_win.prev = win->prev;
+    while (serial_win.prev && serial_win.prev->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
+      serial_win.prev = serial_win.prev->prev;
+    }
+    serial_win.next = win->next;
+    while (serial_win.next && serial_win.next->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
+      serial_win.next = serial_win.next->next;
+    }
+    BLO_write_struct_at_address(writer, wmWindow, win, &serial_win);
     BLO_write_struct(writer, WorkSpaceInstanceHook, win->workspace_hook);
     BLO_write_struct(writer, Stereo3dFormat, win->stereo3d_format);
 
@@ -173,6 +198,7 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
     BLI_listbase_clear(&win->gesture);
 
     win->active = 0;
+    win->blui_shell_role = WM_BLUI_SHELL_NORMAL;
 
     win->cursor = 0;
     win->lastcursor = 0;
@@ -477,6 +503,38 @@ void WM_keyconfig_init(bContext *C)
   }
 }
 
+static void wm_blui_orphan_shell_layouts_remove(Main *bmain)
+{
+  LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+    LISTBASE_FOREACH_MUTABLE (WorkSpaceLayout *, layout, &workspace->layouts) {
+      bScreen *screen = BKE_workspace_layout_screen_get(layout);
+      if (!screen || !BLI_listbase_is_single(&screen->areabase)) {
+        continue;
+      }
+      const ScrArea *area = screen->areabase.first;
+      const SpaceInfo *info = area->spacedata.first;
+      if (area->spacetype != SPACE_INFO || !info || !info->blui_shell_ui) {
+        continue;
+      }
+      bool used = false;
+      LISTBASE_FOREACH (wmWindowManager *, manager, &bmain->wm) {
+        LISTBASE_FOREACH (wmWindow *, window, &manager->windows) {
+          if (window->workspace_hook && WM_window_get_active_screen(window) == screen) {
+            used = true;
+            break;
+          }
+        }
+        if (used) {
+          break;
+        }
+      }
+      if (!used) {
+        BKE_workspace_layout_remove(bmain, workspace, layout);
+      }
+    }
+  }
+}
+
 void WM_check(bContext *C)
 {
   Main *bmain = CTX_data_main(C);
@@ -488,6 +546,10 @@ void WM_check(bContext *C)
     CTX_wm_manager_set(C, wm);
   }
 
+  /* The window writer omits shell role windows. Workspaces/screens may still
+   * contain their private layouts after a .blend read; remove only tagged,
+   * unowned layouts, including the case where no document window was saved. */
+  wm_blui_orphan_shell_layouts_remove(bmain);
   if (wm == NULL || BLI_listbase_is_empty(&wm->windows)) {
     return;
   }

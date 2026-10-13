@@ -332,6 +332,16 @@ int main(int argc,
 #  endif /* USE_WIN32_UNICODE_ARGS */
 #endif   /* WIN32 */
 
+#ifndef WITH_PYTHON_MODULE
+  const bool blui_file_preview = argc > 1 && STREQ(argv[1], "--blui-file-preview");
+  if (blui_file_preview) {
+    if (argc != 4) {
+      return 2;
+    }
+    main_blui_file_preview_prepare();
+  }
+#endif
+
   /* NOTE: Special exception for guarded allocator type switch:
    *       we need to perform switch from lock-free to fully
    *       guarded allocator before any allocation happened.
@@ -474,6 +484,17 @@ int main(int argc,
 
   /* Initialize sub-systems that use `BKE_appdir.h`. */
   IMB_init();
+
+#ifndef WITH_PYTHON_MODULE
+  if (blui_file_preview) {
+    /* No RNA, WM, GHOST window, Python scripts, or user startup/preferences are initialized. */
+    G.background = true;
+    const int result = main_blui_file_preview(argv[2], argv[3]);
+    fflush(NULL);
+    /* A dedicated disposable process owns the decoder and its global state. */
+    exit(result);
+  }
+#endif
 
 #ifdef WITH_USD
   USD_ensure_plugin_path_registered();

@@ -9,9 +9,11 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mailbox import publish, take
 from shell_win32 import ShellMenu, pump, properties, has_dialogs
+import worker_lifetime
 
 
 def main():
+    worker_lifetime.start()
     directory = Path(sys.argv[1])
     ctypes.OleDLL('ole32').CoInitializeEx(None, 2)
     menu = None

@@ -45,18 +45,12 @@ class BLUI_HT_taskbar(Header):
     def draw(self, context):
         layout = self.layout
         layout.menu('BLUI_MT_desktop_start', text='BLUI', icon='BLENDER')
-        layout.separator()
-        for task in runtime.tasks()[:6]:
-            _task_button(layout, task, text=task['title'][:22])
-        layout.menu('BLUI_MT_desktop_tasks', text=iface('All Tasks'), icon='WINDOW', translate=False)
         layout.separator_spacer()
         from bl_operators.blui_file import task_status
         layout.label(text=task_status(), translate=False)
         layout.label(text=iface('MMB: Pan · Wheel: Zoom · Drag: Arrange'), translate=False)
         layout.template_reports_banner()
         layout.template_running_jobs()
-        from datetime import datetime
-        layout.label(text=datetime.now().strftime('%H:%M'), translate=False)
         if not context.preferences.edit.use_global_undo:
             layout.prop(context.preferences.edit, 'use_global_undo', text=iface('Enable Canvas Undo'))
 
@@ -69,6 +63,7 @@ class BLUI_MT_desktop_start(Menu):
         layout.operator('wm.blui_desktop_open', text=iface('Desktop Canvas'), icon='NODETREE', translate=False)
         layout.menu('BLUI_MT_displays', text=iface('Displays'), translate=False)
         layout.menu('BLUI_MT_desktop_widgets', text=iface('Widgets'), translate=False)
+        layout.operator('wm.blui_taskbar_open', text=iface('Open BLUI Taskbar'), icon='WINDOW', translate=False)
         layout.separator()
         for action, label in (('hide', 'Hide Windows Taskbar'), ('restore', 'Restore Windows Taskbar')):
             op = layout.operator('wm.blui_windows_taskbar', text=iface(label), translate=False)
@@ -108,6 +103,8 @@ class BLUI_MT_canvas_context(Menu):
         layout.operator('wm.blui_background_load', text=iface('Choose Desktop Background'), icon='FILE_IMAGE', translate=False)
         op = layout.operator('node.add_node', text=iface('Add Icon Panel'), icon='NODE_SEL', translate=False)
         op.type, op.use_transform = 'NodeFrame', True
+        layout.operator('wm.blui_canvas_frame_selected', text=iface('Frame Selected Cards'), icon='NODE_SEL', translate=False)
+        layout.operator('wm.blui_folder_panel_add', text=iface('Add Folder Panel'), icon='FILE_FOLDER', translate=False)
         layout.operator('node.group_make', text=iface('Group Icons'), icon='NODETREE', translate=False)
         layout.operator('node.group_edit', text=iface('Enter Group'), translate=False)
         layout.operator('node.group_ungroup', text=iface('Ungroup Icons'), translate=False)

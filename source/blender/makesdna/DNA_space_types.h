@@ -124,7 +124,9 @@ typedef struct SpaceInfo {
   /* End 'SpaceLink' header. */
 
   char rpt_mask;
-  char _pad[7];
+  /** Explicit private shell-UI layout marker, not a generic temporary Info editor. */
+  char blui_shell_ui;
+  char _pad[6];
 } SpaceInfo;
 
 /** #SpaceInfo.rpt_mask */

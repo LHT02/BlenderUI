@@ -31,6 +31,13 @@ def pending():
     return batch
 
 
+def retry(paths):
+    """Admission made no request; an uncached icon must remain eligible for a later batch."""
+    for path in paths:
+        if path and '\x00' not in path and len(path) <= 32768 and path not in _icons:
+            _queued.add(path)
+
+
 def apply(rows):
     global _previews
     if _previews is None:
@@ -48,15 +55,20 @@ def apply(rows):
         # Native extractor is top-down; PreviewImage follows Blender's bottom-up storage.
         stride = width * 4
         flipped = b''.join(pixels[y * stride:(y + 1) * stride] for y in range(height - 1, -1, -1))
-        digest = hashlib.sha256(flipped).hexdigest()
+        digest = hashlib.sha256(width.to_bytes(4, 'little') + height.to_bytes(4, 'little') + flipped).hexdigest()
         if digest in _unique:
             preview = _previews[digest]
             _unique.move_to_end(digest)
         else:
             preview = _previews.new(digest)
             preview.image_size = (width, height)
-            preview.image_pixels_float = [component / 255.0 for component in flipped]
-            _unique[digest] = width * height
+            floats = [component / 255.0 for component in flipped]
+            preview.image_pixels_float = floats
+            # Operator/menu buttons use ICON_SIZE_ICON, not the large template_icon
+            # slot. A valid icon_id alone otherwise paints an empty application button.
+            preview.icon_size = (width, height)
+            preview.icon_pixels_float = floats
+            _unique[digest] = width * height * 2
         _sources[path] = digest
         _icons[path] = preview.icon_id
     while len(_icons) > MAX_ICONS:

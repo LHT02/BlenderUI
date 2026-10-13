@@ -2046,6 +2046,25 @@ static void WM_OT_window_new(wmOperatorType *ot)
                  "or \"Settings\". Leave empty to copy the current one");
 }
 
+static void WM_OT_blui_shell_window_create(wmOperatorType *ot)
+{
+  static const EnumPropertyItem roles[] = {
+      {WM_BLUI_SHELL_TASKBAR, "TASKBAR", 0, "Taskbar", "Independent taskbar"},
+      {WM_BLUI_SHELL_STARTMENU, "STARTMENU", 0, "Start Menu", "Independent start menu"},
+      {WM_BLUI_SHELL_TASK_CHOOSER, "TASK_CHOOSER", 0, "Task Windows", "Application window chooser"},
+      {0, NULL, 0, NULL, NULL},
+  };
+  ot->name = "Create Shell UI Window";
+  ot->idname = "WM_OT_blui_shell_window_create";
+  ot->description = "Create an independent native BLUI taskbar or menu window";
+  ot->exec = wm_blui_shell_window_create_exec;
+  ot->poll = wm_window_new_poll;
+  ot->flag = OPTYPE_INTERNAL;
+  RNA_def_enum(ot->srna, "role", roles, WM_BLUI_SHELL_TASKBAR, "Role", "Native shell UI role");
+  RNA_def_int(ot->srna, "width", 900, 160, 32760, "Width", "Physical window width", 160, 4096);
+  RNA_def_int(ot->srna, "height", 48, 24, 2048, "Height", "Physical window height", 24, 1024);
+}
+
 static void WM_OT_window_new_main(wmOperatorType *ot)
 {
   ot->name = "New Main Window";
@@ -3796,6 +3815,7 @@ void wm_operatortypes_register(void)
 {
   WM_operatortype_append(WM_OT_window_close);
   WM_operatortype_append(WM_OT_window_new);
+  WM_operatortype_append(WM_OT_blui_shell_window_create);
   WM_operatortype_append(WM_OT_window_new_main);
   WM_operatortype_append(WM_OT_read_history);
   WM_operatortype_append(WM_OT_read_homefile);

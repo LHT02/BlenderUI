@@ -265,6 +265,9 @@ typedef struct wmWindow {
 
   /** Window-ID also in screens, is for retrieving this window after read. */
   int winid;
+  /** BLUI's explicit auxiliary window role; never inferred from an HWND or title. */
+  int blui_shell_role;
+  int _pad_blui_shell_role;
   /** Window coords. */
   short posx, posy, sizex, sizey;
   /** Borderless, full. */
@@ -361,6 +364,13 @@ typedef struct wmWindow {
   /* Private runtime info to show text in the status bar. */
   void *cursor_keymap_status;
 } wmWindow;
+
+typedef enum eWMBluiShellRole {
+  WM_BLUI_SHELL_NORMAL = 0,
+  WM_BLUI_SHELL_TASKBAR = 1,
+  WM_BLUI_SHELL_STARTMENU = 2,
+  WM_BLUI_SHELL_TASK_CHOOSER = 3,
+} eWMBluiShellRole;
 
 #ifdef ime_data
 #  undef ime_data

@@ -29,6 +29,7 @@
 #include "UI_view2d.h"
 
 #include "BLO_read_write.h"
+#include "DNA_windowmanager_types.h"
 
 #include "info_intern.h" /* own include */
 
@@ -93,6 +94,30 @@ static SpaceLink *info_duplicate(SpaceLink *sl)
 static void info_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
+  LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
+    if (window->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
+      continue;
+    }
+    const bScreen *screen = WM_window_get_active_screen(window);
+    if (!screen) {
+      continue;
+    }
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      if (BLI_findindex(&area->regionbase, region) >= 0) {
+        if (window->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
+          ED_region_header_init(region);
+          keymap = WM_keymap_ensure(wm->defaultconf, "BLUI Taskbar", SPACE_INFO, RGN_TYPE_WINDOW);
+          WM_event_add_keymap_handler(&region->handlers, keymap);
+        }
+        else {
+          ED_region_panels_init(wm, region);
+          keymap = WM_keymap_ensure(wm->defaultconf, "BLUI Shell Popup", SPACE_INFO, RGN_TYPE_WINDOW);
+          WM_event_add_keymap_handler(&region->handlers, keymap);
+        }
+        return;
+      }
+    }
+  }
 
   /* force it on init, for old files, until it becomes config */
   region->v2d.scroll = (V2D_SCROLL_RIGHT);
@@ -115,6 +140,15 @@ static void info_textview_update_rect(const bContext *C, ARegion *region)
 
 static void info_main_region_draw(const bContext *C, ARegion *region)
 {
+  const wmWindow *window = CTX_wm_window(C);
+  if (window && window->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
+    ED_region_header(C, region);
+    return;
+  }
+  if (window && ELEM(window->blui_shell_role, WM_BLUI_SHELL_STARTMENU, WM_BLUI_SHELL_TASK_CHOOSER)) {
+    ED_region_panels(C, region);
+    return;
+  }
   /* draw entirely, view changes should be handled here */
   SpaceInfo *sinfo = CTX_wm_space_info(C);
   View2D *v2d = &region->v2d;

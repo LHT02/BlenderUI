@@ -78,7 +78,9 @@ class GHOST_WindowWin32 : public GHOST_Window {
                     bool alphaBackground = false,
                     GHOST_WindowWin32 *parentWindow = 0,
                     bool is_debug = false,
-                    bool dialog = false);
+                    bool dialog = false,
+                    bool shell_window = false,
+                    bool taskbar_window = false);
 
   /**
    * Destructor.

@@ -137,6 +137,7 @@ set(SRC
   creator.c
   creator_args.c
   creator_signals.c
+  creator_file_preview.cc
 
   creator_intern.h
 )

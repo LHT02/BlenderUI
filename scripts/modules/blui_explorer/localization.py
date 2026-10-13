@@ -282,6 +282,81 @@ _TEXT.update({
 })
 
 
+_TEXT.update({
+    'Taskbar': ('任务栏', '工作列'),
+    'Open BLUI Taskbar': ('打开 BLUI 任务栏', '開啟 BLUI 工作列'),
+    'Close BLUI Taskbar': ('关闭 BLUI 任务栏', '關閉 BLUI 工作列'),
+    'Taskbar Settings': ('任务栏设置', '工作列設定'),
+    'Taskbar Layout': ('任务栏布局', '工作列配置'),
+    'Application': ('应用', '應用程式'),
+    'Application Windows': ('应用窗口', '應用程式視窗'),
+    'Activate Window': ('激活窗口', '啟用視窗'),
+    'New Application Instance': ('打开新的应用实例', '開啟新的應用程式執行個體'),
+    'Windows 10: Left': ('Windows 10：左对齐', 'Windows 10：靠左對齊'),
+    'Windows 11: Center': ('Windows 11：居中', 'Windows 11：置中'),
+    'All Displays': ('所有显示器', '所有顯示器'),
+    'Primary Display': ('主显示器', '主要顯示器'),
+    'All Application Windows': ('所有应用窗口', '所有應用程式視窗'),
+    'Windows on This Display': ('仅此显示器窗口', '僅此顯示器視窗'),
+    'Shift-click or Middle-click: New Instance': ('Shift 单击或中键单击：新实例', 'Shift 點選或中鍵點選：新執行個體'),
+    'This application changed; refresh the taskbar': ('应用窗口已改变，请刷新任务栏', '應用程式視窗已變更，請重新整理工作列'),
+    'This task has no verified identity; refresh the taskbar': ('无法核实窗口身份，请刷新任务栏', '無法確認視窗身分，請重新整理工作列'),
+    'This application cannot safely start a new instance': ('无法安全地打开此应用的新实例', '無法安全地開啟此應用程式的新執行個體'),
+    'Could not open a taskbar window': ('无法打开任务栏窗口', '無法開啟工作列視窗'),
+    'Close Shell Popup': ('关闭菜单窗口', '關閉功能表視窗'),
+    'Open an independent native taskbar; Windows taskbar stays visible unless explicitly hidden':
+        ('打开独立原生任务栏，未手动隐藏时保留 Windows 任务栏', '開啟獨立原生工作列，未手動隱藏時保留 Windows 工作列'),
+    'Restore the Windows taskbar and close only BLUI shell UI windows':
+        ('恢复 Windows 任务栏，仅关闭 BLUI 任务栏和菜单窗口', '還原 Windows 工作列，僅關閉 BLUI 工作列與功能表視窗'),
+    'Start': ('开始', '開始'),
+    'Search Apps': ('搜索应用', '搜尋應用程式'),
+    'Programs': ('应用程序', '應用程式'),
+    'Pinned Apps': ('固定应用', '釘選的應用程式'),
+    'All Apps': ('所有应用', '所有應用程式'),
+    'Recently Opened Apps': ('最近打开', '最近開啟'),
+    'Loading Apps': ('正在加载应用', '正在載入應用程式'),
+    'App list limited; refresh to update': ('应用列表已达上限，可刷新更新', '應用程式清單已達上限，可重新整理更新'),
+    'No Matching Apps': ('未找到匹配应用', '沒有相符的應用程式'),
+    'Unpin App': ('取消固定', '取消釘選'),
+    'Windows Settings': ('Windows 设置', 'Windows 設定'),
+    'Power': ('电源', '電源'),
+    'Power Settings': ('电源设置', '電源設定'),
+    'Lock Windows': ('锁定 Windows', '鎖定 Windows'),
+    'Shut Down Windows': ('关闭 Windows', '關閉 Windows'),
+    'Restart Windows': ('重启 Windows', '重新啟動 Windows'),
+    'Lock Windows?': ('锁定 Windows？', '鎖定 Windows？'),
+    'Shut Down Windows?': ('关闭 Windows？', '關閉 Windows？'),
+    'Restart Windows?': ('重启 Windows？', '重新啟動 Windows？'),
+    'Save your work before continuing': ('请先保存工作再继续', '請先儲存工作再繼續'),
+    'Continue?': ('继续？', '繼續？'),
+    'Could not open Start menu': ('无法打开开始菜单', '無法開啟開始功能表'),
+    'Refresh Apps': ('刷新应用', '重新整理應用程式'),
+    'Open App': ('打开应用', '開啟應用程式'),
+    'Pin or Unpin App': ('固定或取消固定应用', '釘選或取消釘選應用程式'),
+    'App Page': ('应用列表翻页', '應用程式清單換頁'),
+    'Start Menu System Action': ('开始菜单系统操作', '開始功能表系統操作'),
+    'Open indexed Programs, pinned apps, recent apps and local app search':
+        ('打开应用索引、固定应用、最近打开和本地搜索', '開啟應用程式索引、釘選項目、最近開啟與本機搜尋'),
+    'The program is no longer indexed; refresh the menu': ('应用索引已改变，请刷新菜单', '應用程式索引已變更，請重新整理功能表'),
+    'Start menu pinned program limit reached': ('固定应用数量已达上限', '釘選應用程式數量已達上限'),
+    'A program launch is still pending': ('应用仍在启动中', '應用程式仍在啟動中'),
+    'A system action is still pending': ('系统操作仍在进行中', '系統操作仍在進行中'),
+    'Add Folder Panel': ('添加文件夹面板', '新增資料夾面板'),
+    'Folder Panel': ('文件夹面板', '資料夾面板'),
+    'Refresh Folder Panel': ('刷新文件夹面板', '重新整理資料夾面板'),
+    'Folder panel refreshed': ('文件夹面板已刷新', '資料夾面板已重新整理'),
+    'Panel Color': ('面板颜色', '面板色彩'),
+    'Frame Selected Cards': ('为选中项添加框', '為選取項目新增框架'),
+    'Icon Panel': ('图标面板', '圖示面板'),
+    'Attach selected items to a new native frame without moving their visible positions':
+        ('将选中项放入新的原生框，保留可见位置', '將選取項目放入新的原生框架，保留可見位置'),
+    'Refreshing only changes references': ('刷新只同步引用，不更改实际文件', '重新整理只同步參照，不變更實際檔案'),
+    'Choose an absolute folder path': ('请选择完整的文件夹路径', '請選擇完整的資料夾路徑'),
+    'Map a folder to an icon panel without moving or deleting real files':
+        ('将文件夹映射到图标面板，不移动或删除实际文件', '將資料夾對應至圖示面板，不移動或刪除實際檔案'),
+})
+
+
 def register():
     import bpy
     tables = {}

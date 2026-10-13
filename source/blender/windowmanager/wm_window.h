@@ -135,6 +135,7 @@ void wm_quit_with_optional_confirmation_prompt(bContext *C, wmWindow *win) ATTR_
 
 int wm_window_new_exec(bContext *C, struct wmOperator *op);
 int wm_window_new_main_exec(bContext *C, struct wmOperator *op);
+int wm_blui_shell_window_create_exec(bContext *C, struct wmOperator *op);
 
 /* -------------------------------------------------------------------- */
 /** \name System tray (BLUI)

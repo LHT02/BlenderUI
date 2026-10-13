@@ -8,11 +8,26 @@
 #include <windows.h>
 #include "GHOST_ShellMenuWin32.hh"
 
+static DWORD WINAPI icon_watchdog(void *)
+{
+  /* The Python parent can be cancelled while a Shell provider is blocked.
+   * This independent deadline kills only this disposable extraction host. */
+  Sleep(2500);
+  TerminateProcess(GetCurrentProcess(), 124);
+  return 0;
+}
+
 int wmain(int argc, wchar_t **argv)
 {
   if (argc != 2) {
     return 2;
   }
+  HANDLE watchdog = CreateThread(nullptr, 0, icon_watchdog, nullptr, 0, nullptr);
+  if (!watchdog) {
+    return 125;
+  }
+  CloseHandle(watchdog);
+  SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
   const int length = WideCharToMultiByte(CP_UTF8, 0, argv[1], -1, nullptr, 0, nullptr, nullptr);
   if (length <= 1 || length > 131072) {
     return 2;

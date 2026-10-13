@@ -40,11 +40,17 @@ def _validate_value(action, value):
     elif action == 'save':
         if not isinstance(value, str) or len(value) > 32768 or '\x00' in value:
             raise ValueError('Invalid desktop save result')
-    elif action in {'open', 'recycle'}:
+    elif action in {'open', 'recycle', 'task_launch', 'start_state', 'start_launch', 'start_system'}:
         if value is not True:
             raise ValueError('Invalid desktop open result')
     elif action == 'background':
         background.validate_pixels(value)
+    elif action == 'previews':
+        from . import thumbnails
+        thumbnails.validate_pixels(value)
+    elif action == 'start_index':
+        from . import start_menu_model
+        start_menu_model.validate_index(value)
     elif action == 'board_load':
         boards.validate(value)
     elif action == 'board_save':
@@ -85,13 +91,19 @@ def _validate_value(action, value):
                 any(type(row.get(field)) is not int or not 0 < row[field] <= 0xffffffff
                     for field in ('pid', 'thread_id'))):
                 raise ValueError('Invalid desktop task identity')
+            for field, maximum in (('executable', 32768), ('app_id', 1024),
+                                   ('group_key', 1024), ('monitor', 128)):
+                if field in row and (not isinstance(row[field], str) or len(row[field]) > maximum or
+                                     '\x00' in row[field]):
+                    raise ValueError('Invalid desktop task metadata')
 
 
 class Job:
     def __init__(self, action, *args, timeout=10.0):
         arity = {'scan': 1, 'paths': 1, 'save': 2, 'load': 1, 'tasks': 0, 'open': 1,
                  'board_save': 2, 'board_load': 1, 'monitors': 0, 'weather': 1, 'icons': 1,
-                 'background': 1, 'recycle': 1}
+                 'background': 1, 'recycle': 1, 'previews': 1, 'task_launch': 1,
+                 'start_index': 1, 'start_state': 2, 'start_launch': 1, 'start_system': 1}
         if not isinstance(action, str) or action not in arity or len(args) != arity[action]:
             raise ValueError('Unsupported desktop request')
         if action == 'open' and (os.name != 'nt' or not isinstance(args[0], str) or
@@ -107,6 +119,24 @@ class Job:
         if action == 'icons' and (not isinstance(args[0], (list, tuple)) or len(args[0]) > icons.BATCH or
                 any(not isinstance(path, str) or not path or len(path) > 32768 or '\x00' in path for path in args[0])):
             raise ValueError('Invalid desktop icon paths')
+        if action == 'previews':
+            from . import thumbnails
+            if (not isinstance(args[0], (list, tuple)) or not 0 < len(args[0]) <= thumbnails.BATCH or
+                    any(not thumbnails.valid_path(path) for path in args[0])):
+                raise ValueError('Invalid desktop preview paths')
+        if action == 'task_launch':
+            _validate_value('tasks', [args[0]])
+        if action in {'start_index', 'start_state'} and (not isinstance(args[0], str) or not args[0] or
+                len(args[0]) > 32768 or '\x00' in args[0]):
+            raise ValueError('Invalid start menu storage directory')
+        if action in {'start_state', 'start_launch', 'start_system'}:
+            from . import start_menu_model
+            if action == 'start_state':
+                start_menu_model.state(args[1])
+            elif action == 'start_launch':
+                start_menu_model.program(args[0])
+            elif not isinstance(args[0], str) or args[0] not in start_menu_model.SYSTEM_ACTIONS:
+                raise ValueError('Unsupported Start menu system action')
         self.directory = ''
         self.process = None
         self.started, self.timeout = time.monotonic(), timeout

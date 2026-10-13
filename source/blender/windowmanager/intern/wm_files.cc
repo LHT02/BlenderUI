@@ -394,7 +394,9 @@ static void wm_window_match_replace_by_file_wm(bContext *C,
   /* Only first `wm` in list has GHOST-windows. */
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     LISTBASE_FOREACH (wmWindow *, oldwin, &oldwm->windows) {
-      if (oldwin->winid == win->winid) {
+      /* Process-local shell windows are never valid document-window donors.
+       * Their HWND still carries popup/no-activate styles and thin dimensions. */
+      if (oldwin->blui_shell_role == WM_BLUI_SHELL_NORMAL && oldwin->winid == win->winid) {
         has_match = true;
 
         wm_window_substitute_old(oldwm, wm, oldwin, win);
@@ -402,11 +404,13 @@ static void wm_window_match_replace_by_file_wm(bContext *C,
     }
   }
   /* make sure at least one window is kept open so we don't lose the context, check #42303 */
-  if (!has_match) {
-    wm_window_substitute_old(oldwm,
-                             wm,
-                             static_cast<wmWindow *>(oldwm->windows.first),
-                             static_cast<wmWindow *>(wm->windows.first));
+  if (!has_match && wm->windows.first != nullptr) {
+    LISTBASE_FOREACH (wmWindow *, oldwin, &oldwm->windows) {
+      if (oldwin->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
+        wm_window_substitute_old(oldwm, wm, oldwin, static_cast<wmWindow *>(wm->windows.first));
+        break;
+      }
+    }
   }
 
   wm_close_and_free_all(C, current_wm_list);

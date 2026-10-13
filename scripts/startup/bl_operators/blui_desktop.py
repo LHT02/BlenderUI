@@ -297,8 +297,10 @@ from blui_desktop.file_actions import classes as file_classes
 from blui_desktop.background_types import classes as background_classes
 from blui_desktop.displays import classes as display_classes
 from blui_desktop.taskbar_ui import classes as taskbar_classes
+from blui_desktop.start_menu_ui import classes as start_menu_classes
+from blui_desktop.folder_panels import classes as folder_panel_classes
 
-classes = file_classes + background_classes + display_classes + taskbar_classes + (WM_OT_blui_desktop_open, WM_OT_blui_canvas_initialize, WM_OT_blui_canvas_refresh,
+classes = file_classes + background_classes + display_classes + taskbar_classes + start_menu_classes + folder_panel_classes + (WM_OT_blui_desktop_open, WM_OT_blui_canvas_initialize, WM_OT_blui_canvas_refresh,
            WM_OT_blui_canvas_apply,
            WM_OT_blui_canvas_import, WM_OT_blui_canvas_drop, WM_OT_blui_canvas_note,
            WM_OT_blui_canvas_layout, WM_OT_blui_canvas_copy_path, WM_OT_blui_canvas_open_file,

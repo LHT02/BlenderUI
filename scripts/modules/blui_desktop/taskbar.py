@@ -4,7 +4,7 @@
 # https://github.com/dremin/RetroBar (Apache-2.0, WPF + ManagedShell)
 # https://github.com/cairoshell/ManagedShell/blob/master/src/ManagedShell.AppBar/ExplorerHelper.cs
 # BLUI deliberately preserves system AppBar/autohide/workarea settings; its native
-# node footer is not yet a full notification-area host or registered shell AppBar.
+# independent native taskbar is not a notification-area host or registered shell AppBar.
 import atexit
 from collections import deque
 import json

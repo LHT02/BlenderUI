@@ -771,6 +771,12 @@ static void wm_window_ghostwindow_add(wmWindowManager *wm,
   if (G.debug & G_DEBUG_GPU) {
     glSettings.flags |= GHOST_glDebugContext;
   }
+  if (win->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
+    glSettings.flags |= GHOST_glBluiShellWindow;
+  }
+  if (win->blui_shell_role == WM_BLUI_SHELL_TASKBAR) {
+    glSettings.flags |= GHOST_glBluiTaskbarWindow;
+  }
 
   eGPUBackendType gpu_backend = GPU_backend_type_selection_get();
   glSettings.context_type = wm_ghost_drawing_context_type(gpu_backend);
@@ -822,7 +828,7 @@ static void wm_window_ghostwindow_add(wmWindowManager *wm,
 
 #ifndef __APPLE__
     /* set the state here, so minimized state comes up correct on windows */
-    if (wm_init_state.window_focus) {
+    if (wm_init_state.window_focus && win->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
       GHOST_SetWindowState(ghostwin, (GHOST_TWindowState)win->windowstate);
     }
 #endif
@@ -1138,13 +1144,18 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
    * That does not mean there are no live windows: reusing a workspace's screen below
    * would then make two windows share region buffers and redraw flags (one stays blank).
    * Resolve a real copy source before deciding whether the no-window path is needed. */
-  if (win_src == NULL) {
-    if (wm->winactive && wm->winactive->ghostwin) {
+  /* An auxiliary taskbar/menu is not a component copy source: it has a private
+   * INFO layout and can be only 48 pixels high. Use a live normal component,
+   * or take the fresh-window path when only shell UI windows remain. */
+  if (win_src == NULL || win_src->blui_shell_role != WM_BLUI_SHELL_NORMAL) {
+    win_src = NULL;
+    if (wm->winactive && wm->winactive->ghostwin &&
+        wm->winactive->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
       win_src = wm->winactive;
     }
     else {
       LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
-        if (window->ghostwin) {
+        if (window->ghostwin && window->blui_shell_role == WM_BLUI_SHELL_NORMAL) {
           win_src = window;
           break;
         }
@@ -1277,6 +1288,65 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
   }
 
   return OPERATOR_FINISHED;
+}
+
+int wm_blui_shell_window_create_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmWindow *previous_window = CTX_wm_window(C);
+  ScrArea *previous_area = CTX_wm_area(C);
+  ARegion *previous_region = CTX_wm_region(C);
+  WorkSpace *workspace = previous_window ? WM_window_get_active_workspace(previous_window) :
+                                         bmain->workspaces.first;
+  Scene *scene = previous_window ? previous_window->scene : bmain->scenes.first;
+  if (!workspace || !scene) {
+    BKE_report(op->reports, RPT_ERROR, "No component is available for shell UI");
+    return OPERATOR_CANCELLED;
+  }
+  wmWindow *win = wm_window_new(bmain, wm, NULL, false);
+  win->blui_shell_role = RNA_enum_get(op->ptr, "role");
+  win->scene = scene;
+  ViewLayer *view_layer = BKE_view_layer_default_view(scene);
+  STRNCPY(win->view_layer_name, view_layer->name);
+  win->sizex = RNA_int_get(op->ptr, "width");
+  win->sizey = RNA_int_get(op->ptr, "height");
+  win->windowstate = GHOST_kWindowStateNormal;
+  BKE_workspace_active_set(win->workspace_hook, workspace);
+  /* Append a private temporary screen, never retype/share a component screen and
+   * never introduce a seventh default workspace. Closing removes this layout. */
+  WorkSpaceLayout *layout = ED_workspace_layout_add(bmain, workspace, win, "BLUI Shell UI");
+  BKE_workspace_active_layout_set(win->workspace_hook, win->winid, workspace, layout);
+  bScreen *screen = BKE_workspace_layout_screen_get(layout);
+  screen->temp = true;
+  CTX_wm_window_set(C, win);
+  CTX_wm_area_set(C, NULL);
+  CTX_wm_region_set(C, NULL);
+  wm_window_ghostwindow_ensure(wm, win, false);
+  WM_check(C);
+  ScrArea *area = screen->areabase.first;
+  CTX_wm_area_set(C, area);
+  ED_area_newspace(C, area, SPACE_INFO, false);
+  ((SpaceInfo *)area->spacedata.first)->blui_shell_ui = true;
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    if (region->regiontype == RGN_TYPE_HEADER) {
+      region->flag |= RGN_FLAG_HIDDEN;
+    }
+  }
+  ED_screen_change(C, screen);
+  ED_screen_refresh(wm, win);
+  const bool success = win->ghostwin != NULL;
+  if (success) {
+    GHOST_SetTitle(win->ghostwin, "BLUI Shell UI");
+    ED_area_tag_redraw(area);
+  }
+  else {
+    wm_window_close_force(C, wm, win);
+  }
+  CTX_wm_window_set(C, previous_window);
+  CTX_wm_area_set(C, previous_area);
+  CTX_wm_region_set(C, previous_region);
+  return success ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
 
 int wm_window_new_main_exec(bContext *C, wmOperator *op)

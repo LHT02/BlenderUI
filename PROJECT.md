@@ -1,5 +1,129 @@
 # BLUI 项目交接
 
+## 最新交付：独立任务栏、开始菜单与原生异步缩略图（2026-10-13）
+
+- 基线 cf4c706，仍只向用户 gh/blui 提交。主代理统一构建及 GUI 回归，子代理分模块实现。
+- runtime/client/worker 新增 previews、task_launch 与 start_* 白名单接口；原生 shell role
+  窗体在没有节点画布时仍保持任务、显示器、图标及恢复守护心跳，缩略图失败降温。
+- 开始菜单与多窗选择是独立原生窗体，不能把长菜单裁切在任务栏的薄 client 区域内。
+- 本轮Release/实际UI/便携包/ZIP校验已完成。下列保留集成与修复记录；最终结果见本节末尾。
+- 新增 folder_panel_model/folder_panels：文件夹映射到原生 Frame，扫描仍用隔离 scan Job，
+  延后到没有模态交互才通过可撤销操作应用。刷新保留手工卡片和已有位置，只清理该面板
+  自动生成的过期引用；目录、颜色、来源标记随既有原子布局保存，不操作真实文件。
+- 开始菜单请求在创建 helper 前检查程序身份/固定项 schema 与枚举动作；结果消费不依赖
+  菜单窗是否仍开着，关闭菜单后启动结果与固定项保存仍能完成。增加面板同步/schema纯回归。
+- 已为新开始菜单、文件夹面板补充简繁中文词条；任务再启动错误进入任务栏状态而非静默。
+  当前桌面纯服务122项与面板纯回归6项通过，native编译与实际UI仍待验证。
+- runtime新增任务栏 pending 服务唤醒入口，修正 Files-only 下初始显示器快照为空而无法开栏的
+  循环等待；增加独立配置/自有文件夹的原生映射面板回归，不操作用户文件或已有进程。
+- 原生普通组件开窗排除 shell role 复制源；只剩任务栏时走正常默认尺寸的 fresh 分支，
+  防止从开始菜单或托盘打开 Files 被复制成48px薄窗。首次编译发现新DNA字段对齐问题，
+  子代理补齐明确padding后再统一编译，未运行或替换用户软件。
+- 编译继续发现预览入口 UTF16转换函数名拼写不匹配本仓库头文件，主代理按utfconv.h修正；
+  已完成其余897个编译步骤，重新增量链接并随后做实际缩略图夹具。
+- 旁路审查补强：显示器定位失败不能让Blender timer停掉全部桌面服务，原生shell更新有
+  操作异常边界与3秒退避；截断目录快照不能证明未返回引用已删除，保留这些卡片。
+- 原生Frame复制会复用自定义ID，已在请求/持久化前修复唯一身份，并只将真正受其管理的
+  直接子卡片来源标记随父Frame一起更新，手工卡片不被错误认领。
+- 图标独立helper也补充2.5秒自身看门狗，避免撤销/加载取消Python父worker时留下卡在Shell的
+  孙进程。新任务栏词条补简繁中文；DESKTOP/START_MENU说明真实功能、参考来源与边界。
+- Release链接完成；缩略图原生13项（含无窗口、离线仅读缓存）通过，任务分组/再启动18项、
+  shell角色生命周期14项、开始菜单隔离IPC671应用身份只读核验通过，仍待完整UI回归。
+- 原生文件夹面板初次GUI回归通过；补充“复制Frame后首次刷新目标/来源标记”实测，以及按
+  全部关联桌面和共享组计算新增卡片预算，防止扫描把整板推到不可持久化的1000项上限外。
+- 开始菜单真实GUI发现内部C Operator不一定出现在bpy.types，误走旧版props fallback；
+  子代理改用get_rna_type验证真实注册状态后继续回归，不以mock通过代替实际可用。
+- 文件夹面板原生fixture补950个组内节点后再映射200项的预算场景，新增项必须在整图上限内，
+  且最终snapshot仍可被严格模型验证；开始菜单能力检测增加2项回归共27项通过。
+- 真开始菜单GUI通过独立screen/正常高度、内存搜索、固定项原子落盘、复用/开始切换和
+  实际Escape。原文件工作区保持原样，全程无真实应用启动、电源动作或系统任务栏隐藏。
+- 文件加载的窗口匹配同样排除旧shell HWND复制源；only-taskbar保存时新的窗口链为空，
+  不再把NULL传到substitute_old；只有真实旧普通窗才能复用句柄，shell样式不会污染普通窗。
+- 独立栏GUI通过Files-only pending、私有INFO/noCaption/noActivate、单图标分组/真实图标、
+  多窗选择、Win10/11切换、自身最小化恢复、Escape及only-bar组件正常尺寸。
+- 补守护确认隐藏系统栏后的原生栏贴物理屏幕底边：仅定位带合法TASKBAR role/身份的自有
+  HWND，不改系统workarea/AppBar/注册表；恢复时退回work底边，新增纯几何回归。
+- 新增check_shell_persistence保存/回读夹具，所有对象跨load重新查找；三角色重复保存、
+  普通INFO保留、orphan清理及only-taskbar保存加载/普通窗样式待验证。隐藏状态GUI仅mock
+  守护状态并定位QA自有任务栏，绝不真正隐藏用户系统栏。
+- 保存回读fixture在open_mainfile时不跨Main替换保留temp_override的旧Window/Area恢复栈，
+  跟正常加载一样从当前进程上下文进入，加载后才fresh lookup。
+- 全部纯服务203项通过，helper三角色3轮保存/加载及only-taskbar保存/加载实际通过。
+  单窗切换读取点击瞬间真实foreground（仍双重窗口身份校验），不依赖几秒前的active缓存；
+  新增点击状态回归与任务栏/开始菜单截图采样，验证真的绘制而非仅RNA尺寸正确。
+- 用户追加Shift+P：选中项通过原生node.join形成新Frame，位置不变、支持UNDO/组内操作，
+  空选择不创建空框；菜单入口、本地化与使用说明同步。本轮仍继续原任务打包验证。
+- 自动化进程可能被Windows前台权限拒绝，任务栏fixture只mock自身目标的foreground读取
+  来覆盖切换分支；实际最小化/恢复仍操作经核验的自有HWND，拒绝激活必须明确报告。
+- 真截图发现PreviewImage只有大预览slot，operator/menu的小icon slot为空，导致已加载icon_id
+  仍绘制空应用按钮；现在同时提供两slot并把双份像素计入既有预算，含方向/尺寸去重回归。
+- “新窗口”组件菜单增加独立任务栏入口，Files-only用户不必先打开画布/F3；应用图标修复后
+  真任务栏截图采样54色，开始菜单135色，均已查看。文件夹复制首次刷新、整图预算GUI通过。
+- Shift+P三预设原生按键/无空选框/世界坐标/JSON/UNDO/组内框实际通过；最终全部纯测试
+  207项，原生缩略图13项、独立任务栏/开始菜单、保存回读与托盘6轮回归通过。
+- 新便携目录20261013-shell已stage，README/DESKTOP/START_MENU与必需fileicon helper齐全；
+  原版本与用户运行的4个BLUI进程保持原样。接下来验证便携包自身GUI与ZIP完整性后推送。
+- 最后截图尺寸核验发现GHOST初始化setState会给开始/选择菜单重新添加CAPTION；这条常规
+  状态初始化现仅作用NORMAL，全部shell窗保留构造时的无标题样式，补真实菜单样式断言。
+- 菜单实际已600x680、136种绘制颜色；异步QA等待期间Windows可能让菜单失焦正常关闭，
+  toggle测试先显式建立“菜单已打开”前置状态再点击，防把正确打开误判为收起失败。
+- 便携QA raw exit复现两个旧shell_worker留存锁住python.exe；新增独立worker_lifetime模块：
+  disposable shell/desktop助手仅以SYNCHRONIZE权限持有原父进程HANDLE，父退出时仅退出自己，
+  句柄身份不随PID复用改变。原任务栏恢复守护不接此机制，继续可存活恢复系统栏。
+- 两个明确为本轮便携QA遗留、父PID已退出的只读菜单助手已结束，不终止任何用户BLUI；
+  新增真实自建父进程raw-exit夹具，验证disposable子进程自行退出而非外部清理模拟。
+- 最终全部纯测试210项通过；原生SHIFT+P三预设、独立任务栏/开始菜单、映射面板、
+  保存回读/only-bar正常窗、托盘6轮回归和真实parent退出生命周期通过。
+- 便携包实际开始菜单600x680无CAPTION/绘制136色通过；缩略图13项再次在便携EXE通过。
+  不接管通知区、系统托盘、Win键、Jump List和完整UWP索引，不声明已完整替换Windows Shell。
+- 发行目录 `D:/BlenderUI/dist/BLUI-1.0.0-windows-x64-20261013-shell/` 及同名ZIP；ZIP
+  3811文件、125525155字节，CRC全部通过，无PDB/pyc/__pycache__，含必需helper与三份说明。
+  EXE与最终构建SHA256一致：`785D1E4568EFD27A8F8A2369BA5EEE2F898D9D9B80EB605991FC87F38CE6CC84`。
+- Git只推用户gh/blui，普通提交，不触碰origin；既有用户版本与运行进程均保留。
+  未跟踪check_navigation.py/.cmd不提交；本轮源码/说明/测试一并正常提交。
+
+## 开发中：原生开始菜单（2026-10-13）
+
+- 参考 Open-Shell 官方程序目录、固定/最近与异步搜索机制；未复制代码、安装或注入
+  Open-Shell，不替换 Explorer。新增独立纯模型/worker backend；仅索引用户和公共
+  KnownFolder Programs 的 `.lnk/.exe`，保留重定向、不解析快捷方式、不跟随子目录
+  junction；有目录深度、条目、时间和响应上限。
+- 搜索仅内存匹配应用名称/分类，不能执行搜索字符串；显式启动重新验证根路径、
+  文件身份并在写入/删除保护下复查；固定/最近条目原子保存、备份、版本冲突保护。
+- 系统入口为固定 allowlist；锁屏/重启/关机仅用户确认后调用原生 Windows API，
+  不强制终止未保存应用。原生 INFO/窗口 Panel 分离为独立 `STARTMENU` 角色窗，
+  避免窄任务栏客户区裁剪；入口不依赖桌面/节点区域，固定、分页和选择后关窗皆仅
+  操作自有开始菜单角色。新增 UI/异步 facade，root 注册/worker 接入已完成，实际
+  原生开始菜单窗体 UI 回归由主代理串行执行。
+- 对外 worker API 固定为 `start_index/start_state/start_launch/start_system`，响应验证
+  `start_menu_model.validate_index`；root 已接入注册、worker 和异步 facade tick。
+- 新增 `test_start_menu.py`：严格模式、Unicode/命令文本搜索、Programs 范围/重定向、
+  扫描预算、reparse拒绝、两次启动身份验证、原子备份/版本冲突和异步状态竞争，
+  所有启动/电源动作仅 mock，不打开用户程序、不改变真实电源状态。
+- 纯身份回归发现 Windows `DirEntry.stat().st_ino` 固定为 0，和启动复核的 `os.stat`
+  文件索引不一致；扫描只对合格 `.lnk/.exe` 再用 `os.stat` 捕获真实身份，避免所有
+  应用被误判“索引后变化”。框架允许包含空格的真实文件名，不将其当成命令执行。
+- 23 项开始菜单纯回归全通过。补任务栏 Start 再次点击关闭、ESC 仅关闭自有
+  STARTMENU/TASK_CHOOSER 的 operator；曾获得前台后失焦关闭 Start，自有文本/菜单/
+  确认对话框模态期间保留窗口，前台验证失败不假定可关窗、不保存过期 RNA 对象。
+- 真实机器只读扫描得到 671 个 Programs 应用，671 项路径/文件身份复核全通过，
+  约 1.7 秒，无启动/电源操作。新增 `START_MENU.md` 明确 Programs/UWP 边界与官方
+  设计参考、`check_start_menu_services.py` 只读辅助 IPC 验收和真实 owned-fixture 文件
+  写入保护回归；开始菜单不共享/改写系统固定项或使用历史。
+- 真实 fixture guard 验证进一步发现 READ_ATTRIBUTES 不参与 Windows 共享冲突；
+  改成 GENERIC_READ + FILE_SHARE_READ 才真正允许读、拒绝同时写入/删除，避免名义保护。
+- 24 项纯回归及真正隔离 worker 671 项只读索引/身份验证通过。新增主代理可串行运行
+  的 `check_start_menu_ui.py`，覆盖独立角色屏/窗口尺寸、只读搜索、owned CONFIG 固定
+  保存、正常窗口复用、任务栏再次点击收起及真实 Escape；不启动应用/执行电源操作。
+- 补异步 refresh 先读取旧设置、save ACK 先完成再返回 index 的竞态：index 回复的
+  revision 低于当前偏好时不回退固定列表。增加对应回归（总计 25 项）。
+- 初次没有固定项时展示“全部应用”，已有内存固定项则打开固定页；明确进入空固定页
+  不再误显示“全部应用”，避免筛选标签和实际结果不一致。Windows 设置/电源设置 URI
+  已按微软官方当前文档核实，文档补充出处。
+- 原生 UI 回归发现 INTERNAL C operator 不一定出现在 `bpy.types`，原检测误走同窗
+  props fallback；改用 operator `get_rna_type()` 查询真实注册，补该场景及缺失时回退
+  的纯回归，主代理再次安装脚本后重跑原生界面。
+
 ## 最新交付：框选与开窗修复（2026-10-13）
 
 - 基线 `998058fbf7673c383fa2a647f3dabff5b2e880aa`；分支 `blui`，正常提交并推送到
@@ -295,3 +419,62 @@
 
 - 第三方 Shell 扩展首次加载仍可能慢，但在隔离进程运行，已有分组结果保持可用。
 - 本项目尚不声称完整替代 Windows Explorer。
+
+## 独立任务栏子代理进展（2026-10-13）
+
+- 原生新增明确的 TASKBAR / STARTMENU / TASK_CHOOSER 窗口角色和只读 RNA 标识。
+  新窗使用自有临时 INFO layout，不复用桌面 footer，不新增默认工作区；Windows
+  创建即为无标题栏 tool window，避免辅助栏/菜单混入应用任务列表。
+- INFO 主区域按角色使用 Blender 原生 Header / Panel 绘制；菜单与多窗选择
+  使用独立正常高度窗体，避免被 48px 任务栏客户区裁剪。待主代理编译/真实 QA。
+- 新增纯应用分组/多屏几何模型；任务快照增加内核验证的 executable、app_id、
+  group_key、monitor，保留原 PID/线程/创建时间/类名身份校验并过滤 DWM cloak。
+  显式新实例只二次验证当前桌面程序的完整 exe 路径、不经命令壳；UWP/代理宿主
+  与不可验证窗口不提供此动作。子代理不改共享 client/worker，主代理接入 task_launch。
+- 独立 taskbar_windows 模块以新鲜 RNA 角色+自身 HWND 双重约束窗口生命周期；
+  每连接显示器一栏，物理工作区/DPI定位；断屏只回收自身栏，自有菜单夹在对应
+  显示器工作区。布局支持左侧/居中，菜单另开 STARTMENU/TASK_CHOOSER 原生窗。
+- TASKBAR 单独 NOACTIVATE，STARTMENU/CHOOSER 保留键盘焦点；角色窗不写入
+  启动文档窗口链，回读角色清正常；新增菜单 ESC 原生键位，正常组件窗复制
+  仍由 calloc 建立 NORMAL 角色。辅助窗口恢复只在显示拓扑改变时检查。
+- 新增独立任务栏原生 Header、应用多窗选择/设置 Panel、应用图标分组动作模块。
+  画布 footer 已撤去重复任务按钮和时钟，只留文档/文件操作状态；菜单增加独立
+  栏入口与 Folder Panel 入口。单窗点选激活/最小化，多窗独立选择，Shift/中键
+  新实例和明确按钮复用隔离 task_launch；旧系统栏显式恢复入口持续保留。
+- 首次统一构建 makesdna 指出 wmWindow 新角色导致 64bit 对齐不足，已添加明确
+  4-byte padding 保持 8-byte 总增量；未运行子代理 GUI/Ninja，主代理继续编译。
+- 原生应用分组顺序跨激活保持稳定；保留明确 APPWINDOW 的自有子窗任务，排除
+  tool/cloaked 窗；Shift/中键 invoke 增加安全错误报告，不传播异常到交互事件循环。
+- 新增纯测试夹具，覆盖应用唯一分组、UWP/未知宿主不误合并、原始快照不变、
+  负坐标/DPI多屏菜单夹取、身份/路径变更与高权限只读拒绝、新实例无shell参数。
+- 应用分组与安全启动纯测试 18/18 通过，日志 `D:/BlenderUI/build/taskbar-groups.log`。
+  新增模拟 bpy role-window 夹具验证每屏唯一栏、pending服务、断屏/失败回收只作用
+  自有辅助角色、正常窗不关闭，以及菜单定位无跨屏/稳态不重复系统定位调用。
+- 首次 Files 入口监视器快照尚空时，菜单只记录不可变源/目标身份并非阻塞等待；
+  正常高度原生窗先响应键盘焦点，后台快照回来兑现定位。关闭/注销清延迟记录。
+- 辅助 INFO layout 采用明确持久化内部标记；WM_check 只清理已无任何窗口引用的
+  标记 layout/screen，不处理普通原生临时编辑器。TASKBAR 的后续状态初始化也跳过
+  激活；Files-only 首次开栏失败保留 pending 服务意图，退避后可重试不丢请求。
+- 已提供主代理串行运行的 `check_taskbar_ui.py`（子代理未运行），覆盖真实自有
+  窗口的 pending 开栏、无标题/不激活、INFO独立screen、exe图标缓存、单图标分组、
+  多窗选择/ESC、布局切换、自身最小化恢复及只剩栏时新建 Files 正常尺寸。
+- 各屏独立任务筛选时使用各屏独立图标顺序缓存，避免不同显示器绘制互相重排；
+  居中布局两侧补偿固定托盘/时钟宽度，应用区围绕整窗中线而非剩余宽度居中。
+
+## 2026-10-13 桌面文件缩略图（开发中）
+
+- 新增 BLUI.exe 专用早期 `--blui-file-preview` 隔离入口，复用文件管理器 `IMB_thumb_manage` 的图像、视频、Blend/资源嵌入预览与字体缩略图逻辑；不启动窗口、Python 或用户启动文件。
+- 子进程独立 3 秒看门狗、较低优先级、尝试 768 MiB 单进程内存上限；输出仅 256 像素上限的 RGBA。云端离线占位文件只读取已有缩略图缓存，不为预览触发下载。
+- 新接口与快捷方式高质量图标助手分开，失败回退原图标。尚待缓存集成、构建和测试。
+- 新增 `thumbnails.py` 与 `thumbnail_cache.py`：每批 2 项、3.5 秒父层超时、严格 256×256/像素长度校验；主线程只查询内存和创建预览 ID，60 秒异步复查文件变化，失败 120 秒降温、保留原图标。
+- 桌面 FileCard 优先显示独立缩略图缓存，快捷方式、目录及不能预览的文件维持既有高质量图标。缓存上限 1000 路径/32 MiB 像素并去重；队列提供 retry/fail/cancel_pending，异常和 Undo 不会锁死加载项。
+- 增加纯协议/缓存测试（方向、透明通道、尺寸与长度、超时/崩溃回退、候选字符串筛选、内存预算、降温重试、异步更新）；补原图标队列 admission 失败重排，防止请求繁忙时永远不再加载。
+- 纯缩略图协议与缓存测试已通过 16 项；新增原生无 GUI 夹具，覆盖透明 PNG 方向、宽图缩放、MTime 更新、Blend 内嵌预览、真实字体/AVI、损坏与不存在文件回退，等待主构建后执行。夹具先检查新 binary 入口特征，防止对旧 EXE 传未知参数意外启动正常 UI。
+- 预览早入口先检查云端离线属性；仅在线文件先初始化 FFmpeg 再调用原文件管理器扩展分类，以保留 `.ogg` 的视频/纯音频判定行为，避免分类探测提前读取云文件。未更改原文件管理器自身预览流程。
+- 原生夹具补充私有文件 OFFLINE 属性模拟（只回已有缓存、不解码修改后的源）和自有 helper PID 全窗口只读枚举，检查后台预览不创建空白 BLUI 或隐藏托盘宿主窗。
+
+## 2026-10-13 Shift+P 原生图标框回归夹具
+
+- 新增 `blui/tools/check_canvas_frame_shortcut.py`，用真实窗口输入验证 Blender、Blender_27x、Industry_Compatible 三套键位预设的 Shift+P。覆盖选中 A/B 加原生 Frame、未选 C 留框外、可见世界坐标不变、无残留模态、空选不建框、JSON 保存/重建父子关系、原生 Undo 及真实节点组 edit_tree 内加框。
+- 夹具只使用自有进程与临时文件；停用桌面持久化和异步定时器，不操作系统任务栏、真实桌面文件或用户配置。Undo 后按自有 HWND 和树名称重新取得 RNA，避免缓存已替换的 Main 指针。
+- 仅完成脚本语法检查（通过）；子代理未运行 GUI、构建或提交，待主代理统一构建后串行实测。

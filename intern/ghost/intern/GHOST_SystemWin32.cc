@@ -237,7 +237,9 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(const char *title,
       false,
       (GHOST_WindowWin32 *)parentWindow,
       ((glSettings.flags & GHOST_glDebugContext) != 0),
-      is_dialog);
+      is_dialog,
+      ((glSettings.flags & GHOST_glBluiShellWindow) != 0),
+      ((glSettings.flags & GHOST_glBluiTaskbarWindow) != 0));
 
   if (window->getValid()) {
     /* Store the pointer to the window */

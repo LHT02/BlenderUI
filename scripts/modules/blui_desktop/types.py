@@ -78,8 +78,8 @@ class BLUI_FileCard(Node):
         self['blui_id'] = __import__('uuid').uuid4().hex
 
     def draw_buttons(self, _context, layout):
-        from . import icon_cache
-        icon = icon_cache.value(self.filepath)
+        from . import icon_cache, thumbnail_cache
+        icon = thumbnail_cache.value(self.filepath, self.folder) or icon_cache.value(self.filepath)
         column = layout.column(align=True)
         column.alignment = 'CENTER'
         if not icon:
